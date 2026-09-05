@@ -45,5 +45,5 @@ So for models: **no code gap** — point at the pack (`SOH3D_TEXPACK`) and it wo
    texture appears in-world.
 3. **Assets:** decide pack sourcing per game (bundle/point-at for OoT3D; MM3D pack or upscaler).
 
-This work lives mostly in soh3d's renderer + the shared `src/cmb3d` core; it composes with the
-MM integration (`docs/MM_INTEGRATION.md`) since both games share that renderer.
+This work lives mostly in Zelda3D's renderer and shared `cmb3d` core; it composes with the native
+MM integration (`docs/MM_NATIVE.md`) because both games share that renderer.

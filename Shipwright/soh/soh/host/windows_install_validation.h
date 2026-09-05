@@ -8,8 +8,10 @@ class WindowsInstallValidation {
     bool Advance();
 
   private:
+#ifdef _WIN32
     enum class Phase { TempDirectory, Permissions, OneDrive, Done };
 
     Phase phase_ = Phase::TempDirectory;
     std::string installPath_;
+#endif
 };

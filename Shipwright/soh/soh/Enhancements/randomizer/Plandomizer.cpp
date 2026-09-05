@@ -9,7 +9,7 @@
 
 #include <fstream>
 #include <filesystem>
-
+#include <iterator>
 
 #include "soh/SohGui/ImGuiUtils.h"
 #include "soh/Enhancements/randomizer/logic.h"
@@ -17,8 +17,6 @@
 #include "soh/Enhancements/randomizer/rando_hash.h"
 #include "soh/Enhancements/randomizer/Traps.h"
 #include "soh/Enhancements/randomizer/3drando/shops.hpp"
-
-#include <fast/Fast3dGui.h>
 
 #include <fast/Fast3dGui.h>
 
@@ -998,7 +996,7 @@ void PlandomizerDrawOptions() {
                                                     ImVec4(0, 0, 0, 0), ImVec4(1, 1, 1, 1));
                     ImGui::PopStyleVar();
                     if (upRet) {
-                        if (hash + 1 >= gSeedTextures.size()) {
+                        if (hash + 1 >= std::ssize(gSeedTextures)) {
                             hash = 0;
                         } else {
                             hash++;
@@ -1020,7 +1018,7 @@ void PlandomizerDrawOptions() {
                             hash--;
                         }
                     }
-                    if (index != spoilerHash.size() - 1) {
+                    if (index != std::ssize(spoilerHash) - 1) {
                         ImGui::TableNextColumn();
                     }
                     ImGui::PopID();

@@ -1,11 +1,7 @@
-/* Zelda3D RmlUi menu — Dusklight-style layout, adapted to Ship of Harkinian.
-   Ported from Dusklight's res/rml/window.rcss + tabbing.rcss (TP PC port, CC0).
+/* Zelda3D RmlUi product menu.
 
-   Deliberate deviations from Dusklight (see scratch/handoff_rmlui_dusklight.md and the
-   zelda3d-rmlui-menu memory):
-   - Font: Dusklight uses "Fira Sans" / "Fira Sans Condensed" + "Material Symbols Rounded".
-     Only LatoLatin is vendored here, so every family maps to LatoLatin and icons are dropped.
-   - Units: authored in `dp` (density-independent pixels), like Dusklight. SohRmlUi sets the context's
+   The bundled LatoLatin font keeps the menu self-contained and image-backed controls provide icons.
+   Units are authored in `dp` (density-independent pixels). SohRmlUi sets the context's
      density-independent-pixel ratio to the window's display content scale (SDL_GetWindowDisplayScale),
      so every dp here scales 1:1 on a 96-dpi monitor and grows on HiDPI / fractional-scaled displays.
      Relative units (%) are unaffected and keep the panel filling the window at any scale.
@@ -26,8 +22,8 @@ body {
 	width: 100%;
 	height: 100%;
 	padding: 64dp;
-	/* Dim the whole window so the menu reads as a modal cover over the game (Dusklight uses a
-	   backdrop blur here, which the Vulkan render interface can't do yet — a scrim is the stand-in). */
+	/* Dim the whole window so the menu reads as a modal cover over the game. The Vulkan render
+	   interface cannot provide a backdrop blur yet, so a scrim is the stand-in. */
 	background-color: rgba(0, 0, 0, 82%);
 	font-family: LatoLatin;
 	font-weight: normal;
@@ -38,8 +34,7 @@ body {
 
 /* The window: a full-window modal panel. It fills the body's content box (the whole window minus the
    body's dp padding) at every resolution — no fixed max size, so it never shrinks to a small island on
-   a large or HiDPI display. Dusklight scales/fades it in on open via a transform+filter transition; we
-   render it in its open state directly (no filter). */
+   a large or HiDPI display. It renders directly in its open state without a filter transition. */
 window {
 	display: flex;
 	flex-flow: column;
@@ -168,7 +163,7 @@ select-button:focus value {
 	color: #C2A42D;
 }
 
-/* --- Scrollbar (matches Dusklight's slim gold-on-cream bar) ------------------------------- */
+/* --- Scrollbar ----------------------------------------------------------------------------- */
 scrollbarvertical {
 	width: 8dp;
 	margin: 4dp 4dp 4dp 0;

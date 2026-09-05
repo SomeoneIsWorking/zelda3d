@@ -1,20 +1,14 @@
 # Majora's Mask in Zelda3D — the native (2S2H) integration plan
 
-**Status:** live keystone doc for the MM side (2026-07-01). Supersedes `MM_INTEGRATION.md` and
-`MM_MILESTONE4.md` (both recomp-era, now historical). Decision record: `mm-renderer-topology`
-memory. This captures WHY native, the research-grounded facts, the key decisions, and the
-milestone ladder — so none of it is re-derived.
+**Status:** live keystone doc for the MM side. This records the native ownership boundaries,
+research-grounded facts, and remaining integration milestones.
 
 ## Decision (settled 2026-07-01, user)
 
-Get MM the **fully native** way — the **native MM decomp on libultraship**, i.e. the
-**2 Ship 2 Harkinian (2S2H)** model — exactly how soh3d gets OoT from Ship of Harkinian.
-**No Zelda64Recomp, no static recompilation, no MIPS toolchain, no RDRAM/F3DEX transcoder.**
-The recomp work (`src/mm_host/`, `src/n64dl/`, `tools/n64dl_*`) is abandoned reference code.
-
-**Why:** user does not want to rely on MIPS at all. Zelda64Recomp is MIPS recompilation by nature
-(the whole game core is the ROM's MIPS recompiled to C). The only genuinely MIPS-free way to get MM
-is the native decomp. See the `mm-renderer-topology` memory for the full reversal rationale.
+MM runs through the **native MM decomp on libultraship**, using the **2 Ship 2 Harkinian (2S2H)**
+engine model just as Zelda3D's OoT branch uses Ship of Harkinian. The maintained implementation is
+the native game source plus focused adapters to the shared renderer, asset, input, and launcher
+owners.
 
 ## Grounded facts (research 2026-07-01 — cite, don't re-derive)
 

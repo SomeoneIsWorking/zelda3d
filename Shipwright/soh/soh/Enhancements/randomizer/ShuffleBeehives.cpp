@@ -13,12 +13,12 @@
 extern "C" {
 #include "src/overlays/actors/ovl_Obj_Comb/z_obj_comb.h"
 extern PlayState* gPlayState;
+void ObjComb_ChooseItemDrop(ObjComb* objComb, PlayState* play);
 }
 
 extern void EnItem00_DrawRandomizedItem(EnItem00* enItem00, PlayState* play);
 
 void ObjComb_RandomizerChooseItemDrop(ObjComb* objComb, PlayState* play) {
-    s16 params = objComb->actor.params & 0x1F;
     const auto beehiveIdentity = ObjectExtension::GetInstance().Get<CheckIdentity>(&objComb->actor);
 
     if (RAND_GET_OPTION(RSK_SHUFFLE_BEEHIVES) && beehiveIdentity != nullptr &&
@@ -31,20 +31,7 @@ void ObjComb_RandomizerChooseItemDrop(ObjComb* objComb, PlayState* play) {
         return;
     }
 
-    if ((params > 0) || (params < 0x1A)) {
-        if (params == 6) {
-            if (Flags_GetCollectible(play, (objComb->actor.params >> 8) & 0x3F)) {
-                params = -1;
-            } else {
-                params = (params | (((objComb->actor.params >> 8) & 0x3F) << 8));
-            }
-        } else if (Rand_ZeroOne() < 0.5f) {
-            params = -1;
-        }
-        if (params >= 0 && !CVarGetInteger(CVAR_ENHANCEMENT("NoRandomDrops"), 0)) {
-            Item_DropCollectible(play, &objComb->actor.world.pos, params);
-        }
-    }
+    ObjComb_ChooseItemDrop(objComb, play);
 }
 
 void ObjComb_RandomizerWait(ObjComb* objComb, PlayState* play) {
@@ -108,8 +95,8 @@ static CheckIdentity IdentifyBeehive(s32 sceneNum, s16 xPosition, s32 respawnDat
 void ObjComb_RandomizerInit(void* actor) {
     ObjComb* objComb = static_cast<ObjComb*>(actor);
     s16 respawnData = gSaveContext.respawn[RESPAWN_MODE_RETURN].data & ((1 << 8) - 1);
-    auto beehiveIdentity = IdentifyBeehive(gPlayState->sceneNum, (s16)objComb->actor.world.pos.x, respawnData);
-    ObjectExtension::GetInstance().Set<CheckIdentity>(actor, std::move(beehiveIdentity));
+    ObjectExtension::GetInstance().Set<CheckIdentity>(
+        actor, IdentifyBeehive(gPlayState->sceneNum, (s16)objComb->actor.world.pos.x, respawnData));
     objComb->actionFunc = (ObjCombActionFunc)ObjComb_RandomizerWait;
 }
 

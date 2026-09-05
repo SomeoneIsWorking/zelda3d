@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.SomeoneIsWorking.Zelda3D</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <developer id="io.github.someoneisworking">
+    <name>SomeoneIsWorking</name>
+  </developer>
+  <name>Zelda3D</name>
+  <summary>Native launcher for Ocarina of Time and Majora's Mask 3D ports</summary>
+  <description>
+    <p>
+      Zelda3D runs the Ship of Harkinian and 2 Ship 2 Harkinian cores from one
+      native launcher. On first launch it asks for the user's own compatible
+      game images or ZIP archives and stores generated data in the operating
+      system's user configuration directory.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.SomeoneIsWorking.Zelda3D.desktop</launchable>
+  <provides>
+    <binary>zelda3d</binary>
+  </provides>
+  <categories>
+    <category>Game</category>
+    <category>AdventureGame</category>
+  </categories>
+  <url type="homepage">https://github.com/SomeoneIsWorking/zelda3d</url>
+  <content_rating type="oars-1.1" />
+</component>

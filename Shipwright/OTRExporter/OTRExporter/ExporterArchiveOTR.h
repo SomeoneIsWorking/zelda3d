@@ -13,7 +13,7 @@
 class ExporterArchiveOtr : public ExporterArchive {
   public:
     ExporterArchiveOtr(const std::string& path, bool enableWriting);
-    ~ExporterArchiveOtr();
+    ~ExporterArchiveOtr() override;
 
     int CreateArchive(size_t fileCapacity) override;
     bool AddFile(const std::string& filePath, void* fileData, size_t fileSize) override;

@@ -13,9 +13,20 @@ file(GLOB_RECURSE zelda3d_shared_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/player/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/object/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/object/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/audio/*.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/audio/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/platform/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/platform/*.h")
 
-add_library(zelda3d_shared STATIC ${zelda3d_shared_sources})
+find_package(SDL3 REQUIRED)
+find_package(libzip REQUIRED)
+find_package(nlohmann_json REQUIRED)
+find_package(spdlog REQUIRED)
+
+add_library(zelda3d_shared STATIC ${zelda3d_shared_sources}
+    extractor/n64_rom_validation.cpp
+    extractor/metadata/oot_rom_versions.cpp
+    extractor/metadata/mm_rom_versions.cpp
+    extractor/FastCrc32C.c)
 
 # Consumers include RELATIVE TO THIS DIR -- `#include "player/link_gear.h"`, `#include
 # "extractor/Extract.h"`. (This comment used to claim a `zelda3d_shared/` prefix, which never
@@ -25,6 +36,9 @@ target_include_directories(zelda3d_shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # dr_libs: PUBLIC so both games keep resolving <dr_wav.h> for the declarations, while the
 # implementation exists only in audio/dr_libs_impl.cpp here. Declared by the root CMakeLists.
 target_include_directories(zelda3d_shared PUBLIC ${dr_libs_SOURCE_DIR})
+
+target_link_libraries(zelda3d_shared PUBLIC SDL3::SDL3 nlohmann_json::nlohmann_json spdlog::spdlog
+    PRIVATE cmb3d lucent::zip)
 
 # Upstream third-party code; its warnings are not ours to fix and would drown the build.
 set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/audio/dr_libs_impl.cpp
@@ -43,10 +57,8 @@ set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/audio/dr_libs_impl.cpp
 # cost: it is two files to patch, two to audit, and two that can silently drift apart. Consumers
 # include it as "thirdparty/portable-file-dialogs.h" via the PUBLIC include dir above.
 #
-# extractor/ holds Extract.h AND Extract.cpp / FastCrc32C.c, but adds no sources HERE: those two are
-# globbed into each game's own target instead, the same mechanism port/ uses. They name no
-# game-specific type, so this library's contract would allow them — but they call the game's ZAPD
-# entry point and read its gBuildVersion* symbols, which this library does not link. The per-game
-# half is a RomVersionTable each game supplies from its own Extractor/RomVersions.cpp. Claim C070.
+# extractor/ owns complete N64 validation, both immutable version tables, and CRC once here.
+# Only Extract.cpp is compiled per core: it calls that core's ZAPD entry point/build symbols.
+# The per-core RomVersions adapter selects the same shared table used by first-run validation.
 
 set_target_properties(zelda3d_shared PROPERTIES POSITION_INDEPENDENT_CODE ON)

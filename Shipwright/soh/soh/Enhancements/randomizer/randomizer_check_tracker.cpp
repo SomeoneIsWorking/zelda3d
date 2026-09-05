@@ -1,6 +1,7 @@
 #include "soh/OTRGlobals.h"
 #include "soh/host/item_randomizer_bridge.h"
 #include "randomizer_check_tracker.h"
+#include "check_tracker_order.h"
 #include "randomizer_entrance_tracker.h"
 #include "randomizer_item_tracker.h"
 #include "randomizerTypes.h"
@@ -22,6 +23,8 @@
 #include "overlays/actors/ovl_En_GirlA/z_en_girla.h"
 
 #include <string>
+#include <iterator>
+#include <stdexcept>
 #include <sstream>
 #include <vector>
 #include <set>
@@ -187,7 +190,6 @@ std::unordered_map<RandomizerCheck, std::string> checkNameOverrides;
 
 bool ShouldShowCheck(RandomizerCheck rc);
 bool UpdateFilters();
-bool CompareChecks(RandomizerCheck, RandomizerCheck);
 bool CheckByArea(RandomizerCheckArea);
 void DrawLocation(RandomizerCheck);
 void LoadSettings();
@@ -312,9 +314,7 @@ uint16_t GetTotalChecksGotten() {
 bool IsCheckHidden(RandomizerCheck rc) {
     Rando::ItemLocation* itemLocation = OTRGlobals::Instance->gRandoContext->GetItemLocation(rc);
     RandomizerCheckStatus status = itemLocation->GetCheckStatus();
-    bool available = itemLocation->IsAvailable();
     bool skipped = itemLocation->GetIsSkipped();
-    bool obtained = itemLocation->HasObtained();
     bool seen = status == RCSHOW_SEEN || status == RCSHOW_IDENTIFIED;
     bool scummed = status == RCSHOW_SCUMMED;
     bool unchecked = status == RCSHOW_UNCHECKED;
@@ -665,7 +665,6 @@ void CheckTrackerItemReceive(GetItemEntry giEntry) {
                                                      (SceneID)gPlayState->sceneNum) != std::end(skipScenes)) {
         return;
     }
-    auto scene = static_cast<SceneID>(gPlayState->sceneNum);
     // Vanilla special item checks
     if (!IS_RANDO) {
         if (giEntry.itemId == ITEM_SHIELD_DEKU) {
@@ -1659,9 +1658,6 @@ void LoadSettings() {
 
 bool IsCheckShuffled(RandomizerCheck rc) {
     Rando::Location* loc = Rando::StaticData::GetLocation(rc);
-    if (loc->GetRCType() == RCTYPE_SHOP) {
-        auto identity = OTRGlobals::Instance->gRandomizer->IdentifyShopItem(loc->GetScene(), loc->GetActorParams() + 1);
-    }
     if (IS_RANDO) {
         return (loc->GetArea() != RCAREA_INVALID) &&        // don't show Invalid locations
                (loc->GetRCType() != RCTYPE_GOSSIP_STONE) && // TODO: Don't show hints until tracker supports them
@@ -1777,9 +1773,6 @@ void UpdateInventoryChecks() {
     }
 }
 
-void UpdateAreaFullyChecked(RandomizerCheckArea area) {
-}
-
 void UpdateAllAreas() {
     // Sort the entire thing
     for (int i = 0; i < RCAREA_INVALID; i++) {
@@ -1789,7 +1782,7 @@ void UpdateAllAreas() {
 
 void UpdateAreas(RandomizerCheckArea area) {
     if (checksByArea.contains(area)) {
-        areasFullyChecked[area] = areaChecksGotten[area] == checksByArea.find(area)->second.size();
+        areasFullyChecked[area] = areaChecksGotten[area] == std::ssize(checksByArea.find(area)->second);
     }
 }
 
@@ -1807,53 +1800,6 @@ void UpdateOrdering(RandomizerCheckArea rcArea) {
     }
     RecalculateAllAreaTotals();
     CalculateTotals();
-}
-
-bool IsEoDCheck(RandomizerCheckType type) {
-    return type == RCTYPE_BOSS_HEART_OR_OTHER_REWARD || type == RCTYPE_DUNGEON_REWARD;
-}
-
-bool CompareChecks(RandomizerCheck i, RandomizerCheck j) {
-    Rando::Location* x = Rando::StaticData::GetLocation(i);
-    Rando::Location* y = Rando::StaticData::GetLocation(j);
-    auto itemI = OTRGlobals::Instance->gRandoContext->GetItemLocation(i);
-    auto itemJ = OTRGlobals::Instance->gRandoContext->GetItemLocation(j);
-    bool iCollected = itemI->HasObtained();
-    bool iSaved = itemI->GetCheckStatus() == RCSHOW_SAVED;
-    bool jCollected = itemJ->HasObtained();
-    bool jSaved = itemJ->GetCheckStatus() == RCSHOW_SAVED;
-
-    if (!iCollected && jCollected) {
-        return true;
-    } else if (iCollected && !jCollected) {
-        return false;
-    }
-
-    if (!iSaved && jSaved) {
-        return true;
-    } else if (iSaved && !jSaved) {
-        return false;
-    }
-
-    if (!itemI->GetIsSkipped() && itemJ->GetIsSkipped()) {
-        return true;
-    } else if (itemI->GetIsSkipped() && !itemJ->GetIsSkipped()) {
-        return false;
-    }
-
-    if (!IsEoDCheck(x->GetRCType()) && IsEoDCheck(y->GetRCType())) {
-        return true;
-    } else if (IsEoDCheck(x->GetRCType()) && !IsEoDCheck(y->GetRCType())) {
-        return false;
-    }
-
-    if (i < j) {
-        return true;
-    } else if (i > j) {
-        return false;
-    }
-
-    return false;
 }
 
 bool IsHeartPiece(GetItemID giid) {
@@ -1964,6 +1910,9 @@ void DrawLocation(RandomizerCheck rc) {
                 ? Color_Unchecked_Extra
                 : Color_Unchecked_Main;
         extraColor = Color_Unchecked_Extra;
+    } else {
+        throw std::logic_error("Check tracker cannot draw invalid status " + std::to_string(status) + " for check " +
+                               std::to_string(rc));
     }
 
     // Main Text
@@ -2032,66 +1981,66 @@ void DrawLocation(RandomizerCheck rc) {
     // Draw the extra info
     txt = "";
 
-    if (status != RCSHOW_UNCHECKED) {
-        switch (status) {
-            case RCSHOW_SAVED:
-            case RCSHOW_COLLECTED:
-            case RCSHOW_SCUMMED:
-                if (IS_RANDO) {
-                    txt = itemLoc->GetPlacedItem().GetName().GetForLanguage(gSaveContext.language);
-                } else {
-                    if (IsHeartPiece((GetItemID)Rando::StaticData::RetrieveItem(loc->GetVanillaItem()).GetItemID())) {
-                        if (gSaveContext.language == LANGUAGE_ENG || gSaveContext.language == LANGUAGE_GER ||
-                            gSaveContext.language == LANGUAGE_JPN) {
-                            txt = Rando::StaticData::RetrieveItem(loc->GetVanillaItem()).GetName().english;
-                        } else if (gSaveContext.language == LANGUAGE_FRA) {
-                            txt = Rando::StaticData::RetrieveItem(loc->GetVanillaItem()).GetName().french;
-                        }
+    switch (status) {
+        case RCSHOW_UNCHECKED:
+            break;
+        case RCSHOW_SAVED:
+        case RCSHOW_COLLECTED:
+        case RCSHOW_SCUMMED:
+            if (IS_RANDO) {
+                txt = itemLoc->GetPlacedItem().GetName().GetForLanguage(gSaveContext.language);
+            } else {
+                if (IsHeartPiece((GetItemID)Rando::StaticData::RetrieveItem(loc->GetVanillaItem()).GetItemID())) {
+                    if (gSaveContext.language == LANGUAGE_ENG || gSaveContext.language == LANGUAGE_GER ||
+                        gSaveContext.language == LANGUAGE_JPN) {
+                        txt = Rando::StaticData::RetrieveItem(loc->GetVanillaItem()).GetName().english;
+                    } else if (gSaveContext.language == LANGUAGE_FRA) {
+                        txt = Rando::StaticData::RetrieveItem(loc->GetVanillaItem()).GetName().french;
                     }
                 }
-                break;
-            case RCSHOW_IDENTIFIED:
-            case RCSHOW_SEEN:
-                if (IS_RANDO) {
-                    const auto checkType = loc->GetRCType();
-                    const bool hideMerchantName =
-                        checkType == RCTYPE_MERCHANT &&
-                        (!OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_MERCHANT_TEXT_HINT) || mystery);
-                    const bool hideScrubName =
-                        checkType == RCTYPE_SCRUB &&
-                        (!OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_SCRUB_TEXT_HINT) || mystery);
-                    const bool hideShopName = checkType == RCTYPE_SHOP && mystery && IsMysteryShopItem(rc);
-                    const bool revealItemName = !(hideMerchantName || hideScrubName || hideShopName);
+            }
+            break;
+        case RCSHOW_IDENTIFIED:
+        case RCSHOW_SEEN:
+            if (IS_RANDO) {
+                const auto checkType = loc->GetRCType();
+                const bool hideMerchantName =
+                    checkType == RCTYPE_MERCHANT &&
+                    (!OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_MERCHANT_TEXT_HINT) || mystery);
+                const bool hideScrubName =
+                    checkType == RCTYPE_SCRUB &&
+                    (!OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_SCRUB_TEXT_HINT) || mystery);
+                const bool hideShopName = checkType == RCTYPE_SHOP && mystery && IsMysteryShopItem(rc);
+                const bool revealItemName = !(hideMerchantName || hideScrubName || hideShopName);
 
-                    if (itemLoc->GetPlacedRandomizerGet() == RG_ICE_TRAP && revealItemName) {
-                        if (status == RCSHOW_IDENTIFIED) {
-                            txt = OTRGlobals::Instance->gRandoContext->overrides[rc].GetTrickName().GetForLanguage(
-                                gSaveContext.language);
-                        } else {
-                            txt = Rando::StaticData::RetrieveItem(
-                                      OTRGlobals::Instance->gRandoContext->overrides[rc].LooksLike())
-                                      .GetName()
-                                      .GetForLanguage(gSaveContext.language);
-                        }
-                    } else if (revealItemName) {
-                        txt = itemLoc->GetPlacedItem().GetName().GetForLanguage(gSaveContext.language);
+                if (itemLoc->GetPlacedRandomizerGet() == RG_ICE_TRAP && revealItemName) {
+                    if (status == RCSHOW_IDENTIFIED) {
+                        txt = OTRGlobals::Instance->gRandoContext->overrides[rc].GetTrickName().GetForLanguage(
+                            gSaveContext.language);
+                    } else {
+                        txt = Rando::StaticData::RetrieveItem(
+                                  OTRGlobals::Instance->gRandoContext->overrides[rc].LooksLike())
+                                  .GetName()
+                                  .GetForLanguage(gSaveContext.language);
                     }
-                    if (IsVisibleInCheckTracker(rc) && status == RCSHOW_IDENTIFIED) {
-                        auto price = OTRGlobals::Instance->gRandoContext->GetItemLocation(rc)->GetPrice();
-                        txt = !txt.empty() ? fmt::format("{} - {}", txt, price) : fmt::format("{}", price);
-                    }
-                } else {
-                    if (IsHeartPiece((GetItemID)Rando::StaticData::RetrieveItem(loc->GetVanillaItem()).GetItemID())) {
-                        if (gSaveContext.language == LANGUAGE_ENG || gSaveContext.language == LANGUAGE_GER ||
-                            gSaveContext.language == LANGUAGE_JPN) {
-                            txt = Rando::StaticData::RetrieveItem(loc->GetVanillaItem()).GetName().english;
-                        } else if (gSaveContext.language == LANGUAGE_FRA) {
-                            txt = Rando::StaticData::RetrieveItem(loc->GetVanillaItem()).GetName().french;
-                        }
+                } else if (revealItemName) {
+                    txt = itemLoc->GetPlacedItem().GetName().GetForLanguage(gSaveContext.language);
+                }
+                if (IsVisibleInCheckTracker(rc) && status == RCSHOW_IDENTIFIED) {
+                    auto price = OTRGlobals::Instance->gRandoContext->GetItemLocation(rc)->GetPrice();
+                    txt = !txt.empty() ? fmt::format("{} - {}", txt, price) : fmt::format("{}", price);
+                }
+            } else {
+                if (IsHeartPiece((GetItemID)Rando::StaticData::RetrieveItem(loc->GetVanillaItem()).GetItemID())) {
+                    if (gSaveContext.language == LANGUAGE_ENG || gSaveContext.language == LANGUAGE_GER ||
+                        gSaveContext.language == LANGUAGE_JPN) {
+                        txt = Rando::StaticData::RetrieveItem(loc->GetVanillaItem()).GetName().english;
+                    } else if (gSaveContext.language == LANGUAGE_FRA) {
+                        txt = Rando::StaticData::RetrieveItem(loc->GetVanillaItem()).GetName().french;
                     }
                 }
-                break;
-        }
+            }
+            break;
     }
     if (txt == "" && skipped) {
         txt = "Skipped"; // TODO language

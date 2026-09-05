@@ -14,6 +14,7 @@ PYTHON_SUFFIXES = frozenset({".py"})
 STRUCTURE_SUFFIXES = FORMAT_SUFFIXES | PYTHON_SUFFIXES
 
 EXCLUDED_PREFIXES = (
+    "build/",  # generated products and exact-pinned dependency source checkouts
     "2ship/assets/",
     "2ship/src/",  # generated MM decompilation
     "Azahar/",
@@ -79,23 +80,46 @@ def repository_files(repo: Path, suffixes: frozenset[str]) -> list[Path]:
     return sorted(set(paths))
 
 
-def changed_files(repo: Path) -> list[Path]:
+def resolve_base_commit(repo: Path, base: str) -> str:
+    resolved = run_git(
+        repo, ["rev-parse", "--verify", f"{base}^{{commit}}"], check=False
+    )
+    if resolved.returncode:
+        raise VerificationError(f"source comparison base is not a commit: {base}")
+    return resolved.stdout.strip()
+
+
+def changed_files(repo: Path, base: str | None = None) -> list[Path]:
+    """Select working changes, or committed changes from a verified CI base."""
+    revisions = ["HEAD"]
+    if base is not None:
+        revisions = [resolve_base_commit(repo, base), "HEAD"]
     tracked = run_git(
-        repo, ["diff", "--name-only", "--diff-filter=ACMR", "-z", "HEAD", "--"]
+        repo, ["diff", "--name-only", "--diff-filter=ACMR", "-z", *revisions, "--"]
     ).stdout
-    untracked = run_git(
-        repo, ["ls-files", "--others", "--exclude-standard", "-z"]
-    ).stdout
+    untracked = (
+        ""
+        if base is not None
+        else run_git(repo, ["ls-files", "--others", "--exclude-standard", "-z"]).stdout
+    )
     paths = set()
     for raw in (tracked + untracked).split("\0"):
-        if raw and Path(raw).suffix.lower() in FORMAT_SUFFIXES and is_first_party(raw):
-            paths.add(repo / raw)
+        path = repo / raw
+        if (
+            raw
+            and Path(raw).suffix.lower() in FORMAT_SUFFIXES
+            and is_first_party(raw)
+            and path.is_file()
+            and not path.is_symlink()
+        ):
+            paths.add(path)
     return sorted(paths)
 
 
-def modified_legacy_decomp_files(repo: Path) -> list[Path]:
+def modified_legacy_decomp_files(repo: Path, base: str | None = None) -> list[Path]:
+    revisions = ["HEAD"] if base is None else [base, "HEAD"]
     modified = run_git(
-        repo, ["diff", "--name-only", "--diff-filter=M", "-z", "HEAD", "--"]
+        repo, ["diff", "--name-only", "--diff-filter=M", "-z", *revisions, "--"]
     ).stdout
     return sorted(
         repo / raw

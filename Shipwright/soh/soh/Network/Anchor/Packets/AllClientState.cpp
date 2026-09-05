@@ -56,9 +56,11 @@ void Anchor::HandlePacket_AllClientState(nlohmann::json payload) {
 
     // remove clients that are no longer in the list
     std::vector<uint32_t> clientsToRemove;
-    for (auto& [clientId, client] : clients) {
-        if (std::find_if(newClients.begin(), newClients.end(),
-                         [clientId](AnchorClient& c) { return c.clientId == clientId; }) == newClients.end()) {
+    for (const auto& clientEntry : clients) {
+        const uint32_t clientId = clientEntry.first;
+        if (std::find_if(newClients.begin(), newClients.end(), [clientId](const AnchorClient& client) {
+                return client.clientId == clientId;
+            }) == newClients.end()) {
             clientsToRemove.push_back(clientId);
         }
     }

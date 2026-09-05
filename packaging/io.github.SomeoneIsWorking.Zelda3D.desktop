@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Zelda3D
+Comment=Native Ocarina of Time and Majora's Mask 3D port
+Exec=zelda3d
+Icon=io.github.SomeoneIsWorking.Zelda3D
+Terminal=false
+Categories=Game;AdventureGame;
+Keywords=Zelda;Ocarina;Majora;3D;
+X-AppImage-Integrate=false

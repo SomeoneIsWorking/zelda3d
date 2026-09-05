@@ -230,7 +230,7 @@ class GfxRenderingAPISdl3Gpu : public GfxRenderingAPI {
     void SetViewport(int x, int y, int width, int height) override;
     void SetScissor(int x, int y, int width, int height) override;
     void SetUseAlpha(bool useAlpha) override;
-    void DrawTriangles(float bufVbo[], size_t bufVboLen, size_t bufVboNumTris) override;
+    void DrawTriangles(float bufVbo[], std::size_t bufVboLen, std::size_t bufVboNumTris) override;
     void Init() override;
     void OnResize() override;
     void StartFrame() override;

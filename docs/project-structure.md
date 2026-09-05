@@ -44,6 +44,16 @@ Shipping target: `zelda3d_app` builds the one launcher plus `soh_core` and `mm_c
 per-game executables. Run via `./run.sh`; headless managers are `tools/zelda3d_game.sh` (soh) and
 `tools/mm_game.py` (mm).
 
+Desktop release setup belongs to `Shipwright/zelda3d_shared/platform/`: the launcher validates and
+persists the four user-provided ROM selections before loading either core, including exact-one-match
+nested ZIP import. `Ship::Context::GetAppDirectoryPath` owns the cross-platform writable root
+(`XDG_CONFIG_HOME`/`~/.config` on Linux), so setup, generated archives, configuration, logs, and
+saves cannot fall back into a build directory or AppImage mount. `tools/build_appimage_release.py`
+owns the reproducible Ubuntu 22.04 build and calls the shared MM asset owner through
+`tools/build_mm_custom_archive.py` so `2ship.o2r` is generated fresh rather than copied from a warm
+developer tree. `tools/package_appimage.py` is the only Linux release staging and
+artifact-verification path and packages both peer cores without user or ROM-derived assets.
+
 ## The build layering — one runtime, one engine, two peer games
 
 The configure root is the **repo root** (`CMakeLists.txt`). Configure with `cmake -S . -B
@@ -51,8 +61,10 @@ Shipwright/build-cmake -G Ninja`.
 
 Build-time ROM extraction/header generation and shipping runtime archives are separate CMake
 responsibilities. `cmake/Zelda3DAssetExtraction.cmake` owns developer ROM extraction and generated
-headers; `cmake/Zelda3DRuntimeArchives.cmake` always regenerates the current `soh.o2r` and
-`2ship.o2r` consumed by the launcher target. The launcher build validates both runtime artifacts.
+headers; `cmake/Zelda3DRuntimeArchives.cmake` regenerates `soh.o2r`, while
+`launcher_bootstrap/mm_assets.py` owns the atomic MM `mm.o2r`/`2ship.o2r` developer extraction and
+the ROM-free release regeneration of `2ship.o2r`. The launcher build validates all runtime
+artifacts.
 
 ```
 launcher   Shipwright/zelda3d_app     one binary; dlopens a game core, holds no game code
@@ -66,9 +78,8 @@ engine     Shipwright/libultraship    window/renderer/input/resources — knows 
            Shipwright/cmb3d           3DS asset formats (CMB/CSAB/ZAR/ZSI/…)
 ```
 
-This mirrors Dusklight's `aurora` (engine) / `borealis` (app services) / `dusk` (port layer) /
-decomp split — see `docs/dusklight-adoption.md`. The layer Dusklight has no need for is **shared**:
-it hosts one game, we host two.
+This dependency direction is Zelda3D's own architecture. The explicit **shared** layer exists because
+the launcher hosts two peer games without making either game the other's platform owner.
 
 ### Source ownership and size are separate gates
 
@@ -189,10 +200,9 @@ build root had, one layer up. The launcher currently chooses from argv/env inste
 headless tooling needs anyway.
 
 Moving it means owning a `Ship::Context` before any core is loaded and handing it over — the
-"Ship::Context ownership" half of N3 in `docs/MM_NATIVE.md`. Dusklight's model for exactly this is
-`launchUILoop()` (`src/m_Do/m_Do_main.cpp:158`): a second, simpler frame loop — events →
-`aurora_begin_frame` → `ui::update()` → `aurora_end_frame` — with **no game executing at all**, used
-for its prelaunch/disc-picker screen. That is the shape to copy.
+"Ship::Context ownership" half of N3 in `docs/MM_NATIVE.md`. The target boundary is a small launcher
+frame loop that owns events, begins the frame, updates the chooser, and ends the frame with **no game
+core executing at all**.
 
 ### Sharing code between the two games — TWO mechanisms, and the choice is forced
 
@@ -398,11 +408,10 @@ What remains, in ascending cost:
    games' configs.
 
 **Size it against the shipping binary (`strings Shipwright/build-cmake/mm/libmm_core.so`), not
-against a source grep** (claim C073). Five of the ten "bare
-globals needing migration" are dead code inside `BenPort.cpp`'s `#if 0` and never reach the binary —
-the whole `gLed*` family, plus `gA11yTTS` and `gCrowdControl` — as are the three
-`gCosmetics.Link_*Tunic.Value` literals, so the binary holds 3 `gCosmetics.*` strings where the
-source shows 6.
+against a source grep** (claim C073). The three disabled `BenPort.cpp` blocks that carried abandoned
+save-state hotkeys, custom audio decoding, and controller-LED policy have been deleted rather than
+retained as dead source. Their `gLed*`, `gA11yTTS`, `gCrowdControl`, and
+`gCosmetics.Link_*Tunic.Value` strings never reached the binary.
 
 The `gCollisionViewer.*Color` scalar-vs-parent shape is **fixed** (issue 0014) — it turned out to be
 a live defect rather than migration debt: the picker wrote `<key>.Value`, the renderer read `<key>`,

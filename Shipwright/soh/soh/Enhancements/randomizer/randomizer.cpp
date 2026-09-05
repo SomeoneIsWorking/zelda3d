@@ -161,7 +161,7 @@ std::unordered_map<RandomizerGet, RandomizerInf> randomizerGetToRandInf = {
 
 #ifdef _MSC_VER
 #pragma optimize("", off)
-#else
+#elif defined(__GNUC__) && !defined(__clang__)
 #pragma GCC push_options
 #pragma GCC optimize("O0")
 #endif
@@ -237,7 +237,7 @@ bool Randomizer::SpoilerFileExists(const char* spoilerFileName) {
 }
 #ifdef _MSC_VER
 #pragma optimize("", on)
-#else
+#elif defined(__GNUC__) && !defined(__clang__)
 #pragma GCC pop_options
 #endif
 
@@ -797,19 +797,6 @@ RandomizerCheck Randomizer::GetCheckFromRandomizerInf(RandomizerInf randomizerIn
 
 static bool locationsTabOpen = false;
 static bool tricksTabOpen = false;
-
-class ExtendedVanillaTableInvalidItemIdException : public std::exception {
-  private:
-    s16 itemID;
-
-  public:
-    ExtendedVanillaTableInvalidItemIdException(s16 itemID) : itemID(itemID) {
-    }
-    std::string what() {
-        return itemID + " is not a valid ItemID for the extendedVanillaGetItemTable. If you are adding a new"
-                        "item, try adding it to randoGetItemTable instead.";
-    }
-};
 
 static std::unordered_map<RandomizerGet, GameplayStatTimestamp> randomizerGetToStatsTimeStamp = {
     { RG_GOHMA_SOUL, TIMESTAMP_FOUND_GOHMA_SOUL },

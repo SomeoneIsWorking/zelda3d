@@ -5,9 +5,9 @@
 #include <vector>
 #include <string>
 
-#include "../../../include/z64item.h"
-#include "../../../include/z64.h"
-#include "../../../include/message_data_textbox_types.h"
+#include "z64item.h"
+#include "z64.h"
+#include "message_data_textbox_types.h"
 #include "text.h"
 
 #undef MESSAGE_END

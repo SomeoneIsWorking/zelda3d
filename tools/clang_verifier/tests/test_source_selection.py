@@ -7,8 +7,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from clang_verifier import VerificationError
+
 from clang_verifier.source_selection import (
     STRUCTURE_SUFFIXES,
+    changed_files,
     is_first_party,
     repository_files,
 )
@@ -17,9 +20,35 @@ REPO = Path(__file__).resolve().parents[3]
 
 
 class SourceSelectionTests(unittest.TestCase):
+    def test_clean_checkout_selects_committed_changes_and_refuses_unknown_base(
+        self,
+    ) -> None:
+        scratch = REPO / "scratch"
+        scratch.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=scratch) as raw:
+            root = Path(raw)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            source = root / "product.cpp"
+            source.write_text("int value = 1;\n")
+            commit = [
+                "git", "-C", str(root), "-c", "user.name=Verifier Test",
+                "-c", "user.email=verifier@example.invalid", "commit", "-qm", "fixture",
+            ]
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run(commit, check=True)
+            source.write_text("int value = 2;\n")
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run(commit, check=True)
+            self.assertEqual(changed_files(root), [])
+            self.assertEqual(changed_files(root, "HEAD^"), [source])
+            self.assertEqual(changed_files(root, "HEAD"), [])
+            with self.assertRaisesRegex(VerificationError, "not a commit"):
+                changed_files(root, "missing-revision")
+
     def test_vendor_and_generated_trees_are_excluded(self) -> None:
         self.assertFalse(is_first_party("2ship/src/code/z_actor.c"))
         self.assertFalse(is_first_party("Shipwright/ZAPDTR/ZAPD/main.cpp"))
+        self.assertFalse(is_first_party("build/deps/lucent-source/src/zip.cpp"))
         self.assertFalse(is_first_party("Shipwright/soh/assets/generated.c"))
 
     def test_product_sources_are_first_party(self) -> None:

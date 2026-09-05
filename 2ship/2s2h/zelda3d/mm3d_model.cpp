@@ -1,5 +1,7 @@
 // MM3D model store: owns the one ROM handle and lazily parsed model assets.
 #include "mm3d_model_store.h"
+#include "platform/rom_install.h"
+#include <spdlog/spdlog.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -133,14 +135,14 @@ void LoadActorModel(int modelId, const ModelSpec& spec, LoadedModel& model) {
 CtrRom* AssetRom() {
     if (!g_romTried) {
         g_romTried = true;
-        const char* path = getenv("ZELDA3D_MM3D_ROM");
-        if (path == nullptr) {
-            fprintf(stderr, "[MM3D] ZELDA3D_MM3D_ROM not set — cannot load MM3D assets\n");
+        const auto path = Platform::RomSelectionStore::ActiveSelection(Platform::RomKind::Mm3ds);
+        if (!path) {
+            SPDLOG_ERROR("No MM3D asset ROM is activated");
             return nullptr;
         }
-        g_rom = std::make_unique<CtrRom>(path);
+        g_rom = std::make_unique<CtrRom>(*path);
         if (!g_rom->ok()) {
-            fprintf(stderr, "[MM3D] CtrRom(%s): %s\n", path, g_rom->error().c_str());
+            SPDLOG_ERROR("Cannot load selected MM3D asset ROM: {}", g_rom->error());
             g_rom.reset();
         }
     }

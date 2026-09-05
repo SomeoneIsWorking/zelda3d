@@ -44,10 +44,17 @@ class MmAssetLayout:
 
     @classmethod
     def for_repo(
-        cls, repo: Path, runtime_build_dir: Path | None = None
+        cls,
+        repo: Path,
+        runtime_build_dir: Path | None = None,
+        extraction_build_dir: Path | None = None,
     ) -> MmAssetLayout:
         resolved_repo = repo.resolve()
-        extraction_build_dir = resolved_repo / "Shipwright" / "build-mm-extract"
+        extraction_root = (
+            extraction_build_dir.resolve()
+            if extraction_build_dir is not None
+            else resolved_repo / "Shipwright" / "build-mm-extract"
+        )
         runtime_root = (
             runtime_build_dir.resolve()
             if runtime_build_dir is not None
@@ -55,13 +62,13 @@ class MmAssetLayout:
         )
         return cls(
             repo=resolved_repo,
-            extraction_build_dir=extraction_build_dir,
+            extraction_build_dir=extraction_root,
             mm_source_dir=resolved_repo / "2ship",
             extractor=resolved_repo
             / "Shipwright"
             / "OTRExporter"
             / "extract_assets.py",
-            zapd=extraction_build_dir / "ZAPD" / "ZAPD.out",
+            zapd=extraction_root / "ZAPD" / "ZAPD.out",
             runtime_dir=runtime_root / "mm",
         )
 
@@ -194,29 +201,63 @@ def _project_version(cmake_file: Path) -> str:
 
 
 def configure_command(
-    layout: MmAssetLayout, python_executable: str | Path
+    layout: MmAssetLayout,
+    python_executable: str | Path,
+    extra_options: Sequence[str] = (),
 ) -> list[str]:
     """Configure the independent GAME_MM exporter without constraining the C++ compiler."""
     return cmake_build_policy.configure_command(
         layout.repo,
         layout.extraction_build_dir,
-        options=("-DCMAKE_BUILD_TYPE=Release", "-DGAME_STR=MM"),
+        options=("-DCMAKE_BUILD_TYPE=Release", "-DGAME_STR=MM", *extra_options),
         python_executable=python_executable,
     )
 
 
+def _configure_option_requirements(options: Sequence[str]) -> dict[str, str]:
+    requirements: dict[str, str] = {}
+    for option in options:
+        if not option.startswith("-D") or "=" not in option:
+            raise ValueError(f"unsupported CMake configuration option: {option}")
+        key_and_type, value = option[2:].split("=", 1)
+        key = key_and_type.split(":", 1)[0]
+        if not key:
+            raise ValueError(f"CMake configuration option has no cache key: {option}")
+        requirements[key] = value
+    return requirements
+
+
+def _cache_path_matches(cache: Mapping[str, str], key: str, expected: Path) -> bool:
+    configured = cache.get(key)
+    return configured is not None and Path(configured).resolve() == expected.resolve()
+
+
 def has_required_configuration(
-    layout: MmAssetLayout, python_executable: str | Path
+    layout: MmAssetLayout,
+    python_executable: str | Path,
+    configure_options: Sequence[str] = (),
 ) -> bool:
-    return cmake_build_policy.has_ninja_configuration(
-        layout.extraction_build_dir
-    ) and cmake_build_policy.cache_matches(
-        layout.extraction_build_dir,
-        {
-            "GAME_STR": "MM",
-            "Python3_EXECUTABLE": str(Path(python_executable).resolve()),
-        },
+    if not cmake_build_policy.has_ninja_configuration(layout.extraction_build_dir):
+        return False
+    cache = cmake_build_policy.read_cmake_cache(
+        layout.extraction_build_dir / "CMakeCache.txt"
     )
+    if cache.get("GAME_STR") != "MM" or not _cache_path_matches(
+        cache, "Python3_EXECUTABLE", Path(python_executable)
+    ):
+        return False
+    if not _cache_path_matches(
+        cache, "FETCHCONTENT_BASE_DIR", layout.extraction_build_dir / "_deps"
+    ):
+        return False
+
+    for key, expected in _configure_option_requirements(configure_options).items():
+        if key.startswith("FETCHCONTENT_SOURCE_DIR_"):
+            if not _cache_path_matches(cache, key, Path(expected)):
+                return False
+        elif cache.get(key) != expected:
+            return False
+    return True
 
 
 def zapd_build_command(layout: MmAssetLayout, jobs: int) -> list[str]:
@@ -252,6 +293,27 @@ def extraction_command(
     ]
 
 
+def custom_extraction_command(
+    layout: MmAssetLayout,
+    output: Path,
+    python_executable: str | Path,
+) -> list[str]:
+    """Generate only MM's redistributable custom archive with GAME_MM ZAPD."""
+    return [
+        str(python_executable),
+        str(layout.extractor),
+        "-z",
+        str(layout.zapd),
+        "--norom",
+        "--custom-otr-file",
+        output.name,
+        "--custom-assets-path",
+        str(layout.mm_source_dir / "assets" / "custom"),
+        "--port-ver",
+        _project_version(layout.repo / "CMakeLists.txt"),
+    ]
+
+
 def run_command(command: Sequence[str], cwd: Path) -> None:
     try:
         subprocess.run(list(command), cwd=cwd, check=True)
@@ -274,6 +336,16 @@ def _require_sources(layout: MmAssetLayout) -> None:
     if missing:
         names = ", ".join(str(path.relative_to(layout.repo)) for path in missing)
         raise MmAssetError(f"checkout is missing MM asset source(s): {names}")
+
+
+def _require_custom_sources(layout: MmAssetLayout) -> None:
+    required_files = (layout.repo / "CMakeLists.txt", layout.extractor)
+    required_dirs = (layout.mm_source_dir / "assets" / "custom",)
+    missing = [path for path in required_files if not path.is_file()]
+    missing.extend(path for path in required_dirs if not path.is_dir())
+    if missing:
+        names = ", ".join(str(path.relative_to(layout.repo)) for path in missing)
+        raise MmAssetError(f"checkout is missing MM custom-archive source(s): {names}")
 
 
 def _clear_generated_archives(archives: Sequence[Path]) -> None:
@@ -312,6 +384,46 @@ def runtime_archives_are_valid(layout: MmAssetLayout) -> bool:
     except MmAssetError:
         return False
     return True
+
+
+def build_mm_custom_archive(
+    layout: MmAssetLayout,
+    output: Path,
+    *,
+    python_executable: str | Path,
+    jobs: int | None = None,
+    configure_options: Sequence[str] = (),
+    runner: CommandRunner = run_command,
+) -> Path:
+    """Build a fresh redistributable ``2ship.o2r`` without requiring a ROM."""
+    _require_custom_sources(layout)
+    resolved_jobs = jobs if jobs is not None else (os.cpu_count() or 4)
+    if resolved_jobs < 1:
+        raise MmAssetError("MM custom-archive job count must be positive")
+
+    if not has_required_configuration(layout, python_executable, configure_options):
+        runner(
+            configure_command(layout, python_executable, configure_options),
+            layout.repo,
+        )
+        if not has_required_configuration(layout, python_executable, configure_options):
+            raise MmAssetError(
+                "MM custom-archive CMake metadata does not use Ninja, GAME_STR=MM, and "
+                "the requested isolated FetchContent and Python configuration"
+            )
+    runner(zapd_build_command(layout, resolved_jobs), layout.repo)
+    if not layout.zapd.is_file():
+        raise MmAssetError(f"GAME_MM ZAPD is missing after its build: {layout.zapd}")
+
+    resolved_output = output.resolve()
+    resolved_output.parent.mkdir(parents=True, exist_ok=True)
+    _clear_generated_archives((resolved_output,))
+    runner(
+        custom_extraction_command(layout, resolved_output, python_executable),
+        resolved_output.parent,
+    )
+    validate_archive(resolved_output, "portVersion")
+    return resolved_output
 
 
 def extract_mm_runtime_archives(

@@ -217,13 +217,7 @@ bool Scene_CommandObjectList(PlayState* play, SOH::ISceneCommand* cmd) {
 
     s32 i;
     s32 j;
-    s32 k;
-    // s16* objectEntry = SEGMENTED_TO_VIRTUAL(cmd->objectList.segment);
-    s16* objectEntry = (s16*)cmdObj->GetRawPointer();
-
-    k = 0;
-    i = play->objectCtx.unk_09;
-
+    size_t k;
     // Loop until a mismatch in the object lists
     // Then clear all object ids past that in the context object list and kill actors for those objects
     for (i = play->objectCtx.unk_09, k = 0; i < play->objectCtx.num; i++, k++) {
@@ -518,9 +512,7 @@ bool (*sceneCommands[])(PlayState*, SOH::ISceneCommand*) = {
 s32 OTRScene_ExecuteCommands(PlayState* play, SOH::Scene* scene) {
     SOH::SceneCommandID cmdCode;
 
-    for (int i = 0; i < scene->commands.size(); i++) {
-        auto sceneCmd = scene->commands[i];
-
+    for (const auto& sceneCmd : scene->commands) {
         if (sceneCmd == nullptr) // UH OH
             continue;
 

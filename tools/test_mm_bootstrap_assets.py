@@ -14,13 +14,17 @@ TOOLS = REPO / "tools"
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(TOOLS))
 
+from build_mm_custom_archive import source_cache_options
+
 from launcher_bootstrap.mm_assets import (
     MM3D_ROM_NAME,
     MM_ROM_NAME,
     MmAssetError,
     MmAssetLayout,
+    build_mm_custom_archive,
     ensure_mm_runtime_archives,
     extract_mm_runtime_archives,
+    has_required_configuration,
     resolve_mm_rom_environment,
 )
 
@@ -47,15 +51,28 @@ class MmBootstrapAssetTests(unittest.TestCase):
         return MmAssetLayout.for_repo(self.repo)
 
     @staticmethod
-    def _write_configuration(layout: MmAssetLayout, python_executable: Path) -> None:
+    def _write_configuration(
+        layout: MmAssetLayout,
+        python_executable: Path,
+        extra_values: dict[str, str] | None = None,
+    ) -> None:
         layout.extraction_build_dir.mkdir(parents=True, exist_ok=True)
         (layout.extraction_build_dir / "build.ninja").write_text("# fixture\n")
+        values = {
+            "CMAKE_GENERATOR:INTERNAL": "Ninja",
+            "CMAKE_C_COMPILER:FILEPATH": "/usr/bin/cc",
+            "CMAKE_CXX_COMPILER:FILEPATH": "/usr/bin/c++",
+            "GAME_STR:UNINITIALIZED": "MM",
+            "Python3_EXECUTABLE:FILEPATH": str(python_executable.resolve()),
+            "FETCHCONTENT_BASE_DIR:PATH": str(
+                (layout.extraction_build_dir / "_deps").resolve()
+            ),
+        }
+        for key, value in (extra_values or {}).items():
+            values[f"{key}:PATH"] = value
         (layout.extraction_build_dir / "CMakeCache.txt").write_text(
-            "CMAKE_GENERATOR:INTERNAL=Ninja\n"
-            "CMAKE_C_COMPILER:FILEPATH=/usr/bin/cc\n"
-            "CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++\n"
-            "GAME_STR:UNINITIALIZED=MM\n"
-            f"Python3_EXECUTABLE:FILEPATH={python_executable.resolve()}\n"
+            "".join(f"{key}={value}\n" for key, value in values.items()),
+            encoding="utf-8",
         )
 
     @staticmethod
@@ -172,7 +189,11 @@ class MmBootstrapAssetTests(unittest.TestCase):
             command = list(command)
             commands.append((command, cwd))
             if "-S" in command:
-                self._write_configuration(layout, locked_python)
+                self._write_configuration(
+                    layout,
+                    locked_python,
+                    {"FETCHCONTENT_SOURCE_DIR_DR_LIBS": "/shared/deps/dr_libs-src"},
+                )
             if "--target" in command:
                 layout.zapd.parent.mkdir(parents=True, exist_ok=True)
                 layout.zapd.touch()
@@ -199,6 +220,55 @@ class MmBootstrapAssetTests(unittest.TestCase):
         self.assertIn(str(layout.mm_source_dir / "assets" / "xml"), extract[0])
         self.assertEqual(outputs, layout.runtime_archives)
         self.assertTrue(all(path.is_file() for path in outputs))
+
+    def test_custom_archive_is_built_fresh_without_a_rom(self) -> None:
+        layout = self._prepare_sources()
+        locked_python = self.repo / ".venv" / "bin" / "python"
+        output = self.repo / "release-inputs" / "2ship.o2r"
+        output.parent.mkdir()
+        self._write_archive(output, ("portVersion", "stale"))
+        commands: list[tuple[list[str], Path]] = []
+
+        def runner(command, cwd):
+            command = list(command)
+            commands.append((command, cwd))
+            if "-S" in command:
+                self._write_configuration(
+                    layout,
+                    locked_python,
+                    {"FETCHCONTENT_SOURCE_DIR_DR_LIBS": "/shared/deps/dr_libs-src"},
+                )
+            elif "--target" in command:
+                layout.zapd.parent.mkdir(parents=True, exist_ok=True)
+                layout.zapd.touch()
+            else:
+                self.assertFalse(output.exists())
+                self._write_archive(output, ("portVersion", "fresh"))
+
+        result = build_mm_custom_archive(
+            layout,
+            output,
+            python_executable=locked_python,
+            jobs=5,
+            configure_options=(
+                "-DFETCHCONTENT_SOURCE_DIR_DR_LIBS=/shared/deps/dr_libs-src",
+            ),
+            runner=runner,
+        )
+
+        configure, build, extract = commands
+        self.assertIn("-DGAME_STR=MM", configure[0])
+        self.assertIn(
+            "-DFETCHCONTENT_SOURCE_DIR_DR_LIBS=/shared/deps/dr_libs-src",
+            configure[0],
+        )
+        self.assertEqual(build[0][-2:], ["ZAPD", "-j5"])
+        self.assertIn("--norom", extract[0])
+        self.assertNotIn(str(self.repo / "mm.z64"), extract[0])
+        self.assertEqual(extract[1], output.parent)
+        self.assertEqual(result, output.resolve())
+        with zipfile.ZipFile(result) as archive:
+            self.assertEqual(archive.read("fresh"), b"fixture")
 
     def test_mismatched_cached_python_forces_fresh_mm_reconfigure(self) -> None:
         layout = self._prepare_sources()
@@ -231,6 +301,75 @@ class MmBootstrapAssetTests(unittest.TestCase):
 
         self.assertIn("--fresh", commands[0])
         self.assertIn(f"-DPython3_EXECUTABLE={locked_python}", commands[0])
+
+    def test_cached_python_symlink_is_compared_by_interpreter_identity(self) -> None:
+        layout = self._prepare_sources()
+        interpreter = self.repo / "python-real"
+        interpreter.touch()
+        alias = self.repo / "python"
+        alias.symlink_to(interpreter)
+        self._write_configuration(layout, alias)
+
+        self.assertTrue(has_required_configuration(layout, alias))
+
+    def test_changed_fetchcontent_source_forces_fresh_mm_reconfigure(self) -> None:
+        layout = self._prepare_sources()
+        locked_python = self.repo / ".venv" / "bin" / "python"
+        self._write_configuration(
+            layout,
+            locked_python,
+            {"FETCHCONTENT_SOURCE_DIR_DR_LIBS": "/old/dr_libs-src"},
+        )
+        output = self.repo / "release-inputs" / "2ship.o2r"
+        commands: list[list[str]] = []
+
+        def runner(command, _cwd):
+            command = list(command)
+            commands.append(command)
+            if "-S" in command:
+                self._write_configuration(
+                    layout,
+                    locked_python,
+                    {"FETCHCONTENT_SOURCE_DIR_DR_LIBS": "/new/dr_libs-src"},
+                )
+            elif "--target" in command:
+                layout.zapd.parent.mkdir(parents=True, exist_ok=True)
+                layout.zapd.touch()
+            else:
+                output.parent.mkdir(parents=True, exist_ok=True)
+                self._write_archive(output, ("portVersion",))
+
+        build_mm_custom_archive(
+            layout,
+            output,
+            python_executable=locked_python,
+            configure_options=("-DFETCHCONTENT_SOURCE_DIR_DR_LIBS=/new/dr_libs-src",),
+            runner=runner,
+        )
+
+        self.assertIn("--fresh", commands[0])
+
+    def test_fetchcontent_cache_exposes_sources_without_build_directories(self) -> None:
+        cache = self.repo / "_deps"
+        (cache / "dr_libs-src").mkdir(parents=True)
+        (cache / "dr_libs-build").mkdir()
+        (cache / "rmlui-src").mkdir()
+
+        self.assertEqual(
+            source_cache_options(cache),
+            (
+                f"-DFETCHCONTENT_SOURCE_DIR_DR_LIBS={cache / 'dr_libs-src'}",
+                f"-DFETCHCONTENT_SOURCE_DIR_RMLUI={cache / 'rmlui-src'}",
+            ),
+        )
+
+    def test_empty_fetchcontent_source_cache_is_rejected(self) -> None:
+        cache = self.repo / "_deps"
+        cache.mkdir()
+        (cache / "dr_libs-build").mkdir()
+
+        with self.assertRaisesRegex(MmAssetError, "no dependency sources"):
+            source_cache_options(cache)
 
     def test_valid_runtime_pair_skips_extraction(self) -> None:
         layout = self._prepare_sources()

@@ -1,4 +1,4 @@
-"""Provision only public, pinned build submodules required by the shipping target."""
+"""Provision only public, pinned sources required by the shipping target."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+
+from .native_sources import LUCENT, require_pinned_checkout
 
 
 class SourceProvisionError(RuntimeError):
@@ -19,7 +21,7 @@ class BuildSubmodule:
 
 
 BUILD_SUBMODULES = (
-    BuildSubmodule(Path("Shipwright/ZAPDTR"), Path("CMakeLists.txt")),
+    BuildSubmodule(Path("Shipwright/ZAPDTR"), Path("ZAPD/CMakeLists.txt")),
     BuildSubmodule(
         Path("Shipwright/libultraship/extern/StormLib"), Path("CMakeLists.txt")
     ),
@@ -47,9 +49,8 @@ def _missing_submodules(repo: Path) -> list[BuildSubmodule]:
     ]
 
 
-def ensure_build_sources(repo: Path, runner: CommandRunner = _run_checked) -> None:
+def _ensure_build_submodules(repo: Path, runner: CommandRunner) -> None:
     """Initialize missing pinned build submodules without touching initialized trees."""
-    repo = repo.resolve()
     missing = _missing_submodules(repo)
     if not missing:
         return
@@ -82,3 +83,15 @@ def ensure_build_sources(repo: Path, runner: CommandRunner = _run_checked) -> No
             "required build source(s) still missing after submodule initialization: "
             + ", ".join(str(submodule.path) for submodule in still_missing)
         )
+
+
+def ensure_build_sources(repo: Path, runner: CommandRunner = _run_checked) -> None:
+    """Restore public submodules and validate the exact shared runtime checkout."""
+    repo = repo.resolve()
+    _ensure_build_submodules(repo, runner)
+    try:
+        require_pinned_checkout(LUCENT, repo / "build" / "deps" / "lucent-source")
+    except (OSError, subprocess.CalledProcessError, RuntimeError) as exc:
+        raise SourceProvisionError(
+            f"cannot provision pinned Lucent source: {exc}"
+        ) from exc

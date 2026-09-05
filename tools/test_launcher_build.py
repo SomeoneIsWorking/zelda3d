@@ -83,6 +83,26 @@ class LauncherBuildTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.fixture.close()
 
+    def test_product_build_does_not_require_player_owned_runtime_archives(self) -> None:
+        self.fixture.write_toolchain()
+        launcher_build.ensure_product_build(
+            self.fixture.build, lambda _command: self.fixture.write_binary()
+        )
+        self.assertFalse(
+            any(path.exists() for path in self.fixture.build.runtime_archives)
+        )
+
+    def test_ci_build_directory_is_explicit_and_does_not_change_launcher_default(
+        self,
+    ) -> None:
+        requested = self.fixture.repo / "build" / "ci-product"
+        build = launcher_build.BuildLayout.for_repo(
+            self.fixture.repo, build_dir=requested
+        )
+        self.assertEqual(build.build_dir, requested)
+        self.assertEqual(build.binary, requested / "zelda3d" / "zelda3d")
+        self.assertNotEqual(build.build_dir, self.fixture.build.build_dir)
+
     def test_valid_ninja_tree_builds_authoritative_unified_target(self) -> None:
         self.fixture.write_toolchain()
         commands: list[list[str]] = []

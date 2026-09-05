@@ -4,6 +4,7 @@
 #include <mutex>
 #include <cstring>
 #include <iostream>
+#include <stdexcept>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
@@ -35,6 +36,11 @@
 #include "ship/utils/AppleFolderManager.h"
 #include <unistd.h>
 #include <pwd.h>
+#endif
+
+#if defined(__linux__)
+#include <pwd.h>
+#include <unistd.h>
 #endif
 
 namespace Ship {
@@ -138,7 +144,6 @@ void Context::DestroyInstance() {
     // issue 0020 for why the finer per-compile fix is not available against this build's headers.
     // No-ops if nothing was ever compiled, and says so.
     Fast::Sdl3GpuFinalizeShaderCompiler();
-
 }
 
 Context::~Context() {
@@ -213,7 +218,8 @@ Context* Context::CreateInstance(const std::string& name, const std::string& sho
 
 void Context::EarlyLogToStderr() {
     // See declaration comment. Idempotent — calling twice is a no-op.
-    if (spdlog::get("ship_pre_init") != nullptr) return;
+    if (spdlog::get("ship_pre_init") != nullptr)
+        return;
     try {
         auto _early = spdlog::stderr_color_mt("ship_pre_init");
         spdlog::set_default_logger(_early);
@@ -582,8 +588,7 @@ bool Context::InitConsole() {
     // the window is already up and will not re-init, so without this its fresh Console would have
     // the game's commands but none of the engine's.
     if (mWindow != nullptr && mWindow->GetGui() != nullptr) {
-        auto consoleWindow =
-            std::dynamic_pointer_cast<ConsoleWindow>(mWindow->GetGui()->GetGuiWindow("Console"));
+        auto consoleWindow = std::dynamic_pointer_cast<ConsoleWindow>(mWindow->GetGui()->GetGuiWindow("Console"));
         if (consoleWindow != nullptr) {
             consoleWindow->RegisterCommands();
         }
@@ -592,8 +597,8 @@ bool Context::InitConsole() {
     // Say the count out loud. The command registry is per-game while the window that owns the
     // engine's commands is not, so "this game's console came up with only its own commands" is a
     // silent failure otherwise -- nothing downstream would report it until someone typed `help`.
-    const bool consoleWindowUp = mWindow != nullptr && mWindow->GetGui() != nullptr &&
-                                 mWindow->GetGui()->GetGuiWindow("Console") != nullptr;
+    const bool consoleWindowUp =
+        mWindow != nullptr && mWindow->GetGui() != nullptr && mWindow->GetGui()->GetGuiWindow("Console") != nullptr;
     SPDLOG_INFO("Console: {} engine command(s) registered for \"{}\" ({})", GetConsole()->GetCommands().size(),
                 GetName(),
                 consoleWindowUp ? "console window was already up, so they were re-registered here"
@@ -900,7 +905,8 @@ std::string Context::GetAppBundlePath() {
     }
 
 #if defined(__ANDROID__)
-    // SDL3-MIGRATION: SDL_AndroidGetExternalStoragePath -> SDL_GetAndroidExternalStoragePath (Android-only; not built on Linux)
+    // SDL3-MIGRATION: SDL_AndroidGetExternalStoragePath -> SDL_GetAndroidExternalStoragePath (Android-only; not built
+    // on Linux)
     const char* externaldir = SDL_GetAndroidExternalStoragePath();
     if (externaldir != NULL) {
         return externaldir;
@@ -964,7 +970,8 @@ std::string Context::GetAppBundlePath() {
 
 std::string Context::GetAppDirectoryPath(const std::string& appName) {
 #if defined(__ANDROID__)
-    // SDL3-MIGRATION: SDL_AndroidGetExternalStoragePath -> SDL_GetAndroidExternalStoragePath (Android-only; not built on Linux)
+    // SDL3-MIGRATION: SDL_AndroidGetExternalStoragePath -> SDL_GetAndroidExternalStoragePath (Android-only; not built
+    // on Linux)
     const char* externaldir = SDL_GetAndroidExternalStoragePath();
     if (externaldir != NULL) {
         return externaldir;
@@ -998,10 +1005,37 @@ std::string Context::GetAppDirectoryPath(const std::string& appName) {
     }
 #endif
 
-#ifdef NON_PORTABLE
-    // (This NON_PORTABLE branch is not built here; it already named a GetInstance() that does not
-    // exist. Kept compiling against the public accessor rather than a member that has moved.)
-    const std::string effectiveAppName = appName.empty() ? GetRawInstance()->GetShortName() : appName;
+    // Desktop builds are writable installations too. Falling through to "." put saves, configs,
+    // logs and generated archives beside the executable -- which is the read-only mount for an
+    // AppImage and the checkout/build directory for developers.
+    const Context* context = GetRawInstance();
+    const std::string effectiveAppName =
+        appName.empty() ? (context != nullptr ? context->GetShortName() : "zelda3d") : appName;
+#if defined(__linux__)
+    // Match os.UserConfigDir semantics: XDG_CONFIG_HOME, then ~/.config. SDL_GetPrefPath uses
+    // XDG_DATA_HOME instead, which is the wrong owner for this port's configuration and saves.
+    if (const char* configHome = std::getenv("XDG_CONFIG_HOME"); configHome != nullptr && configHome[0] != '\0') {
+        const std::filesystem::path root(configHome);
+        if (!root.is_absolute()) {
+            throw std::runtime_error("XDG_CONFIG_HOME must be an absolute path");
+        }
+        return (root / effectiveAppName).string();
+    }
+    const char* home = std::getenv("HOME");
+    if (home == nullptr || home[0] == '\0') {
+        const passwd* user = getpwuid(getuid());
+        home = user != nullptr ? user->pw_dir : nullptr;
+    }
+    if (home != nullptr && home[0] != '\0') {
+        const std::filesystem::path root(home);
+        if (!root.is_absolute()) {
+            throw std::runtime_error("HOME must be an absolute path to resolve the user configuration directory");
+        }
+        return (root / ".config" / effectiveAppName).string();
+    }
+#else
+    // SDL maps the remaining supported desktops to Application Support on macOS and app data on
+    // Windows, preserving each platform's native writable-user-directory contract.
     char* prefpath = SDL_GetPrefPath(NULL, effectiveAppName.c_str());
     if (prefpath != NULL) {
         std::string ret(prefpath);
@@ -1010,7 +1044,7 @@ std::string Context::GetAppDirectoryPath(const std::string& appName) {
     }
 #endif
 
-    return ".";
+    throw std::runtime_error("cannot resolve the OS user configuration directory");
 }
 
 std::string Context::GetPathRelativeToAppBundle(const std::string& path) {

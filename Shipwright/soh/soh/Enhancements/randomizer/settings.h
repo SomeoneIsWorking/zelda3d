@@ -149,6 +149,12 @@ class Settings {
     static std::shared_ptr<Settings> GetInstance();
 
   private:
+    // Registration modules share this owner so stored callbacks retain the settings lifetime.
+    void CreateWorldAndShuffleOptions();
+    void CreateInventoryAndLogicOptions();
+    void CreateTrickOptions();
+    void CreateOptionGroups();
+
     /**
      * @brief Create the list of description strings for `Option`s.
      */

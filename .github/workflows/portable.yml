@@ -1,0 +1,98 @@
+name: Portable asset-free checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-product:
+    name: Linux complete app and both cores
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CC: clang
+      CXX: clang++
+      CMAKE_PREFIX_PATH: ${{ github.workspace }}/build/deps/sdl
+      LD_LIBRARY_PATH: ${{ github.workspace }}/build/deps/sdl/lib
+      SDL_AUDIODRIVER: dummy
+      SDL_VIDEODRIVER: dummy
+    steps:
+      - name: Check out complete source history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.10.12"
+          python-version: "3.12"
+      - name: Install native Linux build dependencies
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          clang clang-format clang-tidy cmake ninja-build pkg-config
+          libpng-dev libzip-dev nlohmann-json3-dev libtinyxml2-dev libspdlog-dev
+          libopusfile-dev libogg-dev libvorbis-dev libfreetype-dev libbz2-dev zlib1g-dev
+          glslang-dev glslang-tools libgl-dev libx11-dev libxext-dev libxrandr-dev
+          libxcursor-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev libwayland-dev
+          libxkbcommon-dev libasound2-dev libpulse-dev libudev-dev
+      - name: Build pinned SDL3
+        run: uv run --frozen python tools/prepare_ci_sdl.py
+      - name: Build product and execute asset-free runtime contracts
+        env:
+          LINT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: uv run --frozen python tools/verify_product.py --jobs 2 --lint-base "$LINT_BASE"
+
+  desktop-contracts:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            runner: ubuntu-latest
+          - name: Windows x86_64
+            runner: windows-latest
+          - name: macOS arm64
+            runner: macos-14
+    steps:
+      - name: Check out the complete source history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.10.12"
+
+      - name: Verify portable launcher, configuration, and native policy seams
+        env:
+          CC: clang
+          CXX: clang++
+        run: >-
+          uv run --frozen python -m unittest
+          tools.test_cmake_build_policy
+          tools.test_launcher_bootstrap
+          tools.test_launcher_build
+          tools.test_verify_product
+          tools.test_prepare_ci_sdl
+          tools.test_build_appimage_release
+          tools.test_source_provision
+          tools.test_rom_provision
+          tools.test_mm_bootstrap_assets
+          tools.test_fast_contract_structure
+          tools.test_sdl3gpu_renderer_structure
+          tools.test_mm_python_structure
+          tools.test_portable_native_contracts

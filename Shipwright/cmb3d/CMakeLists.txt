@@ -26,6 +26,6 @@ target_include_directories(cmb3d PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../libultra
 
 # texpack.cpp decodes PNGs via stb_image; `stb` (defined in libultraship) carries the
 # header on its PUBLIC include interface.
-target_link_libraries(cmb3d PRIVATE stb)
+target_link_libraries(cmb3d PRIVATE stb lucent::lucent)
 
 set_target_properties(cmb3d PROPERTIES POSITION_INDEPENDENT_CODE ON)

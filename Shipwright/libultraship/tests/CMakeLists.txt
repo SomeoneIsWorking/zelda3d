@@ -3,7 +3,7 @@ include(FetchContent)
 FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG        v1.16.0
+    GIT_TAG        6910c9d9165801d8827d628cb72eb7ea9dd538c5 # v1.16.0
 )
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
@@ -18,6 +18,8 @@ add_executable(lus_tests
     event_system_tests.cpp
     sound_matrix_decoder_tests.cpp
     path_file_helper_tests.cpp
+    context_path_tests.cpp
+    rom_setup_tests.cpp
     archive_resource_tests.cpp
     glob_tests.cpp
     splittext_tests.cpp
@@ -53,7 +55,9 @@ set_property(TARGET lus_tests PROPERTY CXX_STANDARD 20)
 
 target_link_libraries(lus_tests PRIVATE
     libultraship
+    zelda3d_shared
     cmb3d
+    lucent::lucent
     gtest_main
 )
 

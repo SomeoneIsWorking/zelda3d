@@ -4,8 +4,8 @@ find_package(OpenGL QUIET)
 
 #=================== Dear ImGui ===================
 # ImGui is the DEVELOPER-OVERLAY stack: console, save editor, heap/camera/process overlays, actor
-# spawner. The shipped, game-facing UI is RmlUi (below). Two stacks on purpose -- see
-# docs/dusklight-adoption.md; Dusklight, a mature port of the same shape, made the same split.
+# spawner. The shipped, game-facing UI is RmlUi (below). The two stacks have deliberately separate
+# product and developer-tool responsibilities.
 #
 # This replaces a no-op header shim. The shim vendored these exact headers and linked a stub whose
 # every function did nothing, which was fine under a dev-tool window and actively harmful anywhere a
@@ -20,8 +20,7 @@ find_package(OpenGL QUIET)
 FetchContent_Declare(
     imgui
     GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG v1.91.9b-docking
-    GIT_SHALLOW TRUE
+    GIT_TAG 4806a1924ff6181180bf5e4b8b79ab4394118875 # v1.91.9b-docking
 )
 FetchContent_MakeAvailable(imgui)
 
@@ -56,7 +55,7 @@ list(APPEND ADDITIONAL_LIB_INCLUDES
 )
 
 #=================== RmlUi ===================
-# RmlUi provides the HTML/CSS-driven menu (Dusklight-style port). It needs a font
+# RmlUi provides the HTML/CSS-driven product menu. It needs a font
 # engine; the default is FreeType, located via find_package(Freetype) -> the
 # Freetype::Freetype target. On Linux/macOS we rely on the system FreeType
 # (present here as freetype2). Windows/other platforms will need FreeType vendored
@@ -83,7 +82,7 @@ set(RMLUI_SVG_PLUGIN ON)
 FetchContent_Declare(
     lunasvg
     GIT_REPOSITORY https://github.com/sammycage/lunasvg.git
-    GIT_TAG v3.3.0
+    GIT_TAG 49c8cb49ac81ddbdf303250bde2dc574604e71a7 # v3.3.0
 )
 FetchContent_MakeAvailable(lunasvg)
 # Force RmlUi's sub-targets static regardless of the parent's BUILD_SHARED_LIBS.
@@ -93,7 +92,7 @@ set(BUILD_SHARED_LIBS OFF)
 FetchContent_Declare(
     RmlUi
     GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
-    GIT_TAG 6.2
+    GIT_TAG 2230d1a6e8e0848ed87a5761e2a5160b2a175ba4 # 6.2
 )
 FetchContent_MakeAvailable(RmlUi)
 
@@ -117,7 +116,8 @@ endif()
 
 #=================== STB ===================
 set(STB_DIR ${CMAKE_BINARY_DIR}/_deps/stb)
-file(DOWNLOAD "https://github.com/nothings/stb/raw/0bc88af4de5fb022db643c2d8e549a0927749354/stb_image.h" "${STB_DIR}/stb_image.h")
+file(DOWNLOAD "https://github.com/nothings/stb/raw/0bc88af4de5fb022db643c2d8e549a0927749354/stb_image.h" "${STB_DIR}/stb_image.h"
+    EXPECTED_HASH SHA256=c54b15a689e6a1f32c75e2ec23afa442e3e0e37e894b73c1974d08679b20dd5c)
 file(WRITE "${STB_DIR}/stb_impl.c" "#define STB_IMAGE_IMPLEMENTATION\n#include \"stb_image.h\"")
 
 add_library(stb STATIC)
@@ -162,7 +162,7 @@ endif()
 FetchContent_Declare(
     ThreadPool
     GIT_REPOSITORY https://github.com/bshoshany/thread-pool.git
-    GIT_TAG v4.1.0
+    GIT_TAG 097aa718f25d44315cadb80b407144ad455ee4f9 # v4.1.0
 )
 FetchContent_MakeAvailable(ThreadPool)
 

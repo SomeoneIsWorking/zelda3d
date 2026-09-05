@@ -13,7 +13,7 @@
 class ExporterArchiveO2R : public ExporterArchive {
   public:
     ExporterArchiveO2R(const std::string& path, bool enableWriting);
-    ~ExporterArchiveO2R();
+    ~ExporterArchiveO2R() override;
 
     int CreateArchive(size_t fileCapacity) override;
     bool AddFile(const std::string& filePath, void* fileData, size_t fileSize) override;

@@ -76,7 +76,7 @@ entry points and registries compose those owners without absorbing their impleme
 oversized legacy files are frozen by the normal verifier and their caps ratchet downward whenever a
 responsibility is extracted. Never raise a cap to land a change.
 
-Current application of the Dusklight composition pattern: the embedded harness `main.cpp`,
+Current application of Zelda3D's composition boundary: the embedded harness `main.cpp`,
 `harness_cli.py`, launcher, Clang verifier, and MM phase-tour composer delegate to
 responsibility-named modules. The SoH and MM REPLs now route to focused command, transport, framing,
 lifecycle, and domain owners. Do not move extracted libretro/process/transport/gameplay/cache/
@@ -200,16 +200,16 @@ gitignored — never commit them.
 
 **Exception — genuinely third-party libs are NOT vendored flat; they are fork/upstream submodules.**
 Our own engine code (soh/2ship/libultraship) stays flattened as above, but third-party dependencies do
-NOT live in-tree. Two are GitHub forks (patched, so a fork carries the patch; each on a `zelda3d`
-branch byte-identical to the old vendored tree so the build is unchanged):
+NOT live in-tree. Two are GitHub forks whose maintained commits carry the required changes:
 - `SomeoneIsWorking/StormLib` (fork of ladislav-zezula/StormLib v9.25 + free-space optimization) →
   submodule `Shipwright/libultraship/extern/StormLib`.
 - `SomeoneIsWorking/ZAPDTR` (fork of HarbourMasters/ZAPDTR @ #36 base + the ZTextMM MM message-table
-  extraction + a ZRom narrowing fix) → submodule `Shipwright/ZAPDTR`. **libgfxd + tinyxml2 live INSIDE
+  extraction, ZRom narrowing fix, and exporter argument contract), pinned from `main` at
+  `adaf55275d4223f8810c6bbff242e47f4d9be5dd` → submodule `Shipwright/ZAPDTR`. **libgfxd + tinyxml2 live INSIDE
   ZAPDTR** (`ZAPDTR/lib/…`, as upstream vendors them) — so they're out of the zelda3d repo via this one
   submodule, no separate entries.
 
-Update a fork like any submodule (edit on its `zelda3d` branch, push, bump the pointer here). The
+Update a fork like any submodule (edit its maintained `main`, push, bump the exact pointer here). The
 CMake-`FetchContent` deps (rmlui/prism/dr_libs/monocypher/libgfxd-in-libultraship/…) already point at
 their real upstreams. (User directive 2026-07-17: third-party code is a fork/upstream submodule, not
 flattened. The old flat copies were also purged from git history to shrink the repo.)

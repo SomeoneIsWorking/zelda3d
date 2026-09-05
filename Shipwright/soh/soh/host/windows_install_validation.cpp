@@ -12,6 +12,7 @@
 
 namespace {
 
+#ifdef _WIN32
 bool IsSubpath(const std::filesystem::path& path, const std::filesystem::path& base) {
     const auto relative = std::filesystem::relative(path, base);
     return !relative.empty() && relative.native()[0] != '.';
@@ -25,11 +26,10 @@ bool CleanupPermissionProbe() {
         if (std::filesystem::exists("./test/")) {
             std::filesystem::remove("./test/");
         }
-    } catch (const std::filesystem::filesystem_error&) {
-        return false;
-    }
+    } catch (const std::filesystem::filesystem_error&) { return false; }
     return true;
 }
+#endif
 
 } // namespace
 
@@ -52,8 +52,9 @@ bool WindowsInstallValidation::Advance() {
             const std::filesystem::path ownPath = std::filesystem::canonical(buffer).parent_path();
             installPath_ = ownPath.string();
             if (IsSubpath(ownPath, tempPath)) {
-                SohGui::RegisterPopup("SoH Path Error", "SoH is running in a temp folder.\nExtract the .zip and run again.",
-                                      "OK", "", []() { std::exit(0); });
+                SohGui::RegisterPopup("SoH Path Error",
+                                      "SoH is running in a temp folder.\nExtract the .zip and run again.", "OK", "",
+                                      []() { std::exit(0); });
             } else {
                 phase_ = Phase::Permissions;
             }
@@ -64,9 +65,7 @@ bool WindowsInstallValidation::Advance() {
             bool directoryError = false;
             try {
                 std::filesystem::create_directories("./test/");
-            } catch (const std::filesystem::filesystem_error&) {
-                directoryError = true;
-            }
+            } catch (const std::filesystem::filesystem_error&) { directoryError = true; }
 
             if (file == nullptr || directoryError) {
                 SohGui::RegisterPopup("SoH Permissions Error",

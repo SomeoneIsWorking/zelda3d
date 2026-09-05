@@ -2225,7 +2225,7 @@ UnifiedVtx PackN64VertexToUnified(const float* vf, const CCFeatures& cc, float o
 
 } // namespace
 
-void GfxRenderingAPISdl3Gpu::DrawTriangles(float bufVbo[], size_t bufVboLen, size_t bufVboNumTris) {
+void GfxRenderingAPISdl3Gpu::DrawTriangles(float bufVbo[], std::size_t bufVboLen, std::size_t bufVboNumTris) {
     if (!mFrameAcquired || mCurrentShaderProgram == nullptr || mCurrentShaderProgram->frag == nullptr)
         return;
     if (mCurrentFb < 0 || mCurrentFb >= (int)mFramebuffers.size())
