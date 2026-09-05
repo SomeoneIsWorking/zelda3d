@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 
@@ -49,6 +49,18 @@ def cache_matches(build_dir: Path, required: dict[str, str]) -> bool:
     return all(cache.get(key) == value for key, value in required.items())
 
 
+def python_entry_path(executable: str | Path) -> Path:
+    """Keep the venv entry, whose pyvenv.cfg gives it distinct Python semantics."""
+    return Path(executable).absolute()
+
+
+def cache_uses_python(cache: Mapping[str, str], executable: str | Path) -> bool:
+    configured = cache.get("Python3_EXECUTABLE")
+    return configured is not None and python_entry_path(configured) == python_entry_path(
+        executable
+    )
+
+
 def needs_fresh_configure(build_dir: Path) -> bool:
     """A pre-existing cache must be discarded before policy reconfiguration."""
     return (build_dir / "CMakeCache.txt").is_file()
@@ -76,7 +88,7 @@ def configure_command(
         ]
     )
     if python_executable is not None:
-        command.append(f"-DPython3_EXECUTABLE={python_executable}")
+        command.append(f"-DPython3_EXECUTABLE={python_entry_path(python_executable)}")
     return command
 
 

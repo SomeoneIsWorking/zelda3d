@@ -57,11 +57,17 @@ def has_required_configuration(
     build: BuildLayout, python_executable: str | Path | None = None
 ) -> bool:
     required_cache = {"LUS_BUILD_TESTS": "ON"}
-    if python_executable is not None:
-        required_cache["Python3_EXECUTABLE"] = str(Path(python_executable).resolve())
-    return cmake_build_policy.has_ninja_configuration(
-        build.build_dir
-    ) and cmake_build_policy.cache_matches(build.build_dir, required_cache)
+    return (
+        cmake_build_policy.has_ninja_configuration(build.build_dir)
+        and cmake_build_policy.cache_matches(build.build_dir, required_cache)
+        and (
+            python_executable is None
+            or cmake_build_policy.cache_uses_python(
+                cmake_build_policy.read_cmake_cache(build.build_dir / "CMakeCache.txt"),
+                python_executable,
+            )
+        )
+    )
 
 
 def configure_command(

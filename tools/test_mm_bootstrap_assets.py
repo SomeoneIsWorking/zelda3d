@@ -63,7 +63,7 @@ class MmBootstrapAssetTests(unittest.TestCase):
             "CMAKE_C_COMPILER:FILEPATH": "/usr/bin/cc",
             "CMAKE_CXX_COMPILER:FILEPATH": "/usr/bin/c++",
             "GAME_STR:UNINITIALIZED": "MM",
-            "Python3_EXECUTABLE:FILEPATH": str(python_executable.resolve()),
+            "Python3_EXECUTABLE:FILEPATH": str(python_executable.absolute()),
             "FETCHCONTENT_BASE_DIR:PATH": str(
                 (layout.extraction_build_dir / "_deps").resolve()
             ),
@@ -302,7 +302,7 @@ class MmBootstrapAssetTests(unittest.TestCase):
         self.assertIn("--fresh", commands[0])
         self.assertIn(f"-DPython3_EXECUTABLE={locked_python}", commands[0])
 
-    def test_cached_python_symlink_is_compared_by_interpreter_identity(self) -> None:
+    def test_cached_python_symlink_retains_its_entry_identity(self) -> None:
         layout = self._prepare_sources()
         interpreter = self.repo / "python-real"
         interpreter.touch()
@@ -311,6 +311,9 @@ class MmBootstrapAssetTests(unittest.TestCase):
         self._write_configuration(layout, alias)
 
         self.assertTrue(has_required_configuration(layout, alias))
+        self.assertFalse(has_required_configuration(layout, interpreter))
+        self._write_configuration(layout, interpreter)
+        self.assertFalse(has_required_configuration(layout, alias))
 
     def test_changed_fetchcontent_source_forces_fresh_mm_reconfigure(self) -> None:
         layout = self._prepare_sources()

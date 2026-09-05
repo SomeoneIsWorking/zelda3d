@@ -123,7 +123,7 @@ class HarnessBuildTests(unittest.TestCase):
     def test_configure_forwards_python_without_forcing_a_compiler(self) -> None:
         command = harness_build.configure_command(self.fixture.build, "/locked/python")
 
-        self.assertIn("-DPython3_EXECUTABLE=/locked/python", command)
+        self.assertIn(f"-DPython3_EXECUTABLE={Path('/locked/python').absolute()}", command)
         self.assertFalse(any("CMAKE_CXX_COMPILER" in item for item in command))
 
     def test_configure_rejects_incomplete_metadata(self) -> None:

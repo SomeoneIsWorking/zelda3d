@@ -242,8 +242,8 @@ def has_required_configuration(
     cache = cmake_build_policy.read_cmake_cache(
         layout.extraction_build_dir / "CMakeCache.txt"
     )
-    if cache.get("GAME_STR") != "MM" or not _cache_path_matches(
-        cache, "Python3_EXECUTABLE", Path(python_executable)
+    if cache.get("GAME_STR") != "MM" or not cmake_build_policy.cache_uses_python(
+        cache, python_executable
     ):
         return False
     if not _cache_path_matches(
