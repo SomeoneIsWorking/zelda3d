@@ -34,6 +34,7 @@
 
 #include <SDL3/SDL_scancode.h>
 #include "extractor/Extract.h"
+#include "platform/rom_arguments.h"
 // OTRTODO
 // #include <functions.h>
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
@@ -122,7 +123,6 @@ extern "C" {
 #include "port/zelda3d_port_api.h"
 }
 
-
 OTRGlobals* OTRGlobals::Instance;
 GameInteractor* GameInteractor::Instance;
 AudioCollection* AudioCollection::Instance;
@@ -193,8 +193,7 @@ OTRGlobals::OTRGlobals() {
     auto fast3dWindow = std::dynamic_pointer_cast<Fast::Fast3dWindow>(context->GetWindow());
     if (fast3dWindow == nullptr) {
         // The Context takes ownership; we keep only a raw observer (see benFast3dWindow's comment).
-        fast3dWindow = std::make_shared<Fast::Fast3dWindow>(
-            std::vector<std::shared_ptr<Ship::GuiWindow>>({}));
+        fast3dWindow = std::make_shared<Fast::Fast3dWindow>(std::vector<std::shared_ptr<Ship::GuiWindow>>({}));
         context->InitWindow(fast3dWindow);
     } else {
         SPDLOG_INFO("Adopting the engine's existing window rather than constructing a second one.");
@@ -260,7 +259,9 @@ bool PathTestCleanup(FILE* tfile) {
             std::filesystem::remove("./text.txt");
         if (std::filesystem::exists("./test/"))
             std::filesystem::remove("./test/");
-    } catch (std::filesystem::filesystem_error const& ex) { return false; }
+    } catch (std::filesystem::filesystem_error const& ex) {
+        return false;
+    }
     return true;
 }
 
@@ -295,12 +296,9 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
     bool shouldRegen = VerifyArchiveVersion(DetectArchiveVersion("mm.o2r", true));
 
     std::filesystem::path ownPath;
-    std::vector<std::string> args;
-    if (argc > 1) {
-        for (int i = 1; i < argc; i++) {
-            args.push_back(argv[i]);
-        }
-    }
+    const Zelda3D::Platform::RomSelectionStore selectionStore(Ship::Context::GetAppDirectoryPath("zelda3d"));
+    std::vector<std::string> args =
+        Zelda3D::Platform::RomArguments(argc, argv, Zelda3D::Platform::RomKind::MmN64, selectionStore);
     Extractor extract;
     PromptSteps promptStep = PS_FILE_CHECK;
     std::atomic<size_t> extractCount = 0, totalExtract = 0;
@@ -409,7 +407,9 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                         bool error = false;
                         try {
                             create_directories(tfolder);
-                        } catch (std::filesystem::filesystem_error const& ex) { error = true; }
+                        } catch (std::filesystem::filesystem_error const& ex) {
+                            error = true;
+                        }
                         if (tfile == NULL || error) {
                             BenGui::RegisterPopup("2S2H Permissions Error",
                                                   "2S2H does not have proper file permissions.\nPlease move it to a "
@@ -769,8 +769,7 @@ void OTRGlobals::Initialize() {
     }
 }
 
-OTRGlobals::~OTRGlobals() {
-}
+OTRGlobals::~OTRGlobals() {}
 
 extern "C" uint32_t Ship_GetInterpolationFPS() {
     return OTRGlobals::Instance->GetInterpolationFPS();
@@ -1113,7 +1112,7 @@ extern "C" int InitOTR(int argc, char* argv[]) {
         }
 
         srand(now);
-    #ifdef ENABLE_CROWD_CONTROL
+#ifdef ENABLE_CROWD_CONTROL
         CrowdControl::Instance = new CrowdControl();
         CrowdControl::Instance->Init();
         if (CVarGetInteger("gCrowdControl", 0)) {
@@ -1121,7 +1120,7 @@ extern "C" int InitOTR(int argc, char* argv[]) {
         } else {
             CrowdControl::Instance->Disable();
         }
-    #endif
+#endif
 
         Ship::Context::GetRawInstance()->GetFileDropMgr()->RegisterDropHandler(BinarySaveConverter_HandleFileDropped);
         Ship::Context::GetRawInstance()->GetFileDropMgr()->RegisterDropHandler(SaveManager_HandleFileDropped);
@@ -1211,72 +1210,6 @@ extern "C" void Graph_StartFrame() {
     OTRGlobals::Instance->context->GetWindow()->SetLastScancode(-1);
 
     switch (dwScancode) {
-#if 0
-        case KbScancode::LUS_KB_F5: {
-            if (CVarGetInteger("gSaveStatesEnabled", 0) == 0) {
-                Ship::Context::GetRawInstance()->GetWindow()->GetGui()->GetGameOverlay()->TextDrawNotification(
-                    6.0f, true, "Save states not enabled. Check Cheats Menu.");
-                return;
-            }
-            const unsigned int slot = OTRGlobals::Instance->gSaveStateMgr->GetCurrentSlot();
-            const SaveStateReturn stateReturn =
-                OTRGlobals::Instance->gSaveStateMgr->AddRequest({ slot, RequestType::SAVE });
-
-            switch (stateReturn) {
-                case SaveStateReturn::SUCCESS:
-                    SPDLOG_INFO("[SOH] Saved state to slot {}", slot);
-                    break;
-                case SaveStateReturn::FAIL_WRONG_GAMESTATE:
-                    SPDLOG_ERROR("[SOH] Can not save a state outside of \"GamePlay\"");
-                    break;
-                    [[unlikely]] default : break;
-            }
-            break;
-        }
-        case KbScancode::LUS_KB_F6: {
-            if (CVarGetInteger("gSaveStatesEnabled", 0) == 0) {
-                Ship::Context::GetRawInstance()->GetWindow()->GetGui()->GetGameOverlay()->TextDrawNotification(
-                    6.0f, true, "Save states not enabled. Check Cheats Menu.");
-                return;
-            }
-            unsigned int slot = OTRGlobals::Instance->gSaveStateMgr->GetCurrentSlot();
-            slot++;
-            if (slot > 5) {
-                slot = 0;
-            }
-            OTRGlobals::Instance->gSaveStateMgr->SetCurrentSlot(slot);
-            SPDLOG_INFO("Set SaveState slot to {}.", slot);
-            break;
-        }
-        case KbScancode::LUS_KB_F7: {
-            if (CVarGetInteger("gSaveStatesEnabled", 0) == 0) {
-                Ship::Context::GetRawInstance()->GetWindow()->GetGui()->GetGameOverlay()->TextDrawNotification(
-                    6.0f, true, "Save states not enabled. Check Cheats Menu.");
-                return;
-            }
-            const unsigned int slot = OTRGlobals::Instance->gSaveStateMgr->GetCurrentSlot();
-            const SaveStateReturn stateReturn =
-                OTRGlobals::Instance->gSaveStateMgr->AddRequest({ slot, RequestType::LOAD });
-
-            switch (stateReturn) {
-                case SaveStateReturn::SUCCESS:
-                    SPDLOG_INFO("[SOH] Loaded state from slot {}", slot);
-                    break;
-                case SaveStateReturn::FAIL_INVALID_SLOT:
-                    SPDLOG_ERROR("[SOH] Invalid State Slot Number {}", slot);
-                    break;
-                case SaveStateReturn::FAIL_STATE_EMPTY:
-                    SPDLOG_ERROR("[SOH] State Slot {} is empty", slot);
-                    break;
-                case SaveStateReturn::FAIL_WRONG_GAMESTATE:
-                    SPDLOG_ERROR("[SOH] Can not load a state outside of \"GamePlay\"");
-                    break;
-                    [[unlikely]] default : break;
-            }
-
-            break;
-        }
-#endif
 #if defined(_WIN32) || defined(__APPLE__)
         case KbScancode::LUS_KB_F9: {
             // Toggle TTS
@@ -1450,6 +1383,7 @@ extern "C" uint32_t ResourceMgr_GetGamePlatform(int index) {
         case MM_NTSC_US_GC:
             return GAME_PLATFORM_GC;
     }
+    throw Zelda3D::CoreBootError("Cannot identify MM game platform for archive version " + std::to_string(version));
 }
 
 extern "C" uint32_t ResourceMgr_GetGameRegion(int index) {
@@ -1461,6 +1395,7 @@ extern "C" uint32_t ResourceMgr_GetGameRegion(int index) {
         case MM_NTSC_US_GC:
             return GAME_REGION_NTSC;
     }
+    throw Zelda3D::CoreBootError("Cannot identify MM game region for archive version " + std::to_string(version));
 }
 
 extern "C" void ResourceMgr_LoadDirectory(const char* resName) {
@@ -1525,16 +1460,25 @@ std::shared_ptr<Ship::IResource> GetResourceByName(const char* path) {
 }
 
 extern "C" char* ResourceMgr_LoadFileFromDisk(const char* filePath) {
-    FILE* file = fopen(filePath, "r");
-    fseek(file, 0, SEEK_END);
-    int fSize = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    char* data = (char*)malloc(fSize);
-    fread(data, 1, fSize, file);
-
+    FILE* file = fopen(filePath, "rb");
+    if (file == nullptr || fseek(file, 0, SEEK_END) != 0) {
+        if (file != nullptr) {
+            fclose(file);
+        }
+        return nullptr;
+    }
+    const long fileSize = ftell(file);
+    if (fileSize <= 0 || fseek(file, 0, SEEK_SET) != 0) {
+        fclose(file);
+        return nullptr;
+    }
+    char* data = static_cast<char*>(malloc(static_cast<size_t>(fileSize)));
+    if (data == nullptr || fread(data, 1, static_cast<size_t>(fileSize), file) != static_cast<size_t>(fileSize)) {
+        free(data);
+        fclose(file);
+        return nullptr;
+    }
     fclose(file);
-
     return data;
 }
 
@@ -1561,7 +1505,6 @@ extern "C" char* ResourceMgr_LoadJPEG(char* data, size_t dataSize) {
 
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
-            uint16_t* bufferTest = (uint16_t*)finalBuffer;
             int pixelIdx = ((y * w) + x) * 4;
 
             uint8_t r = pixels[pixelIdx + 0] / 8;
@@ -1828,69 +1771,6 @@ extern "C" KeyFrameSkeleton* ResourceMgr_LoadKeyFrameSkelByName(const char* path
 extern "C" KeyFrameAnimation* ResourceMgr_LoadKeyFrameAnimByName(const char* path) {
     return (KeyFrameAnimation*)ResourceGetDataByName(path);
 }
-// std::map<std::string, SoundFontSample*> cachedCustomSFs;
-#if 0
-extern "C" SoundFontSample* ReadCustomSample(const char* path) {
-    return nullptr;
-    /*
-        if (!ExtensionCache.contains(path))
-            return nullptr;
-
-        ExtensionEntry entry = ExtensionCache[path];
-
-        auto sampleRaw = Ship::Context::GetRawInstance()->GetResourceManager()->LoadFile(entry.path);
-        uint32_t* strem = (uint32_t*)sampleRaw->Buffer.get();
-        uint8_t* strem2 = (uint8_t*)strem;
-
-        SoundFontSample* sampleC = new SoundFontSample;
-
-        if (entry.ext == "wav") {
-            drwav_uint32 channels;
-            drwav_uint32 sampleRate;
-            drwav_uint64 totalPcm;
-            drmp3_int16* pcmData =
-                drwav_open_memory_and_read_pcm_frames_s16(strem2, sampleRaw->BufferSize, &channels, &sampleRate,
-       &totalPcm, NULL); sampleC->size = totalPcm; sampleC->sampleAddr = (uint8_t*)pcmData; sampleC->codec = CODEC_S16;
-
-            sampleC->loop = new AdpcmLoop;
-            sampleC->loop->start = 0;
-            sampleC->loop->end = sampleC->size - 1;
-            sampleC->loop->count = 0;
-            sampleC->sampleRateMagicValue = 'RIFF';
-            sampleC->sampleRate = sampleRate;
-
-            cachedCustomSFs[path] = sampleC;
-            return sampleC;
-        } else if (entry.ext == "mp3") {
-            drmp3_config mp3Info;
-            drmp3_uint64 totalPcm;
-            drmp3_int16* pcmData =
-                drmp3_open_memory_and_read_pcm_frames_s16(strem2, sampleRaw->BufferSize, &mp3Info, &totalPcm, NULL);
-
-            sampleC->size = totalPcm * mp3Info.channels * sizeof(short);
-            sampleC->sampleAddr = (uint8_t*)pcmData;
-            sampleC->codec = CODEC_S16;
-
-            sampleC->loop = new AdpcmLoop;
-            sampleC->loop->start = 0;
-            sampleC->loop->end = sampleC->size;
-            sampleC->loop->count = 0;
-            sampleC->sampleRateMagicValue = 'RIFF';
-            sampleC->sampleRate = mp3Info.sampleRate;
-
-            cachedCustomSFs[path] = sampleC;
-            return sampleC;
-        }
-
-        return nullptr;
-    */
-}
-
-extern "C" SoundFontSample* ResourceMgr_LoadAudioSample(const char* path) {
-    return (SoundFontSample*)ResourceGetDataByName(path);
-}
-#endif
-
 extern "C" SoundFont* ResourceMgr_LoadAudioSoundFontByName(const char* path) {
     return (SoundFont*)ResourceGetDataByName(path);
 }
@@ -2078,7 +1958,7 @@ void OTRGlobals::CheckSaveFile(size_t sramSize) const {
     std::fstream saveFile(savePath, std::fstream::in | std::fstream::out | std::fstream::binary);
     if (saveFile.fail()) {
         saveFile.open(savePath, std::fstream::in | std::fstream::out | std::fstream::binary | std::fstream::app);
-        for (int i = 0; i < sramSize; ++i) {
+        for (size_t i = 0; i < sramSize; ++i) {
             saveFile.write("\0", 1);
         }
     }
@@ -2092,52 +1972,6 @@ void OTRGlobals::CheckSaveFile(size_t sramSize) const {
 // extern "C" void Ctx_WriteSaveFile(uintptr_t addr, void* dramAddr, size_t size) {
 //     SaveManager::WriteSaveFile(GetSaveFile(), addr, dramAddr, size);
 // }
-
-std::wstring StringToU16(const std::string& s) {
-    std::vector<unsigned long> result;
-    size_t i = 0;
-    while (i < s.size()) {
-        unsigned long uni;
-        size_t nbytes;
-        bool error = false;
-        unsigned char c = s[i++];
-        if (c < 0x80) { // ascii
-            uni = c;
-            nbytes = 0;
-        } else if (c <= 0xBF) { // assuming kata/hiragana delimiter
-            nbytes = 0;
-            uni = '\1';
-        } else if (c <= 0xDF) {
-            uni = c & 0x1F;
-            nbytes = 1;
-        } else if (c <= 0xEF) {
-            uni = c & 0x0F;
-            nbytes = 2;
-        } else if (c <= 0xF7) {
-            uni = c & 0x07;
-            nbytes = 3;
-        }
-        for (size_t j = 0; j < nbytes; ++j) {
-            unsigned char c = s[i++];
-            uni <<= 6;
-            uni += c & 0x3F;
-        }
-        if (uni != '\1')
-            result.push_back(uni);
-    }
-    std::wstring utf16;
-    for (size_t i = 0; i < result.size(); ++i) {
-        unsigned long uni = result[i];
-        if (uni <= 0xFFFF) {
-            utf16 += (wchar_t)uni;
-        } else {
-            uni -= 0x10000;
-            utf16 += (wchar_t)((uni >> 10) + 0xD800);
-            utf16 += (wchar_t)((uni & 0x3FF) + 0xDC00);
-        }
-    }
-    return utf16;
-}
 
 int CopyStringToCharBuffer(const std::string& inputStr, char* buffer, const int maxBufferSize) {
     if (!inputStr.empty()) {
@@ -2153,38 +1987,6 @@ int CopyStringToCharBuffer(const std::string& inputStr, char* buffer, const int 
     return 0;
 }
 
-extern "C" void OTRGfxPrint(const char* str, void* printer, void (*printImpl)(void*, char)) {
-    const std::vector<uint32_t> hira1 = {
-        u'を', u'ぁ', u'ぃ', u'ぅ', u'ぇ', u'ぉ', u'ゃ', u'ゅ', u'ょ', u'っ', u'-',  u'あ', u'い',
-        u'う', u'え', u'お', u'か', u'き', u'く', u'け', u'こ', u'さ', u'し', u'す', u'せ', u'そ',
-    };
-
-    const std::vector<uint32_t> hira2 = {
-        u'た', u'ち', u'つ', u'て', u'と', u'な', u'に', u'ぬ', u'ね', u'の', u'は', u'ひ', u'ふ', u'へ', u'ほ', u'ま',
-        u'み', u'む', u'め', u'も', u'や', u'ゆ', u'よ', u'ら', u'り', u'る', u'れ', u'ろ', u'わ', u'ん', u'゛', u'゜',
-    };
-
-    std::wstring wstr = StringToU16(str);
-
-    for (const auto& c : wstr) {
-        if (c < 0x80) {
-            printImpl(printer, c);
-        } else if (c >= u'｡' && c <= u'ﾟ') { // katakana
-            printImpl(printer, c - 0xFEC0);
-        } else {
-            auto it = std::find(hira1.begin(), hira1.end(), c);
-            if (it != hira1.end()) { // hiragana block 1
-                printImpl(printer, 0x88 + std::distance(hira1.begin(), it));
-            }
-
-            auto it2 = std::find(hira2.begin(), hira2.end(), c);
-            if (it2 != hira2.end()) { // hiragana block 2
-                printImpl(printer, 0xe0 + std::distance(hira2.begin(), it2));
-            }
-        }
-    }
-}
-
 // Gets the width of the main ImGui window
 extern "C" uint32_t OTRGetCurrentWidth() {
     return OTRGlobals::Instance->context->GetWindow()->GetWidth();
@@ -2193,72 +1995,6 @@ extern "C" uint32_t OTRGetCurrentWidth() {
 // Gets the height of the main ImGui window
 extern "C" uint32_t OTRGetCurrentHeight() {
     return OTRGlobals::Instance->context->GetWindow()->GetHeight();
-}
-
-Color_RGB8 GetColorForControllerLED() {
-#if 0
-    auto brightness = CVarGetFloat("gLedBrightness", 1.0f) / 1.0f;
-    Color_RGB8 color = { 0, 0, 0 };
-    if (brightness > 0.0f) {
-        LEDColorSource source =
-            static_cast<LEDColorSource>(CVarGetInteger("gLedColorSource", LED_SOURCE_TUNIC_ORIGINAL));
-        bool criticalOverride = CVarGetInteger("gLedCriticalOverride", 1);
-        if (gPlayState && (source == LED_SOURCE_TUNIC_ORIGINAL || source == LED_SOURCE_TUNIC_COSMETICS)) {
-            switch (CUR_EQUIP_VALUE(EQUIP_TUNIC) - 1) {
-                case PLAYER_TUNIC_KOKIRI:
-                    color = source == LED_SOURCE_TUNIC_COSMETICS
-                                ? CVarGetColor24("gCosmetics.Link_KokiriTunic.Value", kokiriColor)
-                                : kokiriColor;
-                    break;
-                case PLAYER_TUNIC_GORON:
-                    color = source == LED_SOURCE_TUNIC_COSMETICS
-                                ? CVarGetColor24("gCosmetics.Link_GoronTunic.Value", goronColor)
-                                : goronColor;
-                    break;
-                case PLAYER_TUNIC_ZORA:
-                    color = source == LED_SOURCE_TUNIC_COSMETICS
-                                ? CVarGetColor24("gCosmetics.Link_ZoraTunic.Value", zoraColor)
-                                : zoraColor;
-                    break;
-            }
-        }
-        if (source == LED_SOURCE_CUSTOM) {
-            color = CVarGetColor24("gLedPort1Color", { 255, 255, 255 });
-        }
-        if (criticalOverride || source == LED_SOURCE_HEALTH) {
-            if (HealthMeter_IsCritical()) {
-                color = { 0xFF, 0, 0 };
-            } else if (source == LED_SOURCE_HEALTH) {
-                if (gSaveContext.health / gSaveContext.healthCapacity <= 0.4f) {
-                    color = { 0xFF, 0xFF, 0 };
-                } else {
-                    color = { 0, 0xFF, 0 };
-                }
-            }
-        }
-        color.r = color.r * brightness;
-        color.g = color.g * brightness;
-        color.b = color.b * brightness;
-    }
-#endif
-    return { 0, 0, 0 };
-}
-
-extern "C" void OTRControllerCallback(uint8_t rumble) {
-    // We call this every tick, SDL accounts for this use and prevents driver spam
-    // https://github.com/libsdl-org/SDL/blob/f17058b562c8a1090c0c996b42982721ace90903/src/joystick/SDL_joystick.c#L1114-L1144
-    Ship::Context::GetRawInstance()->GetControlDeck()->GetControllerByPort(0)->GetLED()->SetLEDColor(
-        GetColorForControllerLED());
-
-    // See OTRGlobals.cpp for why the TestingRumble() gate is gone. MM's copy was worse: it had no
-    // else-guard, so it ran on the FIRST call too rather than from the second onward.
-
-    // TODO: other ports?
-    if (rumble) {
-        Ship::Context::GetRawInstance()->GetControlDeck()->GetControllerByPort(0)->GetRumble()->StartRumble();
-    } else {
-        Ship::Context::GetRawInstance()->GetControlDeck()->GetControllerByPort(0)->GetRumble()->StopRumble();
-    }
 }
 
 extern "C" float OTRGetAspectRatio() {
@@ -2362,7 +2098,6 @@ extern "C" int32_t OTRConvertHUDXToScreenX(int32_t v) {
     }
 
     uint32_t gameHeight, gameWidth;
-    float gameAspectRatio = fastWnd->GetAspectRatio();
     intP->GetCurDimensions(&gameWidth, &gameHeight);
     float hudAspectRatio = 4.0f / 3.0f;
     int32_t hudHeight = gameHeight;
@@ -2429,30 +2164,6 @@ extern "C" int AudioPlayer_GetDesiredBuffered(void) {
 
 extern "C" void AudioPlayer_Play(const uint8_t* buf, uint32_t len) {
     AudioPlayerPlayFrame(buf, len);
-}
-
-extern "C" int Controller_ShouldRumble(size_t slot) {
-    // don't rumble if we don't have rumble mappings
-    if (Ship::Context::GetRawInstance()
-            ->GetControlDeck()
-            ->GetControllerByPort(static_cast<uint8_t>(slot))
-            ->GetRumble()
-            ->GetAllRumbleMappings()
-            .empty()) {
-        return 0;
-    }
-
-    // don't rumble if we don't have connected gamepads
-    if (Ship::Context::GetRawInstance()
-            ->GetControlDeck()
-            ->GetConnectedPhysicalDeviceManager()
-            ->GetConnectedSDLGamepadsForPort(slot)
-            .empty()) {
-        return 0;
-    }
-
-    // rumble
-    return 1;
 }
 
 // Helper to redirect the user to the boot screen in place of known console crash scenarios, and emits a notification

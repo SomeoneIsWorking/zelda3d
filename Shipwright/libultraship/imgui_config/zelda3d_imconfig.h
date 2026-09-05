@@ -9,7 +9,7 @@
 // upstream's file to flip two lines, which is a merge conflict every version bump.
 //
 // ImGui is the DEVELOPER-OVERLAY stack in this port. The shipped, game-facing UI is RmlUi. That
-// split is deliberate and follows Dusklight (docs/dusklight-adoption.md): shipped UI and debug UI
+// split is deliberate: shipped UI and debug UI
 // have different requirements and should not share a framework.
 
 // Operator overloads for ImVec2/ImVec4 (+, -, *, ...). SoH's dev-tool code and the group-panel

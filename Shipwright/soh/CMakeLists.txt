@@ -217,10 +217,9 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
         "soh/Extractor/*.h"
         "soh/Extractor/*.hpp"
     )
-    file(GLOB ZELDA3D_SHARED_EXTRACTOR_SOURCES CONFIGURE_DEPENDS
-        "${ZELDA3D_SHARED_DIR}/extractor/*.c"
-        "${ZELDA3D_SHARED_DIR}/extractor/*.cpp"
-        "${ZELDA3D_SHARED_DIR}/extractor/*.h"
+    set(ZELDA3D_SHARED_EXTRACTOR_SOURCES
+        "${ZELDA3D_SHARED_DIR}/extractor/Extract.cpp"
+        "${ZELDA3D_SHARED_DIR}/extractor/Extract.h"
     )
 else()
     file(GLOB_RECURSE soh__Extractor RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS

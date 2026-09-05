@@ -1,62 +1,77 @@
-// Minimal reader for a *decrypted* 3DS cartridge image (CCI/.3ds).
-// Port of tools/ctr_romfs.py. Parses NCSD -> NCCH (partition 0) -> RomFS (IVFC
-// level 3) to list/extract the game's data files (the ZAR archives) with no
-// emulator/crypto. Decrypted dumps only. Pure C++ (no SoH/LUS deps).
+// Reader for decrypted NCSD/NCCH cartridge RomFS assets. No title policy or crypto keys.
 #pragma once
+#include <array>
 #include <cstdint>
-#include <string>
-#include <vector>
-#include <unordered_map>
+#include <filesystem>
+#include <fstream>
 #include <memory>
+#include <span>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace Zelda3D {
-
 struct CtrFile {
     std::string name;
-    std::string path;   // full "/a/b/c.zar"
-    uint64_t offset = 0; // absolute offset into the ROM file
+    std::string path;
+    uint64_t offset = 0;
     uint64_t size = 0;
 };
-
 struct CtrDir {
     std::string name;
     std::string path;
     std::unordered_map<std::string, std::unique_ptr<CtrDir>> dirs;
     std::unordered_map<std::string, CtrFile> files;
 };
-
 class CtrRom {
   public:
-    // Opens and parses the image. ok() is false on failure (see error()).
-    explicit CtrRom(const std::string& path);
-    bool ok() const { return mOk; }
-    const std::string& error() const { return mErr; }
-
-    // Find a file by absolute path ("/actor/zelda_ge1.zar"); nullptr if absent.
+    struct ValidationSummary {
+        bool integrityVerified = false;
+        uint64_t imageBytes = 0, directories = 0, files = 0, fileBytes = 0;
+        uint64_t verifiedBlocks = 0, verifiedBytes = 0;
+    };
+    // Parses every metadata record and validates the directory/hash graph and byte ranges.
+    explicit CtrRom(const std::filesystem::path& path);
+    CtrRom(const CtrRom&) = delete;
+    CtrRom& operator=(const CtrRom&) = delete;
+    bool ok() const {
+        return mOk;
+    }
+    const std::string& error() const {
+        return mErr;
+    }
+    // Reads and verifies the NCCH RomFS superblock and all IVFC hash/data blocks including padding.
+    // Proves readable, internally consistent assets, not Nintendo RSA authenticity, executable or
+    // other-partition integrity, title identity, or immunity to later external mutation.
+    // Failure invalidates this reader; no partial validation is reported as success.
+    bool validateContent();
+    ValidationSummary validationSummary() const {
+        return mOk ? mSummary : ValidationSummary{};
+    }
     const CtrFile* get(const std::string& path) const;
-    // Read a file's bytes.
     std::vector<uint8_t> read(const CtrFile& fe) const;
     std::vector<uint8_t> read(const std::string& path) const;
 
   private:
-    bool fail(const std::string& m) { mErr = m; mOk = false; return false; }
+    struct Level {
+        uint64_t offset = 0, size = 0, blockSize = 0;
+    };
+    bool fail(const std::string& message);
+    bool readAt(uint64_t offset, std::span<uint8_t> bytes) const;
     bool parseNcsd();
     bool parseNcch();
     bool parseRomfs();
-    void walkDir(uint32_t off, CtrDir& node);
-
-    std::string mPath;
-    FILE* mFp = nullptr;
+    bool parseDirectoryTree();
+    mutable std::ifstream mStream;
     bool mOk = false;
+    bool mEncryptionFlag = false;
     std::string mErr;
-
-    uint64_t mNcchOff = 0, mRomfsOff = 0;
-    uint64_t mL3Base = 0, mDirMetaOff = 0, mFileMetaOff = 0, mFileDataOff = 0;
-    std::vector<uint8_t> mDirMeta, mFileMeta;
+    uint64_t mImageSize = 0, mNcchOff = 0, mNcchSize = 0, mRomfsOff = 0, mRomfsSize = 0;
+    uint64_t mSuperblockSize = 0, mMasterHashSize = 0, mFileDataOff = 0;
+    std::array<uint8_t, 32> mSuperblockHash{};
+    std::array<Level, 3> mLevels{};
+    ValidationSummary mSummary;
+    std::vector<uint8_t> mDirMeta, mFileMeta, mDirHash, mFileHash;
     CtrDir mRoot;
-
-  public:
-    ~CtrRom();
 };
-
 } // namespace Zelda3D

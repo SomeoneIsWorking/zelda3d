@@ -3,7 +3,9 @@
 // -> 3DS asset + world scale), lazily parses+decodes a model from the decrypted
 // .3ds the first time it's drawn (on the render thread, GL current), and serves the
 // renderer's provider callback with the CPU data to upload. No baked-in C arrays;
-// the .3ds path comes from env ZELDA3D_OOT3D_ROM (never hardcoded — repo rule).
+// The shared selection owner provides the native path activated by first-run setup.
+#include "platform/rom_install.h"
+#include <spdlog/spdlog.h>
 #include "asset/ctr_rom.h"
 #include "asset/zar.h"
 #include "asset/zsi.h"
@@ -127,14 +129,14 @@ std::vector<std::string> g_autoModelPaths; // index = modelId - kAutoModelBase
 
 Zelda3D::CtrRom* rom() {
     if (!g_rom) {
-        const char* path = getenv("ZELDA3D_OOT3D_ROM");
-        if (!path || !*path) {
-            fprintf(stderr, "[Zelda3D] ZELDA3D_OOT3D_ROM not set — cannot load OoT3D assets\n");
+        const auto path = Zelda3D::Platform::RomSelectionStore::ActiveSelection(Zelda3D::Platform::RomKind::Oot3ds);
+        if (!path) {
+            SPDLOG_ERROR("No OoT3D asset ROM is activated");
             return nullptr;
         }
-        g_rom = std::make_unique<Zelda3D::CtrRom>(path);
+        g_rom = std::make_unique<Zelda3D::CtrRom>(*path);
         if (!g_rom->ok()) {
-            fprintf(stderr, "[Zelda3D] CtrRom(%s): %s\n", path, g_rom->error().c_str());
+            SPDLOG_ERROR("Cannot load selected OoT3D asset ROM: {}", g_rom->error());
             g_rom.reset();
             return nullptr;
         }

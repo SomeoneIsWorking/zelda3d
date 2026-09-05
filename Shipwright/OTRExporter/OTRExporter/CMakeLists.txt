@@ -144,7 +144,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../libultraship/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../libultraship/extern
     ${CMAKE_CURRENT_SOURCE_DIR}/../../libultraship/src/resource
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../mm/2s2h
+	${OTR_EXPORTER_GAME_SOURCE_DIR}
 	.
 )
 
@@ -209,4 +209,3 @@ add_dependencies(${PROJECT_NAME}
 
 # Link with other targets.
 target_link_libraries(${PROJECT_NAME} PUBLIC "${ADDITIONAL_LIBRARY_DEPENDENCIES}")
-

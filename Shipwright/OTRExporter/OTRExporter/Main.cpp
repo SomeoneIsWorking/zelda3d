@@ -48,16 +48,11 @@ std::mutex fileMutex;
 
 void InitVersionInfo();
 
-enum class ExporterFileMode
-{
-    BuildOTR = (int)ZFileMode::Custom + 1,
-};
+constexpr ZFileMode kBuildOtrFileMode = ZFileMode::Custom;
 
-static void ExporterParseFileMode(const std::string& buildMode, ZFileMode& fileMode)
-{
-    if (buildMode == "botr")
-    {
-        fileMode = (ZFileMode)ExporterFileMode::BuildOTR;
+static void ExporterParseFileMode(const std::string& buildMode, ZFileMode& fileMode) {
+    if (buildMode == "botr") {
+        fileMode = kBuildOtrFileMode;
 
         printf("BOTR: Generating OTR Archive...\n");
 
@@ -70,8 +65,7 @@ static void ExporterParseFileMode(const std::string& buildMode, ZFileMode& fileM
 
         auto lst = Directory::ListFiles("Extract");
 
-        for (auto item : lst)
-        {
+        for (auto item : lst) {
             auto fileData = DiskFile::ReadAllBytes(item);
             archive->AddFile(StringHelper::Split(item, "Extract/")[1], fileData.data(), fileData.size());
         }
@@ -90,15 +84,14 @@ typedef struct DataU {
     size_t size;
 } DataU;
 
-static void ExporterProgramEnd()
-{
+static void ExporterProgramEnd() {
     uint32_t crc = 0xFFFFFFFF;
     const uint8_t endianness = (uint8_t)Endianness::Big;
 
     std::vector<uint16_t> portVersion = {};
     std::vector<std::string> versionParts = StringHelper::Split(portVersionString, ".");
 
-    // If a major.minor.patch string was not passed in, fallback to 0 0 0 
+    // If a major.minor.patch string was not passed in, fallback to 0 0 0
     if (versionParts.size() != 3) {
         portVersion = { 0, 0, 0 };
     } else {
@@ -107,9 +100,9 @@ static void ExporterProgramEnd()
             uint16_t num = 0;
             try {
                 num = (uint16_t)std::stoi(val, nullptr);
-            } catch (std::invalid_argument &e) {
+            } catch (std::invalid_argument& e) {
                 num = 0;
-            } catch (std::out_of_range &e) {
+            } catch (std::out_of_range& e) {
                 num = 0;
             }
 
@@ -117,7 +110,7 @@ static void ExporterProgramEnd()
         }
     }
 
-    MemoryStream *portVersionStream = new MemoryStream();
+    MemoryStream* portVersionStream = new MemoryStream();
     BinaryWriter portVerWriter(portVersionStream);
     portVerWriter.SetEndianness(Endianness::Big);
     portVerWriter.Write(endianness);
@@ -126,8 +119,7 @@ static void ExporterProgramEnd()
     portVerWriter.Write(portVersion[2]); // Patch
     portVerWriter.Close();
 
-    if (Globals::Instance->fileMode == ZFileMode::ExtractDirectory)
-    {
+    if (Globals::Instance->fileMode == ZFileMode::ExtractDirectory) {
         std::string romPath = Globals::Instance->baseRomPath.string();
         std::vector<uint8_t> romData = DiskFile::ReadAllBytes(romPath);
 
@@ -138,7 +130,7 @@ static void ExporterProgramEnd()
 
         // Get crc from rom
 
-        MemoryStream *versionStream = new MemoryStream();
+        MemoryStream* versionStream = new MemoryStream();
         BinaryWriter writer(versionStream);
         writer.SetEndianness(Endianness::Big);
         writer.Write(endianness);
@@ -159,19 +151,16 @@ static void ExporterProgramEnd()
         auto portVersionStreamBuffer = portVersionStream->ToVector();
         archive->AddFile("portVersion", (void*)portVersionStreamBuffer.data(), portVersionStream->GetLength());
 
-        for (const auto& item : files)
-        {
+        for (const auto& item : files) {
             std::string fName = item.first;
-            if (fName.find("gTitleZeldaShieldLogoMQTex") != std::string::npos && !ZRom(romPath).IsMQ())
-            {
+            if (fName.find("gTitleZeldaShieldLogoMQTex") != std::string::npos && !ZRom(romPath).IsMQ()) {
                 size_t pos = 0;
-                if ((pos = fName.find("gTitleZeldaShieldLogoMQTex", 0)) != std::string::npos)
-                {
+                if ((pos = fName.find("gTitleZeldaShieldLogoMQTex", 0)) != std::string::npos) {
                     fName.replace(pos, 27, "gTitleZeldaShieldLogoTex");
                 }
             }
             const auto& fileData = item.second;
-            archive->AddFile(fName, (void*)fileData.data(),	fileData.size());
+            archive->AddFile(fName, (void*)fileData.data(), fileData.size());
         }
 
         archive = nullptr;
@@ -195,7 +184,7 @@ static void ExporterProgramEnd()
     printf("Generating Custom OTR Archive...\n");
     auto customOtr = std::make_unique<ExporterArchiveO2R>(customArchiveFileName, true);
     customOtr->CreateArchive(40000);
-    
+
     printf("Adding portVersion file.\n");
     auto portVersionStreamBuffer = portVersionStream->ToVector();
     customOtr->AddFile("portVersion", (void*)portVersionStreamBuffer.data(), portVersionStream->GetLength());
@@ -203,14 +192,11 @@ static void ExporterProgramEnd()
     std::vector<Data> dataVec;
     std::vector<DataU> dataVec2;
 
-
-    for (const auto& item : lst)
-    {
+    for (const auto& item : lst) {
         size_t filenameSepAt = item.find_last_of("/\\");
         const std::string filename = item.substr(filenameSepAt + 1);
 
-        if (std::count(filename.begin(), filename.end(), '.') >= 2)
-        {
+        if (std::count(filename.begin(), filename.end(), '.') >= 2) {
             size_t extensionSepAt = filename.find_last_of(".");
             size_t formatSepAt = filename.find_last_of(".", extensionSepAt - 1);
 
@@ -218,8 +204,9 @@ static void ExporterProgramEnd()
             const std::string format = filename.substr(formatSepAt + 1, extensionSepAt - formatSepAt - 1);
             std::string afterPath = item.substr(0, filenameSepAt + formatSepAt + 1);
 
-            if (extension == "png" && (format == "rgba32" || format == "rgb5a1" || format == "i4" || format == "i8" || format == "ia4" || format == "ia8" || format == "ia16" || format == "ci4" || format == "ci8"))
-            {
+            if (extension == "png" &&
+                (format == "rgba32" || format == "rgb5a1" || format == "i4" || format == "i8" || format == "ia4" ||
+                 format == "ia8" || format == "ia16" || format == "ci4" || format == "ci8")) {
                 ZTexture tex(nullptr);
                 Globals::Instance->buildRawTexture = true;
                 tex.FromPNG(item, ZTexture::GetTextureTypeFromString(format));
@@ -233,7 +220,7 @@ static void ExporterProgramEnd()
                 exporter.Save(&tex, "", &writer);
 
                 std::string src = tex.GetBodySourceCode();
-                writer.Write((char *)src.c_str(), src.size());
+                writer.Write((char*)src.c_str(), src.size());
 
                 std::vector<char> fileData = stream->ToVector();
                 dataVec.push_back({ fileData, StringHelper::Split(afterPath, customAssetsPath)[1], fileData.size() });
@@ -241,15 +228,12 @@ static void ExporterProgramEnd()
             }
         }
 
-        if (item.find("accessibility") != std::string::npos)
-        {
+        if (item.find("accessibility") != std::string::npos) {
             std::string extension = filename.substr(filename.find_last_of(".") + 1);
-            if (extension == "json")
-            {
-                const auto &fileData = DiskFile::ReadAllBytes(item);
+            if (extension == "json") {
+                const auto& fileData = DiskFile::ReadAllBytes(item);
                 printf("Adding accessibility texts %s\n", StringHelper::Split(item, customAssetsPath)[1].c_str());
-                dataVec2.push_back({fileData,
-                                     StringHelper::Split(item, customAssetsPath)[1], fileData.size() });
+                dataVec2.push_back({ fileData, StringHelper::Split(item, customAssetsPath)[1], fileData.size() });
             }
             continue;
         }
@@ -267,12 +251,12 @@ static void ExporterProgramEnd()
     }
 
     printf("Done\n");
-    // For O2Rs the zip file MUST be closed while the vectors are still valid so we need to close the file in this function.
+    // For O2Rs the zip file MUST be closed while the vectors are still valid so we need to close the file in this
+    // function.
     customOtr = nullptr;
 }
 
-static void ExporterParseArgs(int argc, char* argv[], int& i)
-{
+static bool ExporterParseArgs(int argc, char* argv[], int& i) {
     std::string arg = argv[i];
 
     if (arg == "--otrfile") {
@@ -287,59 +271,52 @@ static void ExporterParseArgs(int argc, char* argv[], int& i)
     } else if (arg == "--portVer") {
         portVersionString = argv[i + 1];
         i++;
+    } else {
+        return false;
     }
+    return true;
 }
 
-static bool ExporterProcessFileMode(ZFileMode fileMode)
-{
+static bool ExporterProcessFileMode(ZFileMode fileMode) {
     // Do whatever work is associated with these custom file modes...
     // Return true to indicate one of our own file modes is being processed
-    if (fileMode == (ZFileMode)ExporterFileMode::BuildOTR)
+    if (fileMode == kBuildOtrFileMode)
         return true;
 
     return false;
 }
 
-static void ExporterFileBegin(ZFile* file)
-{
+static void ExporterFileBegin(ZFile* file) {
     fileStart = std::chrono::steady_clock::now();
 
     MemoryStream* stream = new MemoryStream();
     fileWriter = new BinaryWriter(stream);
 }
 
-static void ExporterFileEnd(ZFile* file)
-{
+static void ExporterFileEnd(ZFile* file) {
     // delete fileWriter;
 }
 
-static void ExporterResourceEnd(ZResource* res, BinaryWriter& writer)
-{
+static void ExporterResourceEnd(ZResource* res, BinaryWriter& writer) {
     auto streamShared = writer.GetStream();
     MemoryStream* strem = (MemoryStream*)streamShared.get();
 
-    auto start = std::chrono::steady_clock::now();
-
-    if (res->GetName() != "")
-    {
+    if (res->GetName() != "") {
         std::string oName = res->parent->GetOutName();
         std::string rName = res->GetName();
         std::string prefix = OTRExporter_DisplayList::GetPrefix(res);
 
-        //auto xmlFilePath = res->parent->GetXmlFilePath();
-        //prefix = StringHelper::Split(StringHelper::Split(xmlFilePath.string(), "xml\\")[1], ".xml")[0];
+        // auto xmlFilePath = res->parent->GetXmlFilePath();
+        // prefix = StringHelper::Split(StringHelper::Split(xmlFilePath.string(), "xml\\")[1], ".xml")[0];
 
-        if (StringHelper::Contains(oName, "_scene"))
-        {
+        if (StringHelper::Contains(oName, "_scene")) {
             auto split = StringHelper::Split(oName, "_");
             oName = "";
             for (size_t i = 0; i < split.size() - 1; i++)
                 oName += split[i] + "_";
 
             oName += "scene";
-        }
-        else if (StringHelper::Contains(oName, "_room"))
-        {
+        } else if (StringHelper::Contains(oName, "_room")) {
             if (Globals::Instance->game != ZGame::MM_RETAIL)
                 oName = StringHelper::Split(oName, "_room")[0] + "_scene";
             else
@@ -353,48 +330,32 @@ static void ExporterResourceEnd(ZResource* res, BinaryWriter& writer)
         else
             fName = StringHelper::Sprintf("%s/%s", oName.c_str(), rName.c_str());
 
-        if (Globals::Instance->fileMode == ZFileMode::ExtractDirectory)
-        {
+        if (Globals::Instance->fileMode == ZFileMode::ExtractDirectory) {
             std::unique_lock Lock(fileMutex);
             files[fName] = strem->ToVector();
-        }
-        else
+        } else
             DiskFile::WriteAllBytes("Extract/" + fName, strem->ToVector());
     }
-
-    auto end = std::chrono::steady_clock::now();
-    size_t diff = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
-    //if (diff > 10)
-        //printf("Exported Resource End %s in %zums\n", res->GetName().c_str(), diff);
 }
 
-static void ExporterProcessCompilable(tinyxml2::XMLElement* reader)
-{
+static void ExporterProcessCompilable(tinyxml2::XMLElement* reader) {
     std::string nodeName = reader->Name();
 }
 
-static void ExporterXMLBegin()
-{
-}
+static void ExporterXMLBegin() {}
 
-static void ExporterXMLEnd()
-{
-}
+static void ExporterXMLEnd() {}
 
-void AddFile(std::string fName, std::vector<char> data)
-{
+void AddFile(std::string fName, std::vector<char> data) {
     if (Globals::Instance->fileMode != ZFileMode::ExtractDirectory)
         DiskFile::WriteAllBytes("Extract/" + fName, data);
-    else
-    {
+    else {
         std::unique_lock Lock(fileMutex);
         files[fName] = data;
     }
 }
 
-void ImportExporters()
-{
+void ImportExporters() {
     // In this example we set up a new exporter called "EXAMPLE".
     // By running ZAPD with the argument -se EXAMPLE, we tell it that we want to use this exporter for our resources.
     ExporterSet* exporterSet = new ExporterSet();

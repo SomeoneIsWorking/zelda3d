@@ -309,7 +309,6 @@ class Location {
     ActorID actorId;
     SceneID scene;
     int32_t actorParams;
-    bool checked = false;
     std::string shortName;
     std::string spoilerName;
     RandomizerHintTextKey hintKey;
@@ -317,7 +316,6 @@ class Location {
     bool isVanillaCompletion;
     SpoilerCollectionCheck collectionCheck;
     int16_t vanillaPrice;
-    bool isHintable = false;
     Option excludedOption;
 };
 } // namespace Rando

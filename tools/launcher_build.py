@@ -27,9 +27,15 @@ class BuildLayout:
     jobs: int
 
     @classmethod
-    def for_repo(cls, repo: Path, jobs: int | None = None) -> BuildLayout:
+    def for_repo(
+        cls, repo: Path, jobs: int | None = None, *, build_dir: Path | None = None
+    ) -> BuildLayout:
         repo = repo.resolve()
-        build_dir = repo / "Shipwright" / "build-cmake"
+        build_dir = (
+            build_dir.resolve()
+            if build_dir is not None
+            else repo / "Shipwright" / "build-cmake"
+        )
         return cls(
             repo=repo,
             build_dir=build_dir,
@@ -100,7 +106,7 @@ def require_sources(build: BuildLayout) -> None:
         )
 
 
-def ensure_launcher_build(
+def ensure_product_build(
     build: BuildLayout,
     runner: CommandRunner = run_command,
     *,
@@ -126,6 +132,15 @@ def ensure_launcher_build(
         raise LauncherBuildError(
             f"launcher binary is missing or not executable after build: {build.binary}"
         )
+
+
+def ensure_launcher_build(
+    build: BuildLayout,
+    runner: CommandRunner = run_command,
+    *,
+    python_executable: str | Path | None = None,
+) -> None:
+    ensure_product_build(build, runner, python_executable=python_executable)
 
     # Bootstrap owns the independent MM extraction pipeline; zelda3d_app owns the SoH custom
     # archive. The unified product is launchable only when all three runtime inputs remain present.

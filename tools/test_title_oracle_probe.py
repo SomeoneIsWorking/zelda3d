@@ -63,6 +63,15 @@ class CommandListCache(RegisterCache):
 
 
 class TitleOracleProbeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Cache-identity tests use a controlled checkpoint cursor, never a local game's metadata.
+        self.enterContext(
+            mock.patch.dict(
+                title_oracle_probe.oracle_frame_for_title_cs.__globals__,
+                {"initial_title_cs": lambda: 88},
+            )
+        )
+
     def test_artifact_identity_includes_exact_cursor_frame_and_draw(self) -> None:
         self.assertEqual(
             title_oracle_probe.artifact_args(1093, draw=17),

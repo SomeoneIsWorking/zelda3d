@@ -19,8 +19,8 @@ CMakeLists globs this directory into its own target, against its own headers. Tw
 source of truth — which is the part that matters, because a duplicate is not a neutral cost. It is
 two files to patch, two to audit, and two that drift apart silently.
 
-This is recorded as claim **C064**. Dusklight, whose layering this project otherwise follows, never
-had to solve it: it hosts a single game.
+This is recorded as claim **C064**. Zelda3D needs this boundary because it hosts two independently
+compiled game cores behind one shared runtime.
 
 ## What may go here
 

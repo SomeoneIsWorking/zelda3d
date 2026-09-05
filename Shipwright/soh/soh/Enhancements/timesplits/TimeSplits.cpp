@@ -1,5 +1,6 @@
 #include <vector>
 #include <fstream>
+#include <utility>
 
 #include <ship/Context.h>
 #include "TimeSplits.h"
@@ -511,9 +512,7 @@ void TimeSplitsPopUpContext() {
 
                 if (popupObject.splitType == SPLIT_TYPE_UPGRADE) {
                     if (popupID <= ITEM_SLINGSHOT && popupID != -1) {
-                        ImVec2 imageMin = ImGui::GetItemRectMin();
                         ImVec2 imageMax = ImGui::GetItemRectMax();
-                        // ImVec2 imageSize = ImVec2(imageMax.x - imageMin.x, imageMax.y - imageMin.y); UNUSED
                         ImVec2 textPos = ImVec2(imageMax.x - ImGui::CalcTextSize("00").x - 5,
                                                 imageMax.y - ImGui::CalcTextSize("00").y - 5);
 
@@ -564,7 +563,7 @@ void TimeSplitsItemSplitEvent(uint32_t type, u8 item) {
         }
         if (item == ITEM_SKULL_TOKEN) {
             auto it = std::find_if(splitList.begin(), splitList.end(), [item](const SplitObject& split) {
-                if (split.splitSkullTokenCount == gSaveContext.inventory.gsTokens) {
+                if (std::cmp_equal(split.splitSkullTokenCount, gSaveContext.inventory.gsTokens)) {
                     return split.splitID == item;
                 } else {
                     return split.splitID == ITEM_NONE;

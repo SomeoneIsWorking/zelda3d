@@ -1,6 +1,6 @@
 # Zelda3D — the project root.
 #
-# One runtime, one engine, two games. The layering follows Dusklight's (docs/dusklight-adoption.md):
+# One runtime, one engine, two peer games. Zelda3D owns this layering directly:
 #
 #   engine      Shipwright/libultraship   window/renderer/input/resources — knows no game
 #               Shipwright/cmb3d          3DS asset formats (CMB/CSAB/ZAR/ZSI/…)
@@ -173,11 +173,13 @@ execute_process(
     COMMAND git describe --tags --abbrev=0 --exact-match HEAD
     WORKING_DIRECTORY ${ZELDA3D_ROOT}
     OUTPUT_VARIABLE GIT_COMMIT_TAG
+    RESULT_VARIABLE GIT_COMMIT_TAG_RESULT
+    ERROR_QUIET
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-if(NOT GIT_COMMIT_TAG)
-    set(GIT_COMMIT_TAG "" CACHE STRING "Git commit tag" FORCE)
+if(NOT GIT_COMMIT_TAG_RESULT EQUAL 0)
+    set(GIT_COMMIT_TAG "")
 endif()
 
 set(CMAKE_PROJECT_GIT_COMMIT_TAG "${GIT_COMMIT_TAG}" CACHE STRING "Git commit tag" FORCE)
@@ -332,6 +334,13 @@ add_subdirectory(${ZELDA3D_SHIPWRIGHT_DIR}/ZAPDTR/ZAPD ${CMAKE_BINARY_DIR}/ZAPD)
 add_subdirectory(${ZELDA3D_SHIPWRIGHT_DIR}/OTRExporter ${CMAKE_BINARY_DIR}/OTRExporter)
 
 # cmb3d — shared 3DS asset layer (CMB/CSAB/ZAR/ZSI/CTR-ROM/…), linked by BOTH games.
+set(ZELDA3D_LUCENT_SOURCE "${ZELDA3D_ROOT}/build/deps/lucent-source")
+if(NOT EXISTS "${ZELDA3D_LUCENT_SOURCE}/CMakeLists.txt")
+    message(FATAL_ERROR "Missing pinned Lucent source: ${ZELDA3D_LUCENT_SOURCE}. Run the canonical Python source provisioning before configuring.")
+endif()
+set(LUCENT_BUILD_ZIP ON CACHE BOOL "Build shared bounded ZIP support" FORCE)
+set(LUCENT_BUILD_TESTS OFF CACHE BOOL "Lucent tests belong to its own repository" FORCE)
+add_subdirectory("${ZELDA3D_LUCENT_SOURCE}" "${CMAKE_BINARY_DIR}/lucent")
 add_subdirectory(${ZELDA3D_SHIPWRIGHT_DIR}/cmb3d ${CMAKE_BINARY_DIR}/cmb3d)
 
 ################################################################################
@@ -347,6 +356,29 @@ add_subdirectory(${ZELDA3D_MM_DIR} ${CMAKE_BINARY_DIR}/mm)
 
 if(LUS_BUILD_TESTS)
     enable_testing()
+    find_package(SDL3 REQUIRED)
+
+    add_executable(n64_rom_validation_test Shipwright/zelda3d_shared/extractor/tests/n64_rom_validation_test.cpp)
+    target_link_libraries(n64_rom_validation_test PRIVATE zelda3d_shared)
+    add_test(NAME n64_rom_validation_test COMMAND n64_rom_validation_test
+        "${CMAKE_BINARY_DIR}/scratch/n64-rom-validation")
+    add_executable(ctr_rom_test Shipwright/cmb3d/tests/ctr_rom_test.cpp)
+    target_link_libraries(ctr_rom_test PRIVATE cmb3d lucent::lucent)
+    add_test(NAME ctr_rom_test COMMAND ctr_rom_test "${CMAKE_BINARY_DIR}/scratch/ctr-rom-validation")
+    add_executable(mm_gfx_print_test 2ship/2s2h/host/gfx_print.cpp 2ship/tests/gfx_print_test.cpp)
+    target_include_directories(mm_gfx_print_test PRIVATE 2ship/2s2h)
+    target_link_libraries(mm_gfx_print_test PRIVATE SDL3::SDL3)
+    add_test(NAME mm_gfx_print_test COMMAND mm_gfx_print_test)
+
+    add_executable(game_interactor_multicast_test tools/game_interactor_multicast_test.cpp)
+    # Exercise the shipping template with the core's header contract, without
+    # linking the game/exporter implementation into this asset-free unit test.
+    target_include_directories(game_interactor_multicast_test PRIVATE
+        $<TARGET_PROPERTY:soh_settings,INTERFACE_INCLUDE_DIRECTORIES>)
+    target_compile_definitions(game_interactor_multicast_test PRIVATE
+        $<TARGET_PROPERTY:soh_settings,INTERFACE_COMPILE_DEFINITIONS>)
+    target_link_libraries(game_interactor_multicast_test PRIVATE libultraship)
+    add_test(NAME game_interactor_multicast_test COMMAND game_interactor_multicast_test)
 
     add_executable(boss_fd2_animation_policy_test
         tools/boss_fd2_animation_policy_test.cpp
@@ -380,26 +412,9 @@ endif()
 add_subdirectory(${ZELDA3D_SHIPWRIGHT_DIR}/zelda3d_app ${CMAKE_BINARY_DIR}/zelda3d)
 
 ################################################################################
-# Packaging and asset extraction.
-#
-# The AppImage packages the LAUNCHER, because that is the program: zelda3d_app is the only
-# executable the build produces, and it is what a user runs to reach either game.
-#
-# The asset rules below are still OoT-only — they build soh.o2r / oot.o2r, and no MM equivalent
-# exists yet, so an AppImage built from here ships a launcher whose Majora's Mask row will not find
-# its archives. Said plainly rather than left to be discovered from a broken package.
+# Packaging and asset extraction. Linux releases use tools/package_appimage.py, which stages the
+# launcher, both cores and both redistributable port archives while refusing ROM-derived archives.
 ################################################################################
-set_property(TARGET zelda3d_app PROPERTY APPIMAGE_DESKTOP_FILE_TERMINAL YES)
-set_property(TARGET zelda3d_app PROPERTY APPIMAGE_DESKTOP_FILE "${ZELDA3D_SHIPWRIGHT_DIR}/scripts/linux/appimage/soh.desktop")
-set_property(TARGET zelda3d_app PROPERTY APPIMAGE_ICON_FILE "${CMAKE_BINARY_DIR}/sohIcon.png")
-
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-install(FILES "${CMAKE_BINARY_DIR}/soh/soh.o2r" DESTINATION . COMPONENT ship)
-install(TARGETS ZAPD DESTINATION ./assets/extractor COMPONENT extractor)
-install(DIRECTORY "${ZELDA3D_OOT_DIR}/assets/extractor/" DESTINATION ./assets COMPONENT extractor)
-install(DIRECTORY "${ZELDA3D_OOT_DIR}/assets/xml/" DESTINATION ./assets/xml COMPONENT extractor)
-endif()
-
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
 install(DIRECTORY "${ZELDA3D_OOT_DIR}/assets/extractor/" DESTINATION ./assets/ COMPONENT ship)
 install(DIRECTORY "${ZELDA3D_OOT_DIR}/assets/xml/" DESTINATION ./assets/xml COMPONENT ship)
@@ -408,16 +423,6 @@ endif()
 include(${ZELDA3D_ROOT}/cmake/Zelda3DAssetExtraction.cmake)
 include(${ZELDA3D_ROOT}/cmake/Zelda3DRuntimeArchives.cmake)
 add_dependencies(zelda3d_app zelda3d_runtime_archives)
-
-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-    find_package(ImageMagick COMPONENTS convert)
-    if (ImageMagick_FOUND)
-        execute_process (
-            COMMAND ${ImageMagick_convert_EXECUTABLE} ${ZELDA3D_OOT_DIR}/macosx/sohIcon.png -resize 512x512 ${CMAKE_BINARY_DIR}/sohIcon.png
-            OUTPUT_VARIABLE outVar
-        )
-    endif()
-endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
 
@@ -442,13 +447,13 @@ if(CMAKE_SYSTEM_NAME MATCHES "Windows|NintendoSwitch|CafeOS")
 install(FILES ${ZELDA3D_ROOT}/README.md DESTINATION . COMPONENT ship RENAME readme.txt )
 endif()
 
-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-    set(CPACK_GENERATOR "External")
-elseif(CMAKE_SYSTEM_NAME MATCHES "Windows|NintendoSwitch|CafeOS")
+if(CMAKE_SYSTEM_NAME MATCHES "Windows|NintendoSwitch|CafeOS")
     set(CPACK_GENERATOR "ZIP")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
     set(CPACK_GENERATOR "Bundle")
 endif()
 
-set(CPACK_PROJECT_CONFIG_FILE ${ZELDA3D_SHIPWRIGHT_DIR}/CMake/Packaging-2.cmake)
-include(${ZELDA3D_SHIPWRIGHT_DIR}/CMake/Packaging.cmake)
+if(NOT CMAKE_SYSTEM_NAME MATCHES "Linux")
+    set(CPACK_PROJECT_CONFIG_FILE ${ZELDA3D_SHIPWRIGHT_DIR}/CMake/Packaging-2.cmake)
+    include(${ZELDA3D_SHIPWRIGHT_DIR}/CMake/Packaging.cmake)
+endif()

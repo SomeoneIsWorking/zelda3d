@@ -55,9 +55,8 @@ file(GLOB ZELDA3D_SHARED_PORT_SOURCES CONFIGURE_DEPENDS
 # version, so it belongs in the game target rather than the zelda3d_shared static library. The
 # per-game half is the ROM version table in 2s2h/Extractor/RomVersions.cpp, which the 2s2h glob
 # below already picks up.
-file(GLOB ZELDA3D_SHARED_EXTRACTOR_SOURCES CONFIGURE_DEPENDS
-    "${ZELDA3D_SHARED_DIR}/extractor/*.c" "${ZELDA3D_SHARED_DIR}/extractor/*.cpp"
-    "${ZELDA3D_SHARED_DIR}/extractor/*.h")
+set(ZELDA3D_SHARED_EXTRACTOR_SOURCES
+    "${ZELDA3D_SHARED_DIR}/extractor/Extract.cpp" "${ZELDA3D_SHARED_DIR}/extractor/Extract.h")
 
 # Shared GUI code. Compiled per game like port/ above -- see zelda3d_shared/gui/ui_theming.cpp for
 # the one per-game value that keeps it out of the static library.
@@ -100,7 +99,7 @@ file(GLOB_RECURSE ship__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS
 # SaveManager calls Notification::Emit) — excluding it left 563 undefined references.
 # So we compile the WHOLE tree. (This used to add that the ImGui menu was inert because zelda3d's
 # ImGui was a no-op shim — no longer true: real Dear ImGui is back as the developer-overlay stack,
-# with RmlUi as the shipped game-facing UI. See docs/dusklight-adoption.md.)
+# with RmlUi as the shipped game-facing UI.)
 
 file(GLOB_RECURSE libultra_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "include/PR/*.h")
 

@@ -39,6 +39,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     selection.add_argument(
         "--files", nargs="+", metavar="PATH", help="check only these first-party files"
     )
+    selection.add_argument(
+        "--base", help="check committed changes between this commit and HEAD (hosted CI)"
+    )
+    selection.add_argument(
+        "--compiled",
+        action="store_true",
+        help="check every first-party translation unit in the supplied build",
+    )
     parser.add_argument(
         "--compile-commands", type=Path, default=DEFAULT_COMPILE_COMMANDS
     )
@@ -67,7 +75,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     try:
-        structural_failures = source_structure.verify_structure(REPO)
+        structural_failures = source_structure.verify_structure(REPO, base=args.base)
         if structural_failures:
             details = "\n".join(f"  {failure}" for failure in structural_failures)
             raise VerificationError(f"source structure check failed:\n{details}")
@@ -100,7 +108,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.files:
             files = source_selection.explicit_files(REPO, args.files)
         else:
-            files = source_selection.changed_files(REPO)
+            files = source_selection.changed_files(REPO, args.base)
 
         compile_entries_by_database = {
             path: compilation_database.first_party_entries(REPO, database_entries)
@@ -111,6 +119,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             for database_entries in compile_entries_by_database.values()
             for source, entry in database_entries.items()
         }
+        if args.compiled:
+            files = sorted(compile_entries)
         tidy_files = [
             path.resolve()
             for path in files

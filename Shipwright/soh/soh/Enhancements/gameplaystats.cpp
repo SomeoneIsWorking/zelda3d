@@ -16,7 +16,6 @@
 #include <libultraship/libultraship.h>
 #include "soh/Enhancements/enhancementTypes.h"
 
-
 extern "C" {
 #include <z64.h>
 #include "variables.h"
@@ -284,7 +283,9 @@ extern "C" char* GameplayStats_GetCurrentTime() {
     std::string timeString = formatTimestampGameplayStat(static_cast<u32>(GAMEPLAYSTAT_TOTAL_TIME)).c_str();
     const size_t stringLength = timeString.length();
     char* timeChar = (char*)malloc(stringLength + 1); // We need to use malloc so we can free this from a C file.
-    strcpy(timeChar, timeString.c_str());
+    if (timeChar != nullptr) {
+        SohUtils::CopyStringToCharArray(timeChar, timeString, stringLength + 1);
+    }
     return timeChar;
 }
 
@@ -392,7 +393,7 @@ void GameplayStatsRow(const char* label, const std::string& value, ImVec4 color 
     ImGui::SameLine(ImGui::GetContentRegionAvail().x - (ImGui::CalcTextSize(value.c_str()).x));
     ImGui::Text("%s", value.c_str());
     ImGui::PopStyleColor();
-    if (tooltip != "" && ImGui::IsItemHovered()) {
+    if (tooltip[0] != '\0' && ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", tooltip);
     }
 }
@@ -487,7 +488,8 @@ void DrawGameplayStatsHeader() {
 void DrawGameplayStatsTimestampsTab() {
     // Set up the array of item timestamps and then sort it chronologically
     for (int i = 0; i < TIMESTAMP_MAX; i++) {
-        strcpy(itemTimestampDisplay[i].name, itemTimestampDisplayName[i]);
+        SohUtils::CopyStringToCharArray(itemTimestampDisplay[i].name, itemTimestampDisplayName[i],
+                                        sizeof(itemTimestampDisplay[i].name));
         itemTimestampDisplay[i].time = gSaveContext.ship.stats.itemTimestamp[i];
         itemTimestampDisplay[i].color = itemTimestampDisplayColor[i];
     }
@@ -604,7 +606,7 @@ void DrawGameplayStatsBreakdownTab() {
         } else {
             name = sceneName;
         }
-        strcpy(sceneTimestampDisplay[i].name, name.c_str());
+        SohUtils::CopyStringToCharArray(sceneTimestampDisplay[i].name, name, sizeof(sceneTimestampDisplay[i].name));
         sceneTimestampDisplay[i].time = CVarGetInteger(CVAR_GAMEPLAY_STATS("RoomBreakdown"), 0)
                                             ? gSaveContext.ship.stats.sceneTimestamps[i].roomTime
                                             : gSaveContext.ship.stats.sceneTimestamps[i].sceneTime;

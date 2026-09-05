@@ -13,81 +13,12 @@
 #include "overlays/gamestates/ovl_file_choose/file_choose.h"
 #include "soh/Enhancements/boss-rush/BossRush.h"
 #include "soh/Enhancements/FileSelectEnhancements.h"
+#include "tts_text_bank.h"
 
 extern "C" {
 extern MapData* gMapData;
 extern SaveContext gSaveContext;
 extern PlayState* gPlayState;
-}
-
-typedef enum {
-    /* 0x00 */ TEXT_BANK_SCENES,
-    /* 0x01 */ TEXT_BANK_MISC,
-    /* 0x02 */ TEXT_BANK_KALEIDO,
-    /* 0x03 */ TEXT_BANK_FILECHOOSE,
-} TextBank;
-
-nlohmann::json sceneMap = nullptr;
-nlohmann::json miscMap = nullptr;
-nlohmann::json kaleidoMap = nullptr;
-nlohmann::json fileChooseMap = nullptr;
-
-// MARK: - Helpers
-
-std::string GetParameritizedText(std::string key, TextBank bank, const char* arg) {
-    switch (bank) {
-        case TEXT_BANK_SCENES: {
-            return sceneMap.value(key, "unknown");
-        }
-        case TEXT_BANK_MISC: {
-            auto value = miscMap.value(key, "unknown");
-
-            std::string searchString = "$0";
-            size_t index = value.find(searchString);
-
-            if (index != std::string::npos) {
-                assert(arg != nullptr);
-                value.replace(index, searchString.size(), std::string(arg));
-            }
-            return value;
-        }
-        case TEXT_BANK_KALEIDO: {
-            auto value = kaleidoMap.value(key, "unknown");
-
-            std::string searchString = "$0";
-            size_t index = value.find(searchString);
-
-            if (index != std::string::npos) {
-                assert(arg != nullptr);
-                value.replace(index, searchString.size(), std::string(arg));
-            }
-            return value;
-        }
-        case TEXT_BANK_FILECHOOSE: {
-            auto value = fileChooseMap.value(key, "unknown");
-
-            std::string searchString = "$0";
-            size_t index = value.find(searchString);
-
-            if (index != std::string::npos) {
-                assert(arg != nullptr);
-                value.replace(index, searchString.size(), std::string(arg));
-            }
-            return value;
-        }
-    }
-    return "unknown";
-}
-
-const char* GetLanguageCode() {
-    switch (CVarGetInteger(CVAR_SETTING("Languages"), 0)) {
-        case LANGUAGE_FRA:
-            return "fr-FR";
-        case LANGUAGE_GER:
-            return "de-DE";
-    }
-
-    return "en-US";
 }
 
 // MARK: - Boss Title Cards
@@ -1108,41 +1039,6 @@ void RegisterOnDialogMessageHook() {
 }
 
 // MARK: - Main Registration
-
-void InitTTSBank() {
-    std::string languageSuffix = "_eng.json";
-    switch (CVarGetInteger(CVAR_SETTING("Languages"), 0)) {
-        case LANGUAGE_FRA:
-            languageSuffix = "_fra.json";
-            break;
-        case LANGUAGE_GER:
-            languageSuffix = "_ger.json";
-            break;
-    }
-
-    auto initData = std::make_shared<Ship::ResourceInitData>();
-    initData->Format = RESOURCE_FORMAT_BINARY;
-    initData->Type = static_cast<uint32_t>(Ship::ResourceType::Json);
-    initData->ResourceVersion = 0;
-
-    sceneMap = std::static_pointer_cast<Ship::Json>(Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(
-                                                        "accessibility/texts/scenes" + languageSuffix, true, initData))
-                   ->Data;
-
-    miscMap = std::static_pointer_cast<Ship::Json>(Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(
-                                                       "accessibility/texts/misc" + languageSuffix, true, initData))
-                  ->Data;
-
-    kaleidoMap =
-        std::static_pointer_cast<Ship::Json>(Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(
-                                                 "accessibility/texts/kaleidoscope" + languageSuffix, true, initData))
-            ->Data;
-
-    fileChooseMap =
-        std::static_pointer_cast<Ship::Json>(Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(
-                                                 "accessibility/texts/filechoose" + languageSuffix, true, initData))
-            ->Data;
-}
 
 void RegisterOnSetGameLanguageHook() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSetGameLanguage>([]() { InitTTSBank(); });

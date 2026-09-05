@@ -10,6 +10,7 @@ enum GameInteractionEffectQueryResult { Possible = 0x00, TemporarilyNotPossible 
 
 class GameInteractionEffectBase {
   public:
+    virtual ~GameInteractionEffectBase() = default;
     virtual GameInteractionEffectQueryResult CanBeApplied() = 0;
     GameInteractionEffectQueryResult Apply();
 
@@ -23,7 +24,7 @@ class RemovableGameInteractionEffect : public GameInteractionEffectBase {
     GameInteractionEffectQueryResult Remove();
 
   protected:
-    virtual void _Remove(){};
+    virtual void _Remove() {};
 };
 
 class ParameterizedGameInteractionEffect {

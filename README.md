@@ -36,6 +36,22 @@ references or require Ghidra or either decomp repository's analysis tooling. Run
 `./run.sh --bootstrap-check` for a non-building cold-path check; missing native packages are reported
 with the platform's exact install command.
 
+### AppImage release
+
+The AppImage runs without a terminal. On first launch, Zelda3D shows a Browse prompt for each of the
+four required ROMs. Each selection may be the ROM itself or a ZIP containing exactly one matching
+ROM at any folder depth. Selections are validated by content, remembered under the OS user
+configuration directory, and reused on later launches. Extracted N64 runtime archives, settings,
+logs, and saves are written there too; the read-only AppImage mount is never used as storage.
+
+The release contains the launcher, both game cores, their redistributable port assets, and extractor
+metadata. It contains no ROM and no ROM-derived `oot.o2r` or `mm.o2r`. Maintainers build it from a
+verified Clang tree with:
+
+```sh
+uv run --frozen python tools/build_appimage_release.py
+```
+
 ---
 
 ## Screenshots

@@ -41,6 +41,38 @@ verified vs partial vs stub.
 
 ## Build layering (configure root = the REPO ROOT)
 
+SoH enhancement registration delegates to responsibility-specific implementation modules. Console
+player and randomizer commands live in `debugconsole_player_commands.cpp` and
+`debugconsole_randomizer_commands.cpp`; actor parameter decoding lives in
+`Shipwright/soh/soh/Enhancements/debugger/actorViewerParams.cpp`;
+the save editor composes player, inventory, and information panels from `debugSaveEditorPlayer.cpp`,
+`debugSaveEditorInventory.cpp`, and `debugSaveEditorInfo.cpp`. Actor time-saver actions live in
+`Shipwright/soh/soh/Enhancements/TimeSavers/timesaver_actor_actions.cpp`, and spoken text tables live in
+`Shipwright/soh/soh/Enhancements/tts/tts_text_bank.cpp`.
+These paths are relative to `Shipwright/soh/soh/Enhancements/`.
+
+Within that tree's `randomizer/`, `draw_boss_souls.cpp` owns boss-soul display lists;
+`location_access_world.cpp` owns world access reset, region traversal, and graph export; `logic_inventory_state.cpp`,
+`logic_item_rules.cpp`, and `logic_combat_rules.cpp` own the matching `Logic` operations.
+`Settings` retains option storage and callback lifetime while its registration methods are implemented
+in `settings_world_options.cpp`, `settings_inventory_options.cpp`, `settings_trick_options.cpp`, and
+`settings_option_groups.cpp`, with option-list construction in `settings_option_lists.{h,cpp}`.
+`check_tracker_order.{h,cpp}` owns completion/reward ordering separately
+from tracker UI and event handling. `Shipwright/soh/soh/SaveManagerCBridge.cpp` implements the existing
+C save ABI over `SaveManager`. MM's controller LED/rumble policy lives in
+`2ship/2s2h/controller_feedback.cpp` behind the existing port ABI. Its graphics-text UTF-16 conversion and glyph callback
+adapter live in `2ship/2s2h/host/gfx_print`, using SDL's bounded UTF-8 decoder while retaining MM's
+delimiter and kana mapping policy. The source-preserving actor/game code stays in the game core.
+
+`GameInteractor` owns multicast hook argument lifetime in
+`Shipwright/soh/soh/Enhancements/game-interactor/GameInteractor.h`; the production-template
+regression is `tools/game_interactor_multicast_test.cpp`.
+
+Asset-free product CI composes the normal builder through `tools/verify_product.py`;
+`tools/prepare_ci_sdl.py` owns the pinned CI SDL dependency prefix. Source classification and
+committed-change selection remain in `tools/clang_verifier/source_selection.py`, consumed by
+`tools/verify_clang.py` for both worktree checks and clean hosted checkout lint.
+
 `cmake -S . -B Shipwright/build-cmake -G Ninja`. The root `CMakeLists.txt` is the project root and
 the two games are **peers** under it; see `docs/project-structure.md` for the full picture and for
 the two mechanisms available for sharing code between them.
@@ -67,12 +99,26 @@ separate from the always-current shipping archives in `cmake/Zelda3DRuntimeArchi
 is only the container-callable entry point to that shared MM owner.
 Shared CMake cache/Clang/Ninja/configure policy belongs only to
 `tools/cmake_build_policy.py`, which both launcher and harness build entry points call.
+`launcher_bootstrap/source_provision.py` restores the public build gitlinks and the exact Lucent
+checkout under `build/deps/lucent-source`. `launcher_bootstrap/native_sources.py` owns immutable
+source revisions, checkout validation, and native dependency build options; `tools/prepare_ci_sdl.py`
+and `tools/prepare_native_sources.py` expose that same owner to hosted CI and the release container.
+`tools/verify_product.py` composes compilation, CTest, core probing, and the Clang verifier without
+player-ROM provisioning. `tools/build_appimage_release.py` stages its bounded four-file container
+context under `build/` before orchestrating the release build.
 
-Release ROM provisioning belongs to `Shipwright/zelda3d_shared/platform`: one content identity
-authority validates direct files and nested ZIP entries, `RomSelectionStore` commits accepted
-selections under the OS configuration directory, and the SDL setup owner presents Browse/Quit.
-Both N64 extractors consume the activated launcher environment; neither scans the working tree for
-an alternate ROM. `tools/build_appimage_release.py` owns the reproducible Ubuntu 22.04 release
+Release ROM provisioning belongs to `Shipwright/zelda3d_shared/platform`: `rom_identity` classifies
+candidate content, while `rom_validation` composes the shared N64 extraction revision/whole-image
+CRC owner (`extractor/n64_rom_validation` and `extractor/metadata`) and the `cmb3d/asset/ctr_rom`
+structural/content-integrity reader. `rom_archive` delegates bounded nested-ZIP discovery and
+extraction to Lucent and retains only a fully validated matching ROM. `RomSelectionStore` commits
+accepted selections under the OS configuration directory, and the SDL setup owner presents Browse/Quit.
+`rom_paths` owns the UTF-8 serialized/native path conversion. The selection store alone reads and
+writes ROM environment handoff (wide APIs on Windows); the 3DS model stores consume its native-path
+`ActiveSelection` API, not environment bytes.
+Both N64 extractors consume that same selection-store API; neither reads process configuration
+directly or scans the working tree for an alternate ROM. `tools/build_appimage_release.py` owns the
+reproducible Ubuntu 22.04 release
 build; `tools/package_appimage.py` plus `packaging/` own staging and artifact verification, with
 content and ABI gates that refuse ROMs, ROM-derived archives, and binaries newer than the declared
 glibc/libstdc++ baseline.
@@ -152,13 +198,13 @@ debug_journal/                 dated findings entries — the append-only invest
 | **OoT3D decomp corpus (ground truth)** | ✅ deep, actively growing | `oot3d-decomp/docs/` — 69 docs (actor system, warp, title arc ×26, camera, lighting, cutscene format, player, en_horse, boss_goma, ram_map, static_decomp, divergence_map, ...) | `docs/re-frontier.md` (this pass's new ordering of it) | This is the primary, most mature RE corpus in the whole project. `divergence_map.md` and `state_map.md` are likely the highest-leverage un-consulted docs for future sessions — skim them before starting new RE. |
 | **N64 boot/libultra glue (vendored)** | ✅ vendored, untouched | `Shipwright/soh/src/boot/`, `buffers/`, `dmadata/`, `elf_message/`, `libultra/` | — | Inherited Shipwright boot sequence + libultra shim; not SoH3D-specific, no known gap. |
 | **libultraship support dirs (vendored/generic)** | ✅ vendored | `Shipwright/libultraship/extern/StormLib/` (MPQ archive lib, unrelated 3rd-party dep), `imgui_shim/` (Dear ImGui integration), `include/` (public headers mirroring `src/ship`+`src/libultraship`), `tests/`, `tools/` (incl. `dlist_harness/`) | — | Generic engine plumbing; not itself a parity surface. |
-| **Asset exporter + release packaging** | 🟡 Linux AppImage path locally verified; public artifact pending | `Shipwright/OTRExporter/` (ZAPD-driven OTR/O2R exporter), `launcher_bootstrap/mm_assets.py`, `tools/build_mm_custom_archive.py`, `tools/build_appimage_release.py`, `tools/package_appimage.py`, `packaging/`, remaining platform helpers under `Shipwright/scripts/`, dependency setup under `scripts/` | issue 0024 | The one Linux release path builds with Clang on an Ubuntu 22.04 ABI baseline, regenerates each redistributable port archive with its game-correct exporter, stages the launcher, both cores, extractor metadata, and the SVG icon, then verifies payload completeness, ABI ceilings, core loading, and absence of ROMs plus `oot.o2r`, `oot-mq.o2r`, and `mm.o2r`. The inherited SoH-only CPack/AppImage route is removed. |
+| **Asset exporter + release packaging** | 🟡 implementation and host integration verified; AppImage artifact gate pending | `Shipwright/OTRExporter/` (ZAPD-driven OTR/O2R exporter), `launcher_bootstrap/mm_assets.py`, `tools/build_mm_custom_archive.py`, `tools/build_appimage_release.py`, `tools/package_appimage.py`, `packaging/`, remaining platform helpers under `Shipwright/scripts/`, dependency setup under `scripts/` | issue 0024 | The one Linux release path builds with Clang on an Ubuntu 22.04 ABI baseline, regenerates each redistributable port archive with its game-correct exporter, stages the launcher, both cores, extractor metadata, and the SVG icon, then verifies payload completeness, ABI ceilings, core loading, and absence of ROMs plus `oot.o2r`, `oot-mq.o2r`, and `mm.o2r`. The inherited SoH-only CPack/AppImage route is removed. The final AppImage has not yet passed its packaged first-run gate. |
 | **MM3D scene/room rendering** | ✅ LIVE, default-on (2026-07-21) | `2ship/2s2h/zelda3d/mm3d_draw.c` (`Zelda3D_TryDrawRoom`), `mm3d_model.cpp` (`loadSceneRoom`, `Zelda3D_MM_RoomModelId`), `mm3d_scene_names.inc`, shared parser `Shipwright/cmb3d/asset/{cmb,zsi,lzs}.cpp` | `debug_journal/2026-07-21-mm-scene-room-pipeline.md`, `mm3d-decomp/docs/joker_anchors.md`, test `tools/zelda3d_room_geom_test.cpp` | MM renders **3DS room geometry for its whole world**, no longer N64. Scene table 102/102; MM3D scene ZSIs are LzS-compressed (`ZSI\x09`, `/scenes/`) unlike OoT3D's raw `ZSI\x01` `/scene/`. Two CMB parser bugs fixed, both of which OoT3D hid by coincidence: **index-region offset** (`prm.first` counts u16 SLOTS -> always `first*2`, never `first*elementSize`; OoT3D prms are all USHORT so the two coincide) and **mesh-entry stride** (version-gated 0x04 v6 / 0x0C v10, was hardcoded 4 -> orphaned 27 of 41 sepds and built only 49% of a room). MM3D scene coords are IDENTICAL to N64 (verified by matching the room ZSI actor list against the live N64 actor list) — do NOT add a placement transform. Evidence: **310/313 rooms pass** the structural test (finite, sane extent, zero orphan sepds; the 3 carry no CMB and fall back to the N64 room), plus South/East Clock Town and Termina Field verified live. `ZELDA3D_MM_SCENE` remains only as a debug-isolation knob (0=off, 1=draw, 2=skip-only), mirroring OoT's `ZELDA3D_SCENE`. |
 | **MM3D scene collision** | ✅ LIVE, default-on (2026-07-22) | `2ship/2s2h/zelda3d/mm3d_collision.{h,cpp}`, shared parser `Shipwright/cmb3d/asset/zcol.{h,cpp}`, hook in `2ship/2s2h/z_scene_2SH.cpp` (+ mirror in `2ship/src/code/z_scene.c`), pool sizing in `2ship/src/code/z_bgcheck.c` | `debug_journal/2026-07-21-mm-scene-room-pipeline.md`, tests `tools/zelda3d_collision_test.cpp` + `tools/zelda3d_collision_layout.cpp` | MM walks on the SAME geometry it renders. MM3D's collision layout differs from OoT3D's in two version-gated spots (count triplet at +0x1e not +0x1c; `CollisionPoly` omits the +0x06 flags word so the normal starts there), derived via the format's own plane invariant and verified on **110/111 scenes** at 100% plane / 99.9% face-normal. Also required sizing BgCheck's static-lookup node pool from the ACTUAL mesh (`BgCheck_CountStaticLookupNodes`) — the stock per-scene `memSize` budget is tuned to the N64 mesh and the denser MM3D one oversubscribed it 2.4x, hanging scene load. Verified live: Link lands exactly on the 3DS floor, exits fire (walked the Clock Town south gate into Termina Field), and Termina Field loads + walks with ground height tracking. Debug knob `ZELDA3D_MM_COLLISION` (0=off) only. |
-| **MM asset extraction/build** | 🟡 partial | `2ship/assets/` (archives, code, interface, misc, objects, overlays, scenes, text, extractor, xml, custom) | `docs/MM_INTEGRATION.md` | Mirrors 2S2H's asset pipeline; extraction path exists, coverage vs the MM3D 3DS assets not separately audited this pass (see MM3D asset/format decomp row for the harder blocker). |
+| **MM asset extraction/build** | 🟡 partial | `2ship/assets/` (archives, code, interface, misc, objects, overlays, scenes, text, extractor, xml, custom) | `docs/MM_NATIVE.md` | Mirrors 2S2H's asset pipeline; extraction path exists, coverage vs the MM3D 3DS assets not separately audited this pass (see MM3D asset/format decomp row for the harder blocker). |
 | **Texture pack / hi-res assets** | ✅ done | `textures/`, `Shipwright/cmb3d/asset/texpack.{h,cpp}`, memory `soh3d-texpack` | `docs/parity-workflow.md` "Hi-res texture pack" | CMB textures matched by Citra-legacy CityHash64 (de-tiled + flipped). Since 2026-07-22 the oracle harness drives the SAME pack on BOTH sides via `ZELDA3D_HARNESS_TEXPACK=on|off` (Azahar `citra_custom_textures` + a `load/textures` symlink); `texpack` REPL command reports hit counters per side. |
 | **Shadows + AO** | ❌ REMOVED (2026-07-16) — row was STALE | — (the Zelda3D sun-shadow + SSAO code is gone; `zelda3d_sdl3gpu.cpp` keeps only the repurposed ex-shadow sampler slot) | memory `soh3d-title-no-loop-and-effects-removed` | The dynamic sun-shadow and SSAO enhancements were DELETED at user directive ("OoT3D lighting only"); this row still claimed them shipped, which is why #206 first read as a regression in a live system. The N64 per-actor blob shadow (`ActorShadow_Draw`) is separate and still alive — but it draws at the N64 COLLISION floor (`actor->floorHeight`), not the OoT3D render ground, so it is buried under the terrain: that is #206. |
-| **RmlUi menu port** | 🟡 partial; structure split complete | `Shipwright/libultraship/src/ship/window/gui/rml/SohRmlUi.{h,cpp}`, focused `Zelda3D{MenuState,LauncherBridge,DiagnosticsBridge,MenuAutomationBridge,RmlUiRegistry}.*`, `Shipwright/libultraship/src/fast/Zelda3DMenuInputBridge.cpp`, and public contracts under `Shipwright/libultraship/include/ship/` | memory `soh3d-rmlui-menu` | Phases 0-1 done (Dusklight-style); Phase 2 input/nav is next. Zelda3D menu state, input, launcher, diagnostics, and registration no longer accumulate in `SohRmlUi.cpp`. |
+| **RmlUi menu port** | 🟡 partial; structure split complete | `Shipwright/libultraship/src/ship/window/gui/rml/SohRmlUi.{h,cpp}`, focused `Zelda3D{MenuState,LauncherBridge,DiagnosticsBridge,MenuAutomationBridge,RmlUiRegistry}.*`, `Shipwright/libultraship/src/fast/Zelda3DMenuInputBridge.cpp`, and public contracts under `Shipwright/libultraship/include/ship/` | memory `soh3d-rmlui-menu` | Phases 0-1 keep Zelda3D menu state, input, launcher, diagnostics, and registration out of `SohRmlUi.cpp`; Phase 2 input/navigation remains separately owned. |
 | **Input scheme (PC-native + hotswap glyphs)** | ✅ done — **v3** (2026-07-28, #203) | `Shipwright/libultraship/src/libultraship/controller/controldevice/controller/mapping/ControllerDefaultMappings.cpp` (the default table), `Shipwright/libultraship/src/ship/controller/controldeck/ControlDeck.cpp` (`kZelda3dInputSchemeVersion` migration), `Shipwright/soh/src/zelda3d/input/zelda3d_keymap.{h,cpp}` (live-binding → HUD label), `gZelda3dInputDevice` | `docs/lus_input_architecture.md`, `debug_journal/2026-07-28-pc-native-keyboard-item-bar.md`, `docs/issues/0002-*`, memory `soh3d-hud-glyphs`, `soh3d-input-scheme` | ESC decoupled from BTN_START (v2); **v3 puts the three C-button item slots on `1`/`2`/`3` and C-Up (look/Navi) on `C`, leaving the arrow keys unbound for the mouse-look pass.** Scheme versioned so existing configs re-migrate. The keyboard HUD badge is composited at runtime from the LIVE binding (was baked artwork that had read "C" while BTN_B was F) — REPL `keycap` prints the four resolved labels, `keycap <label>` dumps the composited RGBA. Gamepad/keyboard glyph hotswap via REPL `inputdev 0\|1`. |
 
 | **Desktop release setup and writable state** | 🟡 implementation/focused tests verified; artifact gate pending | `Shipwright/zelda3d_shared/platform/rom_{identity,install,setup}.*`; `Shipwright/libultraship/src/ship/Context.cpp`; launcher composition in `Shipwright/zelda3d_app/zelda3d_main.cpp`; N64 consumers in `rom_auto_extraction.cpp` and `BenPort.cpp` | issue 0024 | The launcher asks for all four ROMs through native Browse prompts, accepts direct files or exactly one nested ZIP match by content, persists selections transactionally, and activates the same paths both cores consume. Linux writable state follows `XDG_CONFIG_HOME`/`~/.config`; other desktops use their native config location. |

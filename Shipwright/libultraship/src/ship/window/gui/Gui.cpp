@@ -66,8 +66,8 @@ Gui::~Gui() {
 
 void Gui::Init() {
     // Dear ImGui is a real library again, and it drives the DEVELOPER OVERLAYS only. The shipped,
-    // game-facing UI is RmlUi (stood up in ImGuiBackendInit) plus the native Zelda3D HUD. Two
-    // stacks on purpose -- see docs/dusklight-adoption.md.
+    // game-facing UI is RmlUi (stood up in ImGuiBackendInit) plus the native Zelda3D HUD. The two
+    // stacks have separate product and developer-tool ownership.
     //
     // Note what is NOT restored: the old "Main - Deck" dock that hosted the game framebuffer as an
     // ImGui::Image. The game frame is composited natively now, so ImGui windows float over it
@@ -95,7 +95,7 @@ void Gui::Init() {
 
     // Font Awesome merged into the default font, so ICON_FA_* glyphs resolve in dev-tool labels.
     io.Fonts->AddFontDefault();
-    const float baseFontSize = 13.0f; // must match the default font size
+    const float baseFontSize = 13.0f;                      // must match the default font size
     const float iconFontSize = baseFontSize * 2.0f / 3.0f; // FA needs 2/3 to sit on the baseline
     static const ImWchar sIconsRanges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
     ImFontConfig iconsConfig;

@@ -10,9 +10,9 @@ DungeonInfo::DungeonInfo(std::string name_, const RandomizerHintTextKey hintKey_
                          const RandomizerGet bossKey_, RandomizerGet reward_, RandomizerArea area_,
                          const uint8_t vanillaKeyCount_, const uint8_t mqKeyCount_,
                          const RandomizerSettingKey mqSetting_)
-    : name(std::move(name_)), hintKey(hintKey_), map(map_), compass(compass_), smallKey(smallKey_), keyRing(keyRing_),
-      bossKey(bossKey_), reward(reward_), area(area_), vanillaKeyCount(vanillaKeyCount_), mqKeyCount(mqKeyCount_),
-      mqSetting(mqSetting_) {
+    : name(std::move(name_)), hintKey(hintKey_), area(area_), map(map_), compass(compass_), smallKey(smallKey_),
+      keyRing(keyRing_), bossKey(bossKey_), reward(reward_), mqSetting(mqSetting_), vanillaKeyCount(vanillaKeyCount_),
+      mqKeyCount(mqKeyCount_) {
 }
 DungeonInfo::DungeonInfo()
     : hintKey(RHT_NONE), map(RG_NONE), compass(RG_NONE), smallKey(RG_NONE), keyRing(RG_NONE), bossKey(RG_NONE),

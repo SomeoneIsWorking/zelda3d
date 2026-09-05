@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from clang_verifier import VerificationError
 from clang_verifier.source_structure import (
     LEGACY_LINE_LIMITS,
     SOURCE_LINE_LIMIT,
@@ -18,6 +19,67 @@ REPO = Path(__file__).resolve().parents[3]
 
 
 class SourceStructureTests(unittest.TestCase):
+    def test_committed_growth_compares_both_caps_and_decomp_with_explicit_base(
+        self,
+    ) -> None:
+        scratch = REPO / "scratch"
+        scratch.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=scratch) as raw:
+            root = Path(raw)
+            source = root / "product.cpp"
+            seam = root / "2ship/src/code/z_actor.c"
+            policy = root / "tools/clang_verifier/source_structure.py"
+            seam.parent.mkdir(parents=True)
+            policy.parent.mkdir(parents=True)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            commit = [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Verifier Test",
+                "-c",
+                "user.email=verifier@example.invalid",
+                "commit",
+                "-qm",
+                "fixture",
+            ]
+            for count in (1201, 1202):
+                source.write_text("int value;\n" * count)
+                seam.write_text("int actor;\n" * (count - 1200))
+                policy.write_text(f"LEGACY_LINE_LIMITS = {{'product.cpp': {count}}}\n")
+                subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+                subprocess.run(commit, check=True)
+
+            self.assertEqual(
+                verify_structure(root, legacy_limits={"product.cpp": 1202}), []
+            )
+            self.assertEqual(
+                verify_structure(
+                    root, legacy_limits={"product.cpp": 1202}, base="HEAD"
+                ),
+                [],
+            )
+            failures = verify_structure(
+                root, legacy_limits={"product.cpp": 1202}, base="HEAD^"
+            )
+            self.assertEqual(len(failures), 2)
+            self.assertIn(
+                "product.cpp: legacy ceiling increased 1201 -> 1202", failures
+            )
+            self.assertTrue(
+                any(
+                    "modified legacy decomp seam grew 1 -> 2" in item
+                    for item in failures
+                )
+            )
+
+    def test_invalid_historical_base_refuses_before_structure_selection(self) -> None:
+        with self.assertRaisesRegex(
+            VerificationError, "source comparison base is not a commit"
+        ):
+            verify_structure(REPO, files=[], legacy_limits={}, base="absent-ci-base")
+
     def assert_oversized(self, suffix: str) -> None:
         scratch = REPO / "scratch"
         scratch.mkdir(exist_ok=True)

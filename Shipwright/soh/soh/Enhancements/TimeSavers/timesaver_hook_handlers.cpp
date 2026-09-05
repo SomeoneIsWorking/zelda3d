@@ -12,6 +12,7 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/enhancementTypes.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
+#include "timesaver_actor_actions.h"
 
 extern "C" {
 #include "src/overlays/actors/ovl_En_Wonder_Talk2/z_en_wonder_talk2.h"
@@ -59,67 +60,6 @@ extern void EnDaiku_EscapeSuccess(EnDaiku* enDaiku, PlayState* play);
 extern void EnJj_WaitToOpenMouth(EnJj* enJj, PlayState* play);
 extern void EnJj_WaitForFish(EnJj* enJj, PlayState* play);
 extern void EnJj_SetupAction(EnJj* enJj, EnJjActionFunc actionFunc);
-}
-
-void EnMa1_EndTeachSong(EnMa1* enMa1, PlayState* play) {
-    if (Message_GetState(&gPlayState->msgCtx) == TEXT_STATE_CLOSING) {
-        Flags_SetRandomizerInf(RAND_INF_LEARNED_EPONA_SONG);
-        Sfx_PlaySfxCentered(NA_SE_SY_CORRECT_CHIME);
-        enMa1->actor.flags &= ~ACTOR_FLAG_TALK_OFFER_AUTO_ACCEPTED;
-        play->msgCtx.ocarinaMode = OCARINA_MODE_04;
-        enMa1->actionFunc = EnMa1_Idle;
-        enMa1->singingDisabled = 1;
-        enMa1->interactInfo.talkState = NPC_TALK_STATE_IDLE;
-        return;
-    }
-}
-
-void EnFu_EndTeachSong(EnFu* enFu, PlayState* play) {
-    if (Message_GetState(&gPlayState->msgCtx) == TEXT_STATE_CLOSING) {
-        Sfx_PlaySfxCentered(NA_SE_SY_CORRECT_CHIME);
-        enFu->actionFunc = EnFu_WaitAdult;
-        enFu->actor.flags &= ~ACTOR_FLAG_TALK_OFFER_AUTO_ACCEPTED;
-
-        play->msgCtx.ocarinaMode = OCARINA_MODE_04;
-        Flags_SetEventChkInf(EVENTCHKINF_PLAYED_SONG_OF_STORMS_IN_WINDMILL);
-        Flags_SetEventChkInf(EVENTCHKINF_LEARNED_SONG_OF_STORMS);
-        return;
-    }
-}
-
-void EnDntDemo_JudgeSkipToReward(EnDntDemo* enDntDemo, PlayState* play) {
-    // todo: figure out a better way to handle toggling so we don't
-    //       need to double check cvars like this
-    if (!(IS_RANDO || CVarGetInteger(CVAR_ENHANCEMENT("TimeSavers.SkipMiscInteractions"), IS_RANDO))) {
-        EnDntDemo_Judge(enDntDemo, play);
-        return;
-    } else if ((IS_RANDO && RAND_GET_OPTION(RSK_SHUFFLE_SPEAK)) || enDntDemo->actor.xzDistToPlayer > 30.0f) {
-        if (enDntDemo->judgeTimer > 0 && enDntDemo->judgeTimer < 40) {
-            enDntDemo->judgeTimer = 40;
-        }
-        EnDntDemo_Judge(enDntDemo, play);
-        return;
-    }
-
-    switch (Player_GetMask(play)) {
-        case PLAYER_MASK_SKULL: {
-            Flags_SetItemGetInf(ITEMGETINF_OBTAINED_STICK_UPGRADE_FROM_STAGE);
-            return;
-        }
-        case PLAYER_MASK_TRUTH: {
-            if (GameInteractor_Should(VB_DEKU_SCRUBS_REACT_TO_MASK_OF_TRUTH, true)) {
-                Flags_SetItemGetInf(ITEMGETINF_OBTAINED_NUT_UPGRADE_FROM_STAGE);
-            }
-            return;
-        }
-        default: {
-            EnDntDemo_Judge(enDntDemo, play);
-            return;
-        }
-    }
-}
-
-void BgSpot03Taki_KeepOpen(BgSpot03Taki* bgSpot03Taki, PlayState* play) {
 }
 
 static u32 successChimeCooldown = 0;
@@ -360,7 +300,6 @@ void TimeSaverOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_li
                             CVarGetInteger(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.GlitchAiding"), 0)) {
                             break;
                         }
-                        EnBox* boxActor = (EnBox*)actor;
                         *should = false;
                         RateLimitedSuccessChime();
                         break;
@@ -552,7 +491,7 @@ void TimeSaverOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_li
                 EnOwl* enOwl = va_arg(args, EnOwl*);
                 s32 owlType = (enOwl->actor.params & 0xFC0) >> 6;
 
-                if (((enOwl->actor.params & 0xFC0) >> 6) == 1) {
+                if (owlType == 1) {
                     Flags_SetEventChkInf(EVENTCHKINF_SPOKE_TO_KAEPORA_BY_LOST_WOODS);
                 }
 
@@ -929,7 +868,7 @@ void TimeSaverOnActorInitHandler(void* actorRef) {
                     (CVarGetInteger(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.LearnSong"), IS_RANDO) || IS_RANDO)) {
                     EnMa1* enMa1 = static_cast<EnMa1*>(innerActorRef);
                     if (enMa1->actionFunc == EnMa1_StartTeachSong) {
-                        enMa1->actionFunc = EnMa1_EndTeachSong;
+                        enMa1->actionFunc = TimeSaver_EndEponaSongLesson;
                         GameInteractor::Instance->UnregisterGameHook<GameInteractor::OnActorUpdate>(enMa1UpdateHook);
                         GameInteractor::Instance->UnregisterGameHook<GameInteractor::OnSceneInit>(enMa1KillHook);
                         enMa1UpdateHook = 0;
@@ -960,7 +899,7 @@ void TimeSaverOnActorInitHandler(void* actorRef) {
                     (CVarGetInteger(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.LearnSong"), IS_RANDO) || IS_RANDO)) {
                     EnFu* enFu = static_cast<EnFu*>(innerActorRef);
                     if (enFu->actionFunc == EnFu_TeachSong) {
-                        enFu->actionFunc = EnFu_EndTeachSong;
+                        enFu->actionFunc = TimeSaver_EndStormsSongLesson;
                         GameInteractor::Instance->UnregisterGameHook<GameInteractor::OnActorUpdate>(enFuUpdateHook);
                         GameInteractor::Instance->UnregisterGameHook<GameInteractor::OnSceneInit>(enFuKillHook);
                         enFuUpdateHook = 0;
@@ -1064,7 +1003,7 @@ void TimeSaverOnActorInitHandler(void* actorRef) {
 
                 BgSpot03Taki* bgSpot03 = static_cast<BgSpot03Taki*>(innerActorRef);
                 if (bgSpot03->actionFunc == BgSpot03Taki_HandleWaterfallState) {
-                    bgSpot03->actionFunc = BgSpot03Taki_KeepOpen;
+                    bgSpot03->actionFunc = TimeSaver_KeepWaterfallOpen;
                     bgSpot03->state = WATERFALL_OPENED;
                     bgSpot03->openingAlpha = 0.0f;
                     Flags_SetSwitch(gPlayState, bgSpot03->switchFlag);
@@ -1090,7 +1029,7 @@ void TimeSaverOnActorInitHandler(void* actorRef) {
     if (actor->id == ACTOR_EN_DNT_DEMO &&
         (IS_RANDO || CVarGetInteger(CVAR_ENHANCEMENT("TimeSavers.SkipMiscInteractions"), IS_RANDO))) {
         EnDntDemo* enDntDemo = static_cast<EnDntDemo*>(actorRef);
-        enDntDemo->actionFunc = EnDntDemo_JudgeSkipToReward;
+        enDntDemo->actionFunc = TimeSaver_ResolveDekuMaskJudgement;
     }
 
     // Forest Temple entrance cutscene

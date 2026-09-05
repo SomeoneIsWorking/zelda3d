@@ -27,9 +27,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <string>
 #include <vector>
 
+#include <SDL3/SDL.h>
 #include <dlfcn.h>
 #include <libgen.h>
 #include <unistd.h>
@@ -37,11 +39,13 @@
 #include <ship/Context.h>
 #include <ship/zelda3d_core.h>
 
+#include "platform/rom_setup.h"
+
 namespace {
 
 struct CoreSpec {
     const char* id;
-    const char* subdir;  // build tree layout: build-cmake/<subdir>/<file>
+    const char* subdir; // build tree layout: build-cmake/<subdir>/<file>
     const char* file;
     const char* envOverride;
     const char* buildTarget; // named in the error, so a missing core is actionable
@@ -289,18 +293,16 @@ int RunSequence(const std::string& spec) {
     // single-game path for why this cannot be left to __cxa_finalize.
     Ship::Context::DestroyInstance();
 
-
     printf("zelda3d: %zu/%zu cores ran to completion in one process\n", ran, ids.size());
     return ran == ids.size() ? 0 : 1;
 }
 
 void Usage() {
-    fprintf(stderr,
-            "usage: zelda3d [oot|mm] [game args...]\n"
-            "       zelda3d --probe-cores    load every core into one process and report\n"
-            "       zelda3d --run-sequence mm,oot   run cores back to back in one process\n"
-            "\n"
-            "The game may also be set with ZELDA3D_GAME. Default: oot.\n");
+    fprintf(stderr, "usage: zelda3d [oot|mm] [game args...]\n"
+                    "       zelda3d --probe-cores    load every core into one process and report\n"
+                    "       zelda3d --run-sequence mm,oot   run cores back to back in one process\n"
+                    "\n"
+                    "The game may also be set with ZELDA3D_GAME. Default: oot.\n");
 }
 
 } // namespace
@@ -315,6 +317,17 @@ int main(int argc, char* argv[]) {
     if (argc > 1 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
         Usage();
         return 0;
+    }
+
+    try {
+        if (!Zelda3D::Platform::EnsureRomSetup(Ship::Context::GetAppDirectoryPath("zelda3d"))) {
+            return 6;
+        }
+    } catch (const std::exception& error) {
+        const std::string message =
+            std::string("Zelda3D cannot open its user configuration directory:\n\n") + error.what();
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Zelda3D — Setup failed", message.c_str(), nullptr);
+        return 6;
     }
 
     // Game selection: first argument if it names one, else $ZELDA3D_GAME, else OoT. Consuming the
@@ -346,11 +359,9 @@ int main(int argc, char* argv[]) {
     int rc = 0;
     int gamesRun = 0;
     for (;;) {
-        // The engine resolves archives and config relative to the CURRENT DIRECTORY (Context's app
-        // directory falls through to "."), which is why run.sh cds into the build dir before
-        // launching a game binary. The launcher inherits that contract rather than changing it: move
-        // to the core's own directory, where its .o2r/.otr and assets are staged. Re-done per game,
-        // since the second game's assets live in ITS directory, not the departing game's.
+        // Core-owned read-only assets remain beside each core. Writable archives, configuration and
+        // saves resolve through SDL's OS user data directory; changing directory here no longer sends
+        // them into the build tree or an AppImage mount.
         const std::string corePath = ResolveCorePath(*spec);
         {
             std::string dir = corePath;
@@ -380,8 +391,9 @@ int main(int argc, char* argv[]) {
         } else {
             // Leaving it unset would send the engine to the launcher's directory and fail obscurely
             // much later, at the first asset it could not find.
-            fprintf(stderr, "ZELDA3D LAUNCHER: cannot locate the loaded %s core on disk (dladdr failed); "
-                            "its assets would be looked for beside this launcher.\n",
+            fprintf(stderr,
+                    "ZELDA3D LAUNCHER: cannot locate the loaded %s core on disk (dladdr failed); "
+                    "its assets would be looked for beside this launcher.\n",
                     spec->id);
             return 5;
         }

@@ -6,27 +6,13 @@
 #endif
 #include "extractor/Extract.h"
 #include "thirdparty/portable-file-dialogs.h"
-#include <ship/utils/binarytools/BitConverter.h>
+#include "extractor/n64_rom_validation.h"
 
 #ifdef unix
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#endif
-
-#ifdef _MSC_VER
-#define BSWAP32 _byteswap_ulong
-#define BSWAP16 _byteswap_ushort
-#elif __has_include(<byteswap.h>)
-#include <byteswap.h>
-#define BSWAP32 bswap_32
-#define BSWAP16 bswap_16
-#else
-#define BSWAP16(value) ((((value)&0xff) << 8) | ((value) >> 8))
-
-#define BSWAP32(value) \
-    (((uint32_t)BSWAP16((uint16_t)((value)&0xffff)) << 16) | (uint32_t)BSWAP16((uint16_t)((value) >> 16)))
 #endif
 
 #if defined(_MSC_VER)
@@ -46,8 +32,6 @@
 #include <filesystem>
 #include <random>
 #include <string>
-
-extern "C" uint32_t CRC32C(unsigned char* data, size_t dataSize);
 
 // The ROM versions this game knows about. Everything per-game lives behind this one call; see
 // Extract.h and each game's Extractor/RomVersions.cpp.
@@ -79,29 +63,6 @@ void Extractor::ShowErrorBox(const char* title, const char* text) {
 #else
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, title, text, nullptr);
 #endif
-}
-
-void Extractor::ShowSizeErrorBox() const {
-    std::unique_ptr<char[]> boxBuffer = std::make_unique<char[]>(mCurrentRomPath.size() + 100);
-    snprintf(boxBuffer.get(), mCurrentRomPath.size() + 100,
-             "The rom file %s was not a valid size. Was %zu MB, expecting 32, 54, or 64MB.", mCurrentRomPath.c_str(),
-             mCurRomSize / MB_BASE);
-    ShowErrorBox("Invalid Rom Size", boxBuffer.get());
-}
-
-// Both CRC failure messages end in the same "go validate your ROM here" line, and the site differs
-// per game, so they are built rather than written out.
-static std::string CrcErrorText(const char* whatNext) {
-    return std::string("Rom CRC did not match the list of known compatible roms. ") + whatNext + "\n\nVisit " +
-           Versions().romValidationUrl + " to validate your ROM and see a list of compatible versions";
-}
-
-void Extractor::ShowCrcErrorBox() const {
-    ShowErrorBox("Rom CRC invalid", CrcErrorText("Please find another.").c_str());
-}
-
-void Extractor::ShowCompressedErrorBox() const {
-    ShowErrorBox("File is Compressed", "The selected file appears to be compressed. Please extract before using.");
 }
 
 int Extractor::ShowRomPickBox(uint32_t verCrc) const {
@@ -163,40 +124,14 @@ int Extractor::ShowYesNoBox(const char* title, const char* box) {
 
 void Extractor::SetRomInfo(const std::string& path) {
     mCurrentRomPath = path;
-    mCurRomSize = GetCurRomSize();
 }
 
 void Extractor::FilterRoms(std::vector<std::string>& roms, RomSearchMode searchMode) {
-    std::ifstream inFile;
-    std::vector<std::string>::iterator it = roms.begin();
-
-    while (it != roms.end()) {
-        std::string rom = *it;
+    std::erase_if(roms, [&](const std::string& rom) {
         SetRomInfo(rom);
-
-        // Skip. We will handle rom size errors later on after filtering
-        if (!ValidateRomSize()) {
-            it++;
-            continue;
-        }
-
-        inFile.open(rom, std::ios::in | std::ios::binary);
-        inFile.read((char*)mRomData.get(), mCurRomSize);
-        inFile.clear();
-        inFile.close();
-
-        BitConverter::RomToBigEndian(mRomData.get(), mCurRomSize);
-
-        // Rom doesn't claim to be valid
-        // Game type doesn't match search mode
-        if (FindRomVersion(GetRomVerCrc()) == nullptr || (searchMode == RomSearchMode::Vanilla && IsMasterQuest()) ||
-            (searchMode == RomSearchMode::MQ && !IsMasterQuest())) {
-            it = roms.erase(it);
-            continue;
-        }
-
-        it++;
-    }
+        return !LoadRom(false) || (searchMode == RomSearchMode::Vanilla && IsMasterQuest()) ||
+               (searchMode == RomSearchMode::MQ && !IsMasterQuest());
+    });
 }
 
 void Extractor::GetRoms(std::vector<std::string>& roms) {
@@ -246,8 +181,8 @@ void Extractor::GetRoms(std::vector<std::string>& roms) {
                 }
             }
         }
+        closedir(d);
     }
-    closedir(d);
 #else
     for (const auto& file : std::filesystem::directory_iterator(mSearchPath)) {
         if (file.is_directory())
@@ -307,79 +242,19 @@ bool Extractor::GetRomPathFromBox() {
 
     mCurrentRomPath = selection[0];
 #endif
-    mCurRomSize = GetCurRomSize();
     return true;
 }
 
 uint32_t Extractor::GetRomVerCrc() const {
-    return BSWAP32(((uint32_t*)mRomData.get())[4]);
+    return Zelda3D::Extractor::N64HeaderCrc(mRomData);
 }
 
-size_t Extractor::GetCurRomSize() const {
-    return std::filesystem::file_size(mCurrentRomPath);
-}
-
-bool Extractor::ValidateAndFixRom() {
-    const RomVersionTable& table = Versions();
-
-    // Some dumps ship with a patched header -- OoT's MQ debug rom is distributed made to look like a
-    // US one. Restoring the byte is what lets the image match a known-good CRC.
-    for (size_t i = 0; i < table.headerPatchCount; i++) {
-        const RomHeaderPatch& patch = table.headerPatches[i];
-
-        if (GetRomVerCrc() == patch.headerCrc) {
-            mRomData[patch.offset] = patch.value;
-        }
-    }
-
-    const uint32_t actualCrc = CRC32C(mRomData.get(), mCurRomSize);
-
-    for (size_t i = 0; i < table.goodCrcCount; i++) {
-        if (actualCrc == table.goodCrcs[i]) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// The file box will only allow selecting an n64 rom but typing in the file name will allow selecting anything.
-bool Extractor::ValidateNotCompressed() const {
-    // ZIP file header
-    if (mRomData[0] == 'P' && mRomData[1] == 'K' && mRomData[2] == 0x03 && mRomData[3] == 0x04) {
-        return false;
-    }
-    // RAR file header. Only the first 4 bytes.
-    if (mRomData[0] == 'R' && mRomData[1] == 'a' && mRomData[2] == 'r' && mRomData[3] == 0x21) {
-        return false;
-    }
-    // 7z file header. 37 7A BC AF 27 1C
-    if (mRomData[0] == '7' && mRomData[1] == 'z' && mRomData[2] == 0xBC && mRomData[3] == 0xAF && mRomData[4] == 0x27 &&
-        mRomData[5] == 0x1C) {
-        return false;
-    }
-
-    return true;
-}
-
-bool Extractor::ValidateRomSize() const {
-    if (mCurRomSize != MB32 && mCurRomSize != MB54 && mCurRomSize != MB64) {
-        return false;
-    }
-    return true;
-}
-
-bool Extractor::ValidateRom(bool skipCrcTextBox) {
-    if (!ValidateNotCompressed()) {
-        ShowCompressedErrorBox();
-        return false;
-    }
-    if (!ValidateRomSize()) {
-        ShowSizeErrorBox();
-        return false;
-    }
-    if (!ValidateAndFixRom()) {
-        if (!skipCrcTextBox) {
-            ShowCrcErrorBox();
+bool Extractor::LoadRom(bool showError) {
+    std::string error;
+    if (!Zelda3D::Extractor::LoadValidatedN64Rom(mCurrentRomPath, Versions(), mRomData, error)) {
+        mRomData.clear();
+        if (showError) {
+            ShowErrorBox("ROM validation failed", error.c_str());
         }
         return false;
     }
@@ -387,27 +262,7 @@ bool Extractor::ValidateRom(bool skipCrcTextBox) {
 }
 
 bool Extractor::ManuallySearchForRom() {
-    std::ifstream inFile;
-
-    if (!GetRomPathFromBox()) {
-        return false;
-    }
-
-    inFile.open(mCurrentRomPath, std::ios::in | std::ios::binary);
-
-    if (!inFile.is_open()) {
-        return false; // TODO Handle error
-    }
-
-    inFile.read((char*)mRomData.get(), mCurRomSize);
-    inFile.close();
-    BitConverter::RomToBigEndian(mRomData.get(), mCurRomSize);
-
-    if (!ValidateRom()) {
-        return false;
-    }
-
-    return true;
+    return GetRomPathFromBox() && LoadRom(true);
 }
 
 bool Extractor::ManuallySearchForRomMatchingType(RomSearchMode searchMode) {
@@ -442,31 +297,8 @@ bool Extractor::ManuallySearchForRomMatchingType(RomSearchMode searchMode) {
 }
 
 bool Extractor::RunFileStandalone(std::string rom) {
-    if (std::filesystem::is_directory(rom)) {
-        return false;
-    }
-    auto file = std::filesystem::path(rom);
-    if ((file.extension() != ".n64") && (file.extension() != ".z64") && (file.extension() != ".v64")) {
-        return false;
-    }
     SetRomInfo(rom);
-
-    if (!ValidateRomSize()) {
-        return false;
-    }
-    std::ifstream inFile;
-
-    inFile.open(rom, std::ios::in | std::ios::binary);
-    inFile.read((char*)mRomData.get(), mCurRomSize);
-    inFile.clear();
-    inFile.close();
-    BitConverter::RomToBigEndian(mRomData.get(), mCurRomSize);
-
-    if (!ValidateRom(true)) {
-        return false;
-    }
-
-    return true;
+    return LoadRom(false);
 }
 
 void Extractor::SetSearchPath(const std::string& path) {
@@ -475,7 +307,6 @@ void Extractor::SetSearchPath(const std::string& path) {
 
 bool Extractor::Run(std::string searchPath, RomSearchMode searchMode) {
     std::vector<std::string> roms;
-    std::ifstream inFile;
 
     SetSearchPath(searchPath);
 
@@ -490,7 +321,7 @@ bool Extractor::Run(std::string searchPath, RomSearchMode searchMode) {
                 if (!ManuallySearchForRomMatchingType(searchMode)) {
                     return false;
                 }
-                break;
+                return true;
             case IDNO:
                 ShowErrorBox("No rom selected", "No rom selected. Exiting");
                 return false;
@@ -514,34 +345,19 @@ bool Extractor::Run(std::string searchPath, RomSearchMode searchMode) {
     for (const auto& rom : roms) {
         SetRomInfo(rom);
 
-        if (!ValidateRomSize()) {
-            ShowSizeErrorBox();
+        if (!LoadRom(true)) {
             continue;
         }
-
-        inFile.open(rom, std::ios::in | std::ios::binary);
-        inFile.read((char*)mRomData.get(), mCurRomSize);
-        inFile.clear();
-        inFile.close();
-        BitConverter::RomToBigEndian(mRomData.get(), mCurRomSize);
 
         int option = ShowRomPickBox(GetRomVerCrc());
 
         if (option == (int)ButtonId::YES) {
-            if (!ValidateRom(true)) {
-                if (rom == roms.back()) {
-                    ShowCrcErrorBox();
-                } else {
-                    ShowErrorBox("Rom CRC invalid", CrcErrorText("Trying the next one...").c_str());
-                }
-                continue;
-            }
-            break;
+            return true;
         } else if (option == (int)ButtonId::FIND) {
             if (!ManuallySearchForRomMatchingType(searchMode)) {
                 return false;
             }
-            break;
+            return true;
         } else if (option == (int)ButtonId::NO) {
             if (rom == roms.back()) {
                 ShowErrorBox("No rom provided", "No rom provided. Exiting");
@@ -551,7 +367,7 @@ bool Extractor::Run(std::string searchPath, RomSearchMode searchMode) {
         }
         break;
     }
-    return true;
+    return false;
 }
 
 bool Extractor::IsMasterQuest() const {

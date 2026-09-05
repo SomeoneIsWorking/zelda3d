@@ -2,6 +2,8 @@
 #include "boss_fd2_mane.h"
 
 #include "boss_fd2_bridge.h"
+#include "functions/math.h"
+#include "functions/rendering.h"
 #include "objects/object_fd2/object_fd2.h"
 #include "overlays/actors/ovl_Boss_Fd2/z_boss_fd2.h"
 #include "soh/frame_interpolation.h"

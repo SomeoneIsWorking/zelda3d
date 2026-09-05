@@ -3,6 +3,7 @@
 #include "repl_camera_state.h"
 #include "../behaviors/title/title_presentation.h"
 #include "../render/camera_reconcile.h"
+#include "functions/rendering.h"
 
 namespace Zelda3D::Repl {
 

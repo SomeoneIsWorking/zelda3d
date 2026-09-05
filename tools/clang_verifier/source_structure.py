@@ -12,6 +12,7 @@ from .source_selection import (
     modified_legacy_decomp_files,
     repo_relative,
     repository_files,
+    resolve_base_commit,
     run_git,
 )
 
@@ -23,7 +24,7 @@ SOURCE_LINE_LIMIT = 1_200
 LEGACY_LINE_LIMITS = {
     "2ship/2s2h/BenGui/BenMenu.cpp": 2303,
     "2ship/2s2h/BenGui/CosmeticEditor.cpp": 1445,
-    "2ship/2s2h/BenPort.cpp": 2476,
+    "2ship/2s2h/BenPort.cpp": 2187,
     "2ship/2s2h/DeveloperTools/SaveEditor.cpp": 2394,
     "2ship/2s2h/GameInteractor/GameInteractor_VanillaBehavior.h": 2462,
     "2ship/2s2h/Rando/DrawFuncs.cpp": 1339,
@@ -38,31 +39,23 @@ LEGACY_LINE_LIMITS = {
     "Shipwright/libultraship/include/libultraship/libultra/gbi.h": 4371,
     "Shipwright/libultraship/include/ship/window/gui/Fonts.h": 2304,
     "Shipwright/libultraship/src/fast/backends/gfx_sdl3gpu.cpp": 2835,
-    "Shipwright/soh/soh/Enhancements/TimeSavers/timesaver_hook_handlers.cpp": 1434,
-    "Shipwright/soh/soh/Enhancements/debugconsole.cpp": 1784,
-    "Shipwright/soh/soh/Enhancements/debugger/actorViewer.cpp": 1231,
-    "Shipwright/soh/soh/Enhancements/debugger/debugSaveEditor.cpp": 1996,
+    "Shipwright/soh/soh/Enhancements/TimeSavers/timesaver_hook_handlers.cpp": 1382,
     "Shipwright/soh/soh/Enhancements/randomizer/3drando/fill.cpp": 1491,
     "Shipwright/soh/soh/Enhancements/randomizer/3drando/hint_list.cpp": 2478,
     "Shipwright/soh/soh/Enhancements/randomizer/3drando/hint_list/hint_list_exclude_dungeon.cpp": 2328,
     "Shipwright/soh/soh/Enhancements/randomizer/3drando/hint_list/hint_list_exclude_overworld.cpp": 2482,
     "Shipwright/soh/soh/Enhancements/randomizer/3drando/hint_list/hint_list_item.cpp": 2169,
-    "Shipwright/soh/soh/Enhancements/randomizer/Plandomizer.cpp": 1214,
+    "Shipwright/soh/soh/Enhancements/randomizer/Plandomizer.cpp": 1212,
     "Shipwright/soh/soh/Enhancements/randomizer/RCToRandInf.cpp": 3068,
     "Shipwright/soh/soh/Enhancements/randomizer/Traps.cpp": 1803,
-    "Shipwright/soh/soh/Enhancements/randomizer/draw.cpp": 1387,
     "Shipwright/soh/soh/Enhancements/randomizer/entrance.cpp": 1786,
-    "Shipwright/soh/soh/Enhancements/randomizer/location_access.cpp": 1238,
     "Shipwright/soh/soh/Enhancements/randomizer/location_access/dungeons/water_temple.cpp": 1453,
-    "Shipwright/soh/soh/Enhancements/randomizer/logic.cpp": 3029,
-    "Shipwright/soh/soh/Enhancements/randomizer/randomizer_check_tracker.cpp": 2519,
-    "Shipwright/soh/soh/Enhancements/randomizer/settings.cpp": 3020,
-    "Shipwright/soh/soh/Enhancements/tts/tts.cpp": 1204,
+    "Shipwright/soh/soh/Enhancements/randomizer/randomizer_check_tracker.cpp": 2470,
     "Shipwright/soh/soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h": 3082,
     "Shipwright/soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerCheck.h": 3387,
     "Shipwright/soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerHintTextKey.h": 1685,
     "Shipwright/soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerInf.h": 2952,
-    "Shipwright/soh/soh/SaveManager.cpp": 2892,
+    "Shipwright/soh/soh/SaveManager.cpp": 2838,
     "Shipwright/soh/soh/config/ConfigUpdaters.cpp": 1582,
     "Shipwright/soh/include/sfx.h": 1423,
     "Shipwright/soh/include/tables/dmadata_table_mqdbg.h": 1535,
@@ -95,19 +88,27 @@ def parse_legacy_limits(source: str) -> dict[str, int]:
     raise VerificationError("could not read LEGACY_LINE_LIMITS from verifier source")
 
 
-def head_legacy_limits(repo: Path) -> dict[str, int] | None:
+def historical_legacy_limits(
+    repo: Path, revision: str = "HEAD"
+) -> dict[str, int] | None:
     candidates = ("tools/clang_verifier/source_structure.py", "tools/verify_clang.py")
     for relative in candidates:
-        result = run_git(repo, ["show", f"HEAD:{relative}"], check=False)
+        result = run_git(repo, ["show", f"{revision}:{relative}"], check=False)
         if result.returncode == 0:
             return parse_legacy_limits(result.stdout)
     return None
 
 
 def verify_legacy_limit_changes(
-    repo: Path, current: dict[str, int], previous: dict[str, int] | None = None
+    repo: Path,
+    current: dict[str, int],
+    previous: dict[str, int] | None = None,
+    *,
+    base: str | None = None,
 ) -> list[str]:
-    previous = head_legacy_limits(repo) if previous is None else previous
+    previous = (
+        historical_legacy_limits(repo, base or "HEAD") if previous is None else previous
+    )
     if previous is None:
         return []
     failures = []
@@ -124,18 +125,21 @@ def verify_legacy_limit_changes(
     return failures
 
 
-def verify_modified_decomp_seams(repo: Path) -> list[str]:
+def verify_modified_decomp_seams(repo: Path, base: str | None = None) -> list[str]:
     failures = []
-    for path in modified_legacy_decomp_files(repo):
+    for path in modified_legacy_decomp_files(repo, base):
         relative = repo_relative(path, repo)
-        head = run_git(repo, ["show", f"HEAD:{relative}"], check=False)
-        if head.returncode != 0:
-            continue
+        revision = base or "HEAD"
+        previous = run_git(repo, ["show", f"{revision}:{relative}"], check=False)
+        if previous.returncode != 0:
+            raise VerificationError(
+                f"cannot read prior legacy seam: {revision}:{relative}"
+            )
         current_lines = count_lines(path)
-        head_lines = count_blob_lines(head.stdout.encode())
-        if current_lines > head_lines:
+        previous_lines = count_blob_lines(previous.stdout.encode())
+        if current_lines > previous_lines:
             failures.append(
-                f"{relative}: modified legacy decomp seam grew {head_lines} -> {current_lines} lines; "
+                f"{relative}: modified legacy decomp seam grew {previous_lines} -> {current_lines} lines; "
                 "extract or compact the seam"
             )
     return failures
@@ -145,15 +149,19 @@ def verify_structure(
     repo: Path,
     files: Sequence[Path] | None = None,
     legacy_limits: dict[str, int] | None = None,
+    *,
+    base: str | None = None,
 ) -> list[str]:
+    if base is not None:
+        base = resolve_base_commit(repo, base)
     full_repository_check = files is None
     files = (
         repository_files(repo, STRUCTURE_SUFFIXES) if full_repository_check else files
     )
     limits = LEGACY_LINE_LIMITS if legacy_limits is None else legacy_limits
-    failures = verify_legacy_limit_changes(repo, limits)
+    failures = verify_legacy_limit_changes(repo, limits, base=base)
     if full_repository_check:
-        failures.extend(verify_modified_decomp_seams(repo))
+        failures.extend(verify_modified_decomp_seams(repo, base))
     seen = set()
     for path in files:
         relative = repo_relative(path, repo)

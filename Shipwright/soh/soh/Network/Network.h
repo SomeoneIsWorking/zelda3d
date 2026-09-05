@@ -20,6 +20,7 @@ class Network {
     void HandleRemoteJson(std::string payload);
 
   public:
+    virtual ~Network() = default;
     // Initialised, because nothing else does. There is no Network constructor and no subclass sets
     // these, so `new CrowdControl()` left both indeterminate -- and they gate `Enable()`'s early
     // return, the menu's Enable/Disable label, and `Disable()`'s `receiveThread.join()`. A garbage

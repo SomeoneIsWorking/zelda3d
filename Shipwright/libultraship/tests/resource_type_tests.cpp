@@ -1,11 +1,15 @@
 #include <gtest/gtest.h>
 #include <cstring>
 #include <memory>
+#include <type_traits>
+#include <utility>
 #include <variant>
 #include <vector>
 
 #include "ship/resource/File.h"
 #include "ship/resource/Resource.h"
+#include "ship/resource/ResourceFactoryBinary.h"
+#include "ship/resource/ResourceFactoryXML.h"
 #include "ship/resource/ResourceLoader.h"
 #include "ship/resource/ResourceType.h"
 #include "ship/resource/factory/BlobFactory.h"
@@ -21,6 +25,40 @@
 // ============================================================
 // Helpers
 // ============================================================
+
+static_assert(std::has_virtual_destructor_v<Ship::ResourceFactory>);
+static_assert(std::has_virtual_destructor_v<Ship::ResourceFactoryBinary>);
+static_assert(std::has_virtual_destructor_v<Ship::ResourceFactoryXML>);
+
+namespace {
+class LifetimeFactory final : public Ship::ResourceFactory {
+  public:
+    explicit LifetimeFactory(std::shared_ptr<int> lifetime) : mLifetime(std::move(lifetime)) {
+    }
+
+    std::shared_ptr<Ship::IResource> ReadResource(std::shared_ptr<Ship::File>,
+                                                  std::shared_ptr<Ship::ResourceInitData>) override {
+        return nullptr;
+    }
+
+  protected:
+    bool FileHasValidFormatAndReader(std::shared_ptr<Ship::File>, std::shared_ptr<Ship::ResourceInitData>) override {
+        return false;
+    }
+
+  private:
+    std::shared_ptr<int> mLifetime;
+};
+} // namespace
+
+TEST(ResourceFactoryLifetime, BasePointerDeletionReleasesDerivedState) {
+    auto lifetime = std::make_shared<int>(1);
+    std::weak_ptr<int> observer = lifetime;
+    std::unique_ptr<Ship::ResourceFactory> factory = std::make_unique<LifetimeFactory>(std::move(lifetime));
+    ASSERT_FALSE(observer.expired());
+    factory.reset();
+    EXPECT_TRUE(observer.expired());
+}
 
 static std::shared_ptr<Ship::ResourceInitData> MakeBinaryInitData(bool isCustom = false) {
     auto id = std::make_shared<Ship::ResourceInitData>();

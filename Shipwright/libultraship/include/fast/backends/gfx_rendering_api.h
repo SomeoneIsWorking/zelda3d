@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <stdint.h>
 
 #include <unordered_map>
@@ -18,7 +19,7 @@ enum FilteringMode { FILTER_THREE_POINT, FILTER_LINEAR, FILTER_NONE };
 
 // A hash function used to hash a: pair<float, float>
 struct hash_pair_ff {
-    size_t operator()(const std::pair<float, float>& p) const {
+    std::size_t operator()(const std::pair<float, float>& p) const {
         const auto hash1 = std::hash<float>{}(p.first);
         const auto hash2 = std::hash<float>{}(p.second);
 
@@ -48,7 +49,7 @@ class GfxRenderingAPI {
     virtual void SetViewport(int x, int y, int width, int height) = 0;
     virtual void SetScissor(int x, int y, int width, int height) = 0;
     virtual void SetUseAlpha(bool useAlpha) = 0;
-    virtual void DrawTriangles(float buf_vbo[], size_t buf_vbo_len, size_t buf_vbo_num_tris) = 0;
+    virtual void DrawTriangles(float buf_vbo[], std::size_t buf_vbo_len, std::size_t buf_vbo_num_tris) = 0;
     virtual void Init() = 0;
     virtual void OnResize() = 0;
     virtual void StartFrame() = 0;

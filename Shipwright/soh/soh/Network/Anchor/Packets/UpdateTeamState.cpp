@@ -161,15 +161,10 @@ void Anchor::HandlePacket_UpdateTeamState(nlohmann::json payload) {
                     (loadedData.sceneFlags[i].swch & ~mask) | (gSaveContext.sceneFlags[i].swch & mask);
             }
 
-            if (i == SCENE_GANONS_TOWER_COLLAPSE_EXTERIOR) {
-                // Keep collapse timer flag
-                u32 mask = (1 << 0x36);
-                loadedData.sceneFlags[i].swch =
-                    (loadedData.sceneFlags[i].swch & ~mask) | (gSaveContext.sceneFlags[i].swch & mask);
-            }
-
             gSaveContext.sceneFlags[i] = loadedData.sceneFlags[i];
             if (IsSaveLoaded() && gPlayState->sceneNum == i) {
+                // Only persisted flags are synchronized. tempSwch, including
+                // the collapse timer's switch 0x36, remains owned by this play state.
                 gPlayState->actorCtx.flags.chest = loadedData.sceneFlags[i].chest;
                 gPlayState->actorCtx.flags.swch = loadedData.sceneFlags[i].swch;
                 gPlayState->actorCtx.flags.clear = loadedData.sceneFlags[i].clear;

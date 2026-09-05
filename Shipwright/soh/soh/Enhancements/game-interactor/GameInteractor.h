@@ -342,9 +342,10 @@ class GameInteractor {
             RegisteredGameHooks<H>::hookData.erase(hookId);
         }
         HooksToUnregister<H>::hooks.clear();
-        // Execute hooks
+        // Multicast arguments are borrowed: moving into one subscriber would consume
+        // the payload before later subscribers (or a filter's callback) observe it.
         for (auto& hook : RegisteredGameHooks<H>::functions) {
-            hook.second(std::forward<Args>(args)...);
+            hook.second(args...);
             RegisteredGameHooks<H>::hookData[hook.first].calls += 1;
         }
     }
@@ -405,7 +406,7 @@ class GameInteractor {
         }
         // Execute hooks
         for (auto& hook : RegisteredGameHooks<H>::functionsForID[id]) {
-            hook.second(std::forward<Args>(args)...);
+            hook.second(args...);
             RegisteredGameHooks<H>::hookData[hook.first].calls += 1;
         }
     }
@@ -466,7 +467,7 @@ class GameInteractor {
         }
         // Execute hooks
         for (auto& hook : RegisteredGameHooks<H>::functionsForPtr[ptr]) {
-            hook.second(std::forward<Args>(args)...);
+            hook.second(args...);
             RegisteredGameHooks<H>::hookData[hook.first].calls += 1;
         }
     }
@@ -507,8 +508,8 @@ class GameInteractor {
         HooksToUnregister<H>::hooksForFilter.clear();
         // Execute hooks
         for (auto& hook : RegisteredGameHooks<H>::functionsForFilter) {
-            if (hook.second.first(std::forward<Args>(args)...)) {
-                hook.second.second(std::forward<Args>(args)...);
+            if (hook.second.first(args...)) {
+                hook.second.second(args...);
                 RegisteredGameHooks<H>::hookData[hook.first].calls += 1;
             }
         }

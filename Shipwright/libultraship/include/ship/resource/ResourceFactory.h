@@ -26,6 +26,8 @@ namespace Ship {
  */
 class ResourceFactory {
   public:
+    virtual ~ResourceFactory() = default;
+
     /**
      * @brief Deserializes a File into an IResource.
      *

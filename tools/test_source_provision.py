@@ -5,8 +5,9 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from launcher_bootstrap import source_provision
+from launcher_bootstrap import native_sources, source_provision
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -16,14 +17,37 @@ class SourceProvisionTests(unittest.TestCase):
         (REPO / "scratch").mkdir(exist_ok=True)
         self.temporary = tempfile.TemporaryDirectory(dir=REPO / "scratch")
         self.repo = Path(self.temporary.name)
+        self.checkout_patcher = mock.patch.object(
+            source_provision, "require_pinned_checkout"
+        )
+        self.checkout = self.checkout_patcher.start()
+        self.addCleanup(self.checkout_patcher.stop)
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
     def _complete(self, relative: Path) -> None:
-        path = self.repo / relative
-        path.mkdir(parents=True, exist_ok=True)
-        (path / "CMakeLists.txt").touch()
+        # These fixtures reproduce each pinned upstream tree, independently of
+        # the provisioner's postcondition declarations.
+        build_file = {
+            Path("Shipwright/ZAPDTR"): Path("ZAPD/CMakeLists.txt"),
+            Path("Shipwright/libultraship/extern/StormLib"): Path("CMakeLists.txt"),
+        }[relative]
+        path = self.repo / relative / build_file
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+
+    def test_zapd_root_cmake_file_does_not_satisfy_nested_upstream_layout(self) -> None:
+        root = self.repo / "Shipwright/ZAPDTR"
+        root.mkdir(parents=True)
+        (root / "CMakeLists.txt").touch()
+        with self.assertRaisesRegex(
+            source_provision.SourceProvisionError, "refusing to overwrite"
+        ):
+            source_provision.ensure_build_sources(
+                self.repo, lambda _command: self.fail("incomplete source")
+            )
+        self.checkout.assert_not_called()
 
     def test_missing_build_submodules_are_initialized_at_pinned_paths_only(
         self,
@@ -78,7 +102,7 @@ class SourceProvisionTests(unittest.TestCase):
         ):
             source_provision.ensure_build_sources(self.repo, lambda _command: None)
 
-    def test_complete_sources_are_a_no_op(self) -> None:
+    def test_complete_submodules_still_provision_exact_lucent_source(self) -> None:
         for submodule in source_provision.BUILD_SUBMODULES:
             self._complete(submodule.path)
         commands = []
@@ -86,6 +110,39 @@ class SourceProvisionTests(unittest.TestCase):
             self.repo, lambda command: commands.append(command)
         )
         self.assertEqual(commands, [])
+        self.checkout.assert_called_once_with(
+            native_sources.LUCENT, self.repo / "build/deps/lucent-source"
+        )
+
+    def test_wrong_or_dirty_lucent_checkout_refuses_through_native_source_owner(
+        self,
+    ) -> None:
+        for submodule in source_provision.BUILD_SUBMODULES:
+            self._complete(submodule.path)
+        (self.repo / "build/deps/lucent-source").mkdir(parents=True)
+        for outputs in (
+            ("wrong-revision", ""),
+            (native_sources.LUCENT.revision, " M CMakeLists.txt"),
+        ):
+            with (
+                self.subTest(outputs=outputs),
+                mock.patch.object(
+                    source_provision,
+                    "require_pinned_checkout",
+                    native_sources.require_pinned_checkout,
+                ),
+                mock.patch.object(
+                    native_sources.subprocess, "check_output", side_effect=outputs
+                ),
+                mock.patch.object(native_sources.subprocess, "run") as run,
+                self.assertRaisesRegex(
+                    source_provision.SourceProvisionError, "lucent source must be clean"
+                ),
+            ):
+                source_provision.ensure_build_sources(
+                    self.repo, lambda _command: self.fail("submodules are complete")
+                )
+            run.assert_not_called()
 
 
 if __name__ == "__main__":

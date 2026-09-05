@@ -14,6 +14,7 @@
 #include "../../render/model_queries.h"
 #include "asset/mat4.h"
 #include "fast/zelda3d_material_overrides.h"
+#include "functions/math.h"
 #include "overlays/actors/ovl_Boss_Fd/z_boss_fd.h"
 #include "overlays/actors/ovl_Boss_Fd2/z_boss_fd2.h"
 
