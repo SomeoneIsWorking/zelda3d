@@ -30,7 +30,9 @@ Added explicit SOH3D_HARNESS_NO_CAPTURE=1 diagnostic mode in the first-party har
 The libretro Azahar dependency now has a maintained fork and immutable source declaration at
 `tools/soh3d_harness/AZAHAR_SOURCE.toml` (`SomeoneIsWorking/azahar`, revision
 `d488783b3708339a739dca5e10077cd21cb97226`). The fork carries the six harness RPC/oracle commits
-and the applied diagnostic probes that were previously described as a re-applied patch stack.
+and the applied memory, PICA, software-rasterizer, logging, and custom-texture probes that were
+previously described as a re-applied patch stack. The separate GPU blit logger remains only in the
+existing dirty checkout and is not part of this pinned branch.
 The harness readback path now tracks the staging image layout and restores the core image layout
 before returning. A Vulkan validation run over 30 frames still reports
 `VUID-vkCmdDraw-None-09600` for an image whose current layout is `UNDEFINED` while a descriptor
