@@ -13,6 +13,9 @@ inline constexpr uint32_t kTitleContextAddress = 0x0050AF34;
 inline constexpr uint32_t kTitleSceneOffset = 0x006C;
 inline constexpr uint32_t kTitleActiveOffset = 0x0078;
 inline constexpr uint32_t kTitlePlayStatePointerAddress = 0x00539F98;
+// The title global stores play + 0x14 (the engine's current-play field), while
+// all PlayState offsets in this harness are relative to the struct base.
+inline constexpr uint32_t kTitlePlayStateGlobalBias = 0x0014;
 inline constexpr uint32_t kTitlePoseTableAddress = 0x005642D0;
 inline constexpr uint32_t kTitlePoseCount = 25;
 inline constexpr uint32_t kTitlePoseStride = 36;

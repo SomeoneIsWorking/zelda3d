@@ -13,12 +13,15 @@ std::optional<uint32_t> CurrentPlayState() {
         return *playState;
     }
 
-    // The title demo is not a Play gamestate on 3DS. Its live PlayState pointer
-    // resides in a separate fixed slot so scene and actor inspection can still
-    // use the same typed state accessors while the demo is active.
+    // The title demo is not a Play gamestate on 3DS. Its live-play global stores
+    // play + 0x14 rather than the PlayState base, so normalize it before any
+    // caller applies PlayState offsets.
     const auto titlePlayState = memory.Read32OrNullopt(OracleLayout::kTitlePlayStatePointerAddress);
     if (titlePlayState && *titlePlayState != 0) {
-        return *titlePlayState;
+        if (*titlePlayState < OracleLayout::kTitlePlayStateGlobalBias) {
+            return std::nullopt;
+        }
+        return *titlePlayState - OracleLayout::kTitlePlayStateGlobalBias;
     }
     return std::nullopt;
 }
