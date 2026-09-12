@@ -67,3 +67,7 @@ the real libretro callback, and rejects out-of-range coordinates or invalid pres
 command discriminator passed for both press/release and negative-coordinate inputs. This removes
 the harness-control blind spot; it does not yet prove an empty-slot name-entry sequence or create a
 gameplay checkpoint.
+
+The harness keeps single-screen output by default for existing parity captures. The diagnostic
+override `ZELDA3D_HARNESS_TOUCH_LAYOUT=1` selects the fork's `default` two-screen layout so pointer
+coordinates can reach the touchscreen; no game or emulator memory is bypassed.

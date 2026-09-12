@@ -10,6 +10,7 @@
 #include "libretro.h"
 #include "libretro_frontend.h"
 #include "libretro_vulkan.h"
+#include "process_environment.h"
 #include "texpack_setup.h"
 
 namespace HarnessFrontend {
@@ -99,7 +100,7 @@ bool EnvironmentCallback(unsigned command, void* data) {
                 return true;
             }
             if (variable->key && std::strcmp(variable->key, "citra_layout_option") == 0) {
-                variable->value = "single_screen";
+                variable->value = HarnessProcess::TouchscreenLayoutEnabled() ? "default" : "single_screen";
                 return true;
             }
             variable->value = nullptr;
