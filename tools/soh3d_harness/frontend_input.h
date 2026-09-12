@@ -14,6 +14,8 @@ uint64_t InputPollCount();
 uint32_t InputIdsSeen();
 void SetAnalog(int16_t leftX, int16_t leftY, int16_t rightX, int16_t rightY);
 void GetAnalog(int16_t* leftX, int16_t* leftY, int16_t* rightX, int16_t* rightY);
+void SetPointer(int16_t x, int16_t y, bool pressed);
+void GetPointer(int16_t* x, int16_t* y, bool* pressed);
 
 void HandleInput(std::istringstream& arguments);
 

@@ -16,6 +16,9 @@ int16_t g_analog_left_x = 0;
 int16_t g_analog_left_y = 0;
 int16_t g_analog_right_x = 0;
 int16_t g_analog_right_y = 0;
+int16_t g_pointer_x = 0;
+int16_t g_pointer_y = 0;
+bool g_pointer_pressed = false;
 
 } // namespace
 
@@ -37,6 +40,21 @@ int16_t InputState(unsigned /*port*/, unsigned device, unsigned index, unsigned 
             if (id == RETRO_DEVICE_ID_ANALOG_Y) {
                 return g_analog_right_y;
             }
+        }
+        return 0;
+    }
+    if (device == RETRO_DEVICE_POINTER) {
+        if (index != 0) {
+            return 0;
+        }
+        if (id == RETRO_DEVICE_ID_POINTER_X) {
+            return g_pointer_x;
+        }
+        if (id == RETRO_DEVICE_ID_POINTER_Y) {
+            return g_pointer_y;
+        }
+        if (id == RETRO_DEVICE_ID_POINTER_PRESSED) {
+            return g_pointer_pressed ? 1 : 0;
         }
         return 0;
     }
@@ -76,6 +94,18 @@ void GetAnalog(int16_t* leftX, int16_t* leftY, int16_t* rightX, int16_t* rightY)
     *leftY = g_analog_left_y;
     *rightX = g_analog_right_x;
     *rightY = g_analog_right_y;
+}
+
+void SetPointer(int16_t x, int16_t y, bool pressed) {
+    g_pointer_x = x;
+    g_pointer_y = y;
+    g_pointer_pressed = pressed;
+}
+
+void GetPointer(int16_t* x, int16_t* y, bool* pressed) {
+    *x = g_pointer_x;
+    *y = g_pointer_y;
+    *pressed = g_pointer_pressed;
 }
 
 void HandleInput(std::istringstream& arguments) {
