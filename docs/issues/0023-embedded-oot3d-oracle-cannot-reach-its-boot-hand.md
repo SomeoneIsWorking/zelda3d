@@ -17,6 +17,14 @@ semaphore, so the frontend read back an image that was still in the core's pendi
 queue-order violation manifested as a fence stall and `UNDEFINED`/`SHADER_READ_ONLY_OPTIMAL`
 validation errors.
 
+The remaining title-driving failure is a separate setup/state boundary. A cold run accepts the
+same A/START input and reaches the recovered title actor's transition request (`play+0x5C2D =
+0x14`), but the title-to-file-select handoff cannot become gameplay because this harness save
+directory has no save slots and Azahar reports the required system title
+`title/0004000e/00033500/content/00000000.app` missing. The old title-state accessor also treated
+the 3DS live-play global (`play + 0x14`) as the PlayState base, causing `scene` to report `0x05c0`
+instead of the actual title scene `0x006b`; that diagnostic error is now corrected in the harness.
+
 ## What was tried / dead ends
 
 
@@ -42,3 +50,11 @@ The harness readback path now tracks the staging image layout and restores the c
 before returning. The core now signals that frame handoff and waits for its worker submission before
 the callback; a Vulkan validation run over 30 captured frames completes with no image-layout or
 semaphore-submit errors.
+
+### Note (2026-09-12)
+The no-capture title probe now has a falsifying trace for the remaining gap: cold boot → `run 300`
+→ A hold/release → `run 50` writes the recovered transition byte `0x14`, but `gameplay` remains
+`ok no`; the emulator logs the missing system-title app and missing `save00.bin`/`save01.bin`/
+`save02.bin`. After normalizing the title global by subtracting its documented `+0x14` bias,
+the same probe reports `playstate 0x0871e840 mode=title` and `scene 0x006b`, so the title
+diagnostics no longer hide the handoff state behind the wrong base address.

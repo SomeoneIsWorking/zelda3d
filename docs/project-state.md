@@ -70,8 +70,10 @@ fork now provides ordered Vulkan frame handoff; a validation-enabled run of 30 c
 ordinary harness CLI both complete successfully.
 
 Gap: the current title-driving recipe still does not reach the current-contract gameplay PlayState or
-produce a fresh gameplay checkpoint, so no new gameplay oracle observation is yet valid. The software
-renderer remains too slow for this scenario on the current host. See [issue #23](issues/0023-embedded-oot3d-oracle-cannot-reach-its-boot-hand.md).
+produce a fresh gameplay checkpoint, so no new gameplay oracle observation is yet valid. The cold
+title probe reaches the recovered transition request, but the file-select handoff has no save slots
+and the required system-title app is absent from the harness save directory. The software renderer
+remains too slow for this scenario on the current host. See [issue #23](issues/0023-embedded-oot3d-oracle-cannot-reach-its-boot-hand.md).
 
 ### S007 — Packaged player setup
 
