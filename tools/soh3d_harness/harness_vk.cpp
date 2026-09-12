@@ -43,6 +43,7 @@ struct State {
     bool haveImage = false;
     VkImage srcImage = VK_NULL_HANDLE;
     VkImageLayout srcLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    VkSemaphore readySemaphore = VK_NULL_HANDLE;
 
     // Serializes queue use between the core (via lock_queue/unlock_queue) and
     // our own readback submits — Azahar's Vulkan scheduler submits async.
@@ -66,11 +67,12 @@ uint32_t FindMemoryType(uint32_t typeBits, VkMemoryPropertyFlags want) {
 
 // --- retro_hw_render_interface_vulkan callbacks -----------------------------
 
-void cb_set_image(void* /*handle*/, const struct retro_vulkan_image* image, uint32_t /*num_semaphores*/,
-                  const VkSemaphore* /*semaphores*/, uint32_t /*src_queue_family*/) {
+void cb_set_image(void* /*handle*/, const struct retro_vulkan_image* image, uint32_t num_semaphores,
+                  const VkSemaphore* semaphores, uint32_t /*src_queue_family*/) {
     std::lock_guard<std::mutex> lk(g.imgMtx);
     if (!image) {
         g.haveImage = false;
+        g.readySemaphore = VK_NULL_HANDLE;
         return;
     }
     // create_info.image is the underlying VkImage of the view; that is the
@@ -81,6 +83,7 @@ void cb_set_image(void* /*handle*/, const struct retro_vulkan_image* image, uint
     g.srcImage = image->create_info.image;
     g.srcLayout = image->image_layout;
     g.haveImage = (g.srcImage != VK_NULL_HANDLE);
+    g.readySemaphore = num_semaphores ? semaphores[0] : VK_NULL_HANDLE;
 }
 
 // Single-image, synchronous model: we always hand the core frame slot 0 and
@@ -354,12 +357,14 @@ bool HaveImage() {
 bool Readback(std::vector<uint8_t>& out, uint32_t w, uint32_t h, size_t& pitch) {
     VkImage src;
     VkImageLayout srcLayout;
+    VkSemaphore readySemaphore;
     {
         std::lock_guard<std::mutex> lk(g.imgMtx);
-        if (!g.ok || !g.haveImage || g.srcImage == VK_NULL_HANDLE)
+        if (!g.ok || !g.haveImage || g.srcImage == VK_NULL_HANDLE || g.readySemaphore == VK_NULL_HANDLE)
             return false;
         src = g.srcImage;
         srcLayout = g.srcLayout;
+        readySemaphore = g.readySemaphore;
     }
     const uint32_t sw = w, sh = h;
     if (!sw || !sh)
@@ -414,6 +419,10 @@ bool Readback(std::vector<uint8_t>& out, uint32_t w, uint32_t h, size_t& pitch) 
 
     VkSubmitInfo si{};
     si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    si.waitSemaphoreCount = 1;
+    si.pWaitSemaphores = &readySemaphore;
+    si.pWaitDstStageMask = &waitStage;
     si.commandBufferCount = 1;
     si.pCommandBuffers = &g.cmd;
     {
