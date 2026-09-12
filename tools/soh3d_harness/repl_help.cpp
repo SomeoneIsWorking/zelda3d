@@ -16,6 +16,7 @@ void PrintHelp() {
                          "  input <mask>         set held button mask (RETRO_DEVICE_JOYPAD)\n"
                          "                       B=0 Y=1 SELECT=2 START=3 UP=4 DOWN=5\n"
                          "                       LEFT=6 RIGHT=7 A=8 X=9 L=10 R=11\n"
+                         "  pointer <x> <y> <p>  set touchscreen pointer (s16 coords, p=0|1)\n"
                          "  loadstate <path>     load Azahar save state from file\n"
                          "  savestate <path>     write Azahar save state to file\n"
                          "  playstate            print PlayState pointer + mode=play|title\n"

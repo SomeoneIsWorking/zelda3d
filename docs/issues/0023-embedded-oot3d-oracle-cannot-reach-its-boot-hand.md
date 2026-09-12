@@ -58,3 +58,12 @@ The no-capture title probe now has a falsifying trace for the remaining gap: col
 `save02.bin`. After normalizing the title global by subtracting its documented `+0x14` bias,
 the same probe reports `playstate 0x0871e840 mode=title` and `scene 0x006b`, so the title
 diagnostics no longer hide the handoff state behind the wrong base address.
+
+### Note (2026-09-12)
+The maintained fork's libretro core already supports `RETRO_DEVICE_POINTER`, but the harness
+frontend previously exposed only joypad and analog state. The harness now owns a narrow
+`pointer <x> <y> <pressed>` REPL command, forwards signed-16 coordinates and press state through
+the real libretro callback, and rejects out-of-range coordinates or invalid press values. A live
+command discriminator passed for both press/release and negative-coordinate inputs. This removes
+the harness-control blind spot; it does not yet prove an empty-slot name-entry sequence or create a
+gameplay checkpoint.
