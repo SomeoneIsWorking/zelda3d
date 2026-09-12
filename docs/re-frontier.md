@@ -31,8 +31,8 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
   once ground truth is known, these are what make DRIVING/OBSERVING the port reliable for
   sweeps). Referenced per-arc below, not restated.
 - `docs/parity-workflow.md` — the method for closing a step (oracle A/B, matched frames).
-- `KANBAN.md` / GitHub Issues — user-driven work items; a `⬜ todo` RE step here is not
-  automatically a kanban card (see CLAUDE.md's kanban-scope hard rule).
+- `docs/issues/` — atomic work points; a `⬜ todo` RE step here becomes an issue only when it
+  needs a separate investigation or implementation. `KANBAN.md` preserves earlier reports.
 
 <!-- Machine-edited by tools/re_frontier.py add/set. Format: `## <area>` sections;
      each entry is `### <id> — <title>` followed by `- <field>: <value>` lines. -->

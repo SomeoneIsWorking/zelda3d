@@ -1,10 +1,10 @@
-# debug_journal
+# Investigation evidence archive
 
-Parity-sweep findings, RE root-cause notes, and dead ends. Per project directive
-(user 2026-07-02): parity findings are tracked HERE, not on the kanban. The kanban
-is user-requested work only.
+This directory preserves earlier parity-sweep findings, RE root-cause notes, and dead ends.
+Consult them before reinvestigating a case. Record current atomic work in `docs/issues/` and
+capability status in `docs/project-state.md`; this journal is not their authority.
 
-Layout: one file per finding, named `<date>-<slug>.md`. Include:
+Existing entries use one file per finding, named `<date>-<slug>.md`, and record:
 - Symptom (with quantitative measurement or oracle A/B ref)
 - Reproducing tooling (REPL cmds / sweep tool)
 - Root cause (if known, with disasm/decomp evidence). Mark "OPEN" if unresolved.
@@ -55,6 +55,6 @@ observations as findings.
   case where the defect literally cannot be expressed as a render-state difference
   (extremely rare), and only after upstream is a full match at that state.
 
-**Tooling TODO (open):** `parity_ab.py` / GX-capture must expose a structured-record
-sweep mode as the default; the current PNG composite is for the acceptance-of-a-named-
-defect case, not the sweep signal.
+**Historical tooling gap:** the original sweep workflow called for `parity_ab.py` /
+GX-capture to expose structured records by default; check the current tool and issue registry
+before treating this as open work.

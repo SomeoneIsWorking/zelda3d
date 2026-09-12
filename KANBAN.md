@@ -1,16 +1,9 @@
-# Kanban — local board
+# Kanban — historical user reports and evidence
 
-Local task board for **zelda3d** (OoT3D / soh3d + MM3D / 2ship3d). **This markdown file IS the source
-of truth** — no GitHub Issues. Add a card only when the user reports/requests something (same
-USER-DRIVEN-ONLY rule as before: agent sweeps fix-in-session + journal, they do NOT create cards).
-Move a card between columns as work progresses; delete it (or move to `done`) when the user confirms.
-
-Screenshots for a card: attach in chat, or drop the file under `scratch/kanban/` (gitignored) and link
-it here — we don't commit PNGs to the repo.
-
-Columns: **todo · in-progress · in-review · needs-confirmation · blocked · done**
-
-Card format: `- [#N] <title> — <notes / evidence link>`  (N = simple incrementing id you assign)
+This board preserves earlier user reports, confirmations, and investigation evidence with their
+original column placement. The column labels below are historical and do not assert current state.
+Use `docs/issues/` for current atomic work and `docs/project-state.md` for capability status; consult
+this file for provenance before changing either authority. Do not add or move cards here.
 
 ## todo
 
