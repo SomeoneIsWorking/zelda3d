@@ -20,7 +20,7 @@ S003 is the current focus.
 | S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial | S002 | G001, G002 |
 | S004 | OoT3D actor animation, facial, camera, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G001 |
 | S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G002 |
-| S006 | An embedded Azahar oracle and parity tooling can compare the port with independent 3DS execution | verified | S001 | G001, G002 |
+| S006 | An embedded Azahar oracle and parity tooling can compare the port with independent 3DS execution | partial | S001 | G001, G002 |
 | S007 | The AppImage accepts four direct ROMs or bounded ZIPs and persists validated choices without shipping game content | partial | S001 | G003 |
 | S008 | Linux CI builds the complete app and both cores and executes asset-free native contracts | partial | — | G003 |
 | S009 | macOS arm64 CI exercises portable policy seams; complete app delivery remains open | partial | — | G003 |
@@ -67,6 +67,12 @@ Gap: MM3D coverage is substantially incomplete and must be established independe
 Evidence: the repository embeds Azahar, exposes state and rendering probes, records closed parity cases,
 and carries positive/negative controls for its trusted comparison instruments. This verifies the harness,
 not parity for unmeasured content.
+
+Gap: the current host cannot complete a fresh oracle boot. The default Vulkan route stalls in
+`HarnessVk::Readback` during `HarnessFrontend::SubmitOracleFrame`; the supported software route stalls
+in its renderer work queue before emitting the `boot succeeded` protocol handshake. Until the harness
+starts and reaches the current-contract gameplay state again, no new oracle observation is valid.
+See [issue #23](issues/0023-embedded-oot3d-oracle-cannot-reach-its-boot-hand.md).
 
 ### S007 — Packaged player setup
 
