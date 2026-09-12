@@ -2,7 +2,7 @@
 id: 23
 title: Embedded OoT3D oracle cannot reach its boot handshake on this host
 status: investigating
-symptom: After a successful incremental build, tools/harness_cli.py boot-to-play does not emit 'boot succeeded' or create scratch/gameplay_settled.p45-00401070.state. Default Vulkan execution spins in HarnessVk::Readback from HarnessFrontend::SubmitOracleFrame; supported SOH3D_HARNESS_SW=1 execution instead stalls in the software renderer work queue before the handshake, including at ZELDA3D_HARNESS_RES_FACTOR=1 with SOH3D_HARNESS_HEADLESS=1.
+symptom: The harness now completes its Vulkan handshake and captured frame runs, but the title-driving recipe still does not reach a gameplay PlayState or produce a fresh gameplay checkpoint. The software renderer remains too slow for the same scenario on this host.
 state_items: S006
 tags: oracle,harness,renderer,vulkan,software
 created: 2026-09-12
@@ -11,6 +11,11 @@ updated: 2026-09-12
 
 ## Root cause
 
+The libretro Vulkan fork called `set_image` and the synchronous `video_refresh` callback before its
+worker had submitted the render command. Its `MasterSemaphoreLibRetro` then discarded the render
+semaphore, so the frontend read back an image that was still in the core's pending submission. That
+queue-order violation manifested as a fence stall and `UNDEFINED`/`SHADER_READ_ONLY_OPTIMAL`
+validation errors.
 
 ## What was tried / dead ends
 
@@ -29,12 +34,11 @@ Added explicit SOH3D_HARNESS_NO_CAPTURE=1 diagnostic mode in the first-party har
 ### Note (2026-09-12)
 The libretro Azahar dependency now has a maintained fork and immutable source declaration at
 `tools/soh3d_harness/AZAHAR_SOURCE.toml` (`SomeoneIsWorking/azahar`, revision
-`d488783b3708339a739dca5e10077cd21cb97226`). The fork carries the six harness RPC/oracle commits
+`0de1e9d7ab2aff3d980ec9056966e85f4c0ba345`). The fork carries the six harness RPC/oracle commits
 and the applied memory, PICA, software-rasterizer, logging, and custom-texture probes that were
 previously described as a re-applied patch stack. The separate GPU blit logger remains only in the
 existing dirty checkout and is not part of this pinned branch.
 The harness readback path now tracks the staging image layout and restores the core image layout
-before returning. A Vulkan validation run over 30 frames still reports
-`VUID-vkCmdDraw-None-09600` for an image whose current layout is `UNDEFINED` while a descriptor
-expects `SHADER_READ_ONLY_OPTIMAL`; this is evidence of a remaining core-side layout contract bug,
-not a reason to disable capture or add a timeout.
+before returning. The core now signals that frame handoff and waits for its worker submission before
+the callback; a Vulkan validation run over 30 captured frames completes with no image-layout or
+semaphore-submit errors.

@@ -65,14 +65,13 @@ Gap: MM3D coverage is substantially incomplete and must be established independe
 ### S006 — Independent oracle comparisons
 
 Evidence: the repository embeds Azahar, exposes state and rendering probes, records closed parity cases,
-and carries positive/negative controls for its trusted comparison instruments. This verifies the harness,
-not parity for unmeasured content.
+and carries positive/negative controls for its trusted comparison instruments. The maintained libretro
+fork now provides ordered Vulkan frame handoff; a validation-enabled run of 30 captured frames and the
+ordinary harness CLI both complete successfully.
 
-Gap: the current host cannot complete a fresh oracle boot. The default Vulkan route stalls in
-`HarnessVk::Readback` during `HarnessFrontend::SubmitOracleFrame`; the supported software route stalls
-in its renderer work queue before emitting the `boot succeeded` protocol handshake. Until the harness
-starts and reaches the current-contract gameplay state again, no new oracle observation is valid.
-See [issue #23](issues/0023-embedded-oot3d-oracle-cannot-reach-its-boot-hand.md).
+Gap: the current title-driving recipe still does not reach the current-contract gameplay PlayState or
+produce a fresh gameplay checkpoint, so no new gameplay oracle observation is yet valid. The software
+renderer remains too slow for this scenario on the current host. See [issue #23](issues/0023-embedded-oot3d-oracle-cannot-reach-its-boot-hand.md).
 
 ### S007 — Packaged player setup
 
