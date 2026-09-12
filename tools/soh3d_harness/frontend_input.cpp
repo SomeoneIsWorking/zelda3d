@@ -12,6 +12,8 @@ namespace {
 uint32_t g_input_mask = 0;
 uint64_t g_input_poll_count = 0;
 uint32_t g_input_poll_ids_seen = 0;
+uint64_t g_pointer_poll_count = 0;
+uint32_t g_pointer_ids_seen = 0;
 int16_t g_analog_left_x = 0;
 int16_t g_analog_left_y = 0;
 int16_t g_analog_right_x = 0;
@@ -47,6 +49,10 @@ int16_t InputState(unsigned /*port*/, unsigned device, unsigned index, unsigned 
         if (index != 0) {
             return 0;
         }
+        ++g_pointer_poll_count;
+        if (id < 32) {
+            g_pointer_ids_seen |= 1U << id;
+        }
         if (id == RETRO_DEVICE_ID_POINTER_X) {
             return g_pointer_x;
         }
@@ -80,6 +86,14 @@ uint64_t InputPollCount() {
 
 uint32_t InputIdsSeen() {
     return g_input_poll_ids_seen;
+}
+
+uint64_t PointerPollCount() {
+    return g_pointer_poll_count;
+}
+
+uint32_t PointerIdsSeen() {
+    return g_pointer_ids_seen;
 }
 
 void SetAnalog(int16_t leftX, int16_t leftY, int16_t rightX, int16_t rightY) {

@@ -71,3 +71,7 @@ gameplay checkpoint.
 The harness keeps single-screen output by default for existing parity captures. The diagnostic
 override `ZELDA3D_HARNESS_TOUCH_LAYOUT=1` selects the fork's `default` two-screen layout so pointer
 coordinates can reach the touchscreen; no game or emulator memory is bypassed.
+
+The existing `diag` command now reports pointer poll counts and IDs alongside joypad polling. This
+distinguishes a control that was merely accepted by the REPL from one consumed by the fork's input
+path before any title transition conclusion is drawn.
