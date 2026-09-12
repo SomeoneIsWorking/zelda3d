@@ -9,6 +9,11 @@ namespace HarnessFrontend {
 bool Headless();
 int ResolutionFactor();
 void EnsureWindow();
+// The libretro core can emit video callbacks while retro_load_game() is still
+// constructing its renderer. Do not synchronously read a Vulkan image until
+// initialization has completed and the wire protocol is ready to report a
+// frame failure.
+void EnableOracleCapture();
 void PumpEventsAndPresent();
 void RequestSohCapture(bool sohBooted);
 void PresentSideBySide();

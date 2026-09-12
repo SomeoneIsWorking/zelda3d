@@ -24,6 +24,7 @@ uint32_t g_oracle_width = 0;
 uint32_t g_oracle_height = 0;
 std::size_t g_oracle_pitch = 0;
 bool g_oracle_dirty = false;
+bool g_oracle_capture_enabled = false;
 
 std::vector<uint8_t> g_soh_pixels;
 
@@ -63,6 +64,10 @@ void EnsureWindow() {
     if (!g_window) {
         std::fprintf(stderr, "harness: SDL_CreateWindow failed: %s\n", SDL_GetError());
     }
+}
+
+void EnableOracleCapture() {
+    g_oracle_capture_enabled = true;
 }
 
 void RequestSohCapture(bool sohBooted) {
@@ -130,6 +135,9 @@ void PumpEventsAndPresent() {
 }
 
 void SubmitOracleFrame(const void* data, unsigned width, unsigned height, std::size_t pitch) {
+    if (!g_oracle_capture_enabled) {
+        return;
+    }
     if (!width || !height) {
         return;
     }
