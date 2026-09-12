@@ -31,8 +31,7 @@ Start every task by checking these THREE maps: skip closed cases (parity-map), f
 
 ## The backlog is a LOCAL kanban in `KANBAN.md` — USE IT
 
-The backlog is a **local markdown board, `KANBAN.md`** — it IS the source of truth (no GitHub
-Issues; GitHub made screenshot attachment awkward, user directive 2026-07-17). `BACKLOG.md` is just a
+The backlog is a **local markdown board, `KANBAN.md`** — it IS the source of truth. `BACKLOG.md` is just a
 pointer. Edit `KANBAN.md` directly with the normal file tools — there is no `kanban.py` / `gh` round-trip.
 
 - **Find work:** read `KANBAN.md` (cards grouped under column headings).
@@ -42,12 +41,12 @@ pointer. Edit `KANBAN.md` directly with the normal file tools — there is no `k
   fixes (move to `done` / delete it); don't self-close them. Move back to an earlier column if it regressed.
 - **Add a card:** append `- [#N] <title> — <notes>` under `todo` (N = next simple id). Capture user
   reports immediately.
-- **HARD RULE — kanban is for USER-DRIVEN work ONLY.** It holds requests the user has personally made
+- **HARD RULE — kanban is for user-driven work ONLY.** It holds requests the user has personally made
   or parity issues the user has personally reported. **Agent-run parity sweeps do NOT produce cards.**
   When a sweep uncovers a divergence (wrong CMB, missing behavior, N64 fallback, whatever), fix it
   in-session — close-test + fix + commit — and record the finding in `debug_journal/`. A backlog of
   sweep-discovered gaps is a workflow smell. If a finding is genuinely beyond in-session scope, note it
-  in the journal and continue the loop. Do not file. (User directive 2026-07-02.)
+  in the journal and continue the loop. Do not file.
 - **Screenshots:** attach them in chat, or drop the file under `scratch/kanban/` (gitignored) and link
   it from the card. **Never commit PNGs to the repo.**
 
@@ -56,25 +55,14 @@ pointer. Edit `KANBAN.md` directly with the normal file tools — there is no `k
 A card does **not** advance to `needs-confirmation` or `done` until you have posted proof to the
 issue. **No evidence = not fixed.** This is mandatory, not optional.
 
-- **User-visible fix** → an AFTER screenshot from the live game:
-  `tools/kanban.py evidence <#> after.png --caption "fixed: <what now works>"`. For a regression
+- **User-visible fix** → an AFTER screenshot from the live game. For a regression
   the user reported with a picture, frame the SAME view so it's a like-for-like before/after.
 - **Non-visual / tooling fix** → post the proof that applies (REPL/log output, a quantitative
   measurement, a test result) as an issue comment. Still required.
-- Then `mv <#> needs-confirmation` and let the USER confirm user-visible fixes (don't self-close
+- Then move the card under `needs-confirmation` and let the user confirm user-visible fixes (don't self-close
   them). Close outright only for non-user-visible work.
 
 ## RULE: structure SoH3D like a real PC game — per-behavior modules, OOP, NOT one giant soh3d.c
-
-USER 2026-08-24: "Ideally a file should be max 1200 lines"
-
-USER 2026-08-24: "And a file should be focused around a responsibility, grab-bag files are banned"
-
-The 1,200-line ceiling and responsibility boundary are independent requirements. A smaller grab-bag
-still fails the architecture rule: every file owns one cohesive concept and a narrow interface;
-entry points and registries compose those owners without absorbing their implementations. Existing
-oversized legacy files are frozen by the normal verifier and their caps ratchet downward whenever a
-responsibility is extracted. Never raise a cap to land a change.
 
 Current application of Zelda3D's composition boundary: the embedded harness `main.cpp`,
 `harness_cli.py`, launcher, Clang verifier, and MM phase-tour composer delegate to
@@ -106,7 +94,7 @@ soh/src/zelda3d/behaviors/actor_behavior.h       // base interface + registry (d
   module — not a patch bolted onto `core/zelda3d.c`.
 - **Restructuring existing code into this shape is welcome**, incrementally: each time you touch a
   behavior, migrate it out of `core/zelda3d.c` / monolithic files into its module. Don't regress working
-  behavior; fall through to legacy for not-yet-migrated actors. (user directive, 2026-06-25, hard rule)
+  behavior; fall through to legacy for not-yet-migrated actors.
 
 ## RULE: ground truth for any behavioral divergence is the OoT3D DECOMP — extend it, don't memory-poke
 
@@ -128,7 +116,7 @@ it the same repo-relative way. OoT3D decomp is a
 **primary project goal and a prerequisite for full parity** — not a side quest. So when you find a
 behavioral difference (an actor moving/posing/animating wrong vs OoT3D), the correct response is to
 **extend the OoT3D decomp until it covers that behavior**, derive the ground truth from the 3DS binary,
-and port THAT faithfully. (user directive, 2026-06-25, hard instruction)
+and port THAT faithfully.
 
 - **Do NOT reverse-engineer the behavior by poking SoH's N64-struct memory by raw byte offset.** SoH is
   a 64-bit build; the N64 struct-offset *comments* (`z_*.h`) do NOT match the real runtime layout (8-byte
@@ -145,8 +133,7 @@ Before touching a fix, confirm you can **reliably drive the game to the failing 
 it** — reproduce the state on demand, hold it still, frame it, and read back the relevant engine
 values. If you can't, your first task is to BUILD/extend that tooling, not to guess at a fix. A fix
 attempted on top of flaky control produces "evidence" that's really just luck (e.g. #5: identical
-before/after shots because the cucco was never reliably posed/observed). "If you can't control the
-game reliably, you shouldn't be working on the bug fix." (user directive, 2026-06-20)
+before/after shots because the cucco was never reliably posed/observed).
 
 - Prefer **GENERIC, reusable** control primitives over one-off per-bug hacks. The generic actor
   surface in `soh3d.c` REPL is the model: `asel <id|any> [n]` (select nth-nearest live actor),
@@ -211,48 +198,19 @@ NOT live in-tree. Two are GitHub forks whose maintained commits carry the requir
 
 Update a fork like any submodule (edit its maintained `main`, push, bump the exact pointer here). The
 CMake-`FetchContent` deps (rmlui/prism/dr_libs/monocypher/libgfxd-in-libultraship/…) already point at
-their real upstreams. (User directive 2026-07-17: third-party code is a fork/upstream submodule, not
-flattened. The old flat copies were also purged from git history to shrink the repo.)
+their real upstreams.
 
-## Context is a budget — spend it on answers, not on paging
-
-A long arc dies of context exhaustion long before it runs out of work, and the failure mode is not
-"I stopped": it is reaching for cheap probes that cannot distinguish the answers, and being confidently
-wrong. Three such errors landed in one session (2026-07-28) — two draw-order claims and a "the harness
-isn't built" that was a `find -maxdepth 3` failing to reach a depth-4 path. Rigor is the fix for those;
-these rules are how you keep enough budget to afford rigor.
-
-- **DELEGATE surveys to subagents.** "Find every call site of X and what colour it sets", "which of
-  these 12 files touches Y" — a subagent reads the 7,000-line file and hands back twenty lines. This
-  is the single biggest lever; use it before the others. (Standing authorization: [[soh3d-subagents-authorized]].)
-- **MEASURE instead of looking.** A screenshot costs about a hundred lines of source, and a pixel
-  measurement is usually the better evidence anyway: "960 green px at identical extents" and "349 vs
-  350 bright px in the same bbox" settled two HUD elements more convincingly than any render could,
-  and a colour mask over two separately-captured frames once produced a bogus mismatch that was
-  *grass moving between captures*. Read an image only when the question is genuinely visual and no
-  measurement can settle it — a layout judgement, a "does this look right" call, or evidence for the
-  user. This is the existing verify-quantitatively rule extended to its context cost.
-- **Ask `tools/codequery.py` for a SYMBOL, never `sed -n` for a line range.** `outline <file>` /
-  `slice <file> <fn>` / `def` / `callers` / `find` return what you asked for instead of a guessed
-  window that overshoots and gets re-issued. Guessing ranges in `z_parameter.c` (7,200 lines) was the
-  second-largest context sink of the HUD arc.
-- **Keep build/run output on a leash** — `| tail -3` plus a `grep -E "error:"`, never a raw dump.
-- **Start a big arc in a fresh session.** #205 grew from "port the HUD" into a renderer change, a new
-  Gfx opcode and a texture decoder; by pass 3 it wanted a clean session and would have been done
-  faster in one. If an arc has already spawned two sub-arcs, that is the signal.
-- **Durable state is what makes running out survivable, and it works** — commits, `docs/issues/`,
-  the frontier and the codemap carried every finding of that session across the thin patch. Write the
-  finding down when you get it, not when you have room.
+For targeted source inspection, use `tools/codequery.py` (`outline`, `slice`, `def`, `callers`,
+`find`) before paging through oversized files.
 
 ## Hard rules
 
 - **Headless always:** this is a Wayland machine — never open a headed window.
-  `tools/zelda3d_game.sh` now defaults to headless (`ZELDA3D_HEADLESS=0` is the explicit headed
+  `tools/zelda3d_game.py` defaults to headless (`ZELDA3D_HEADLESS=0` is the explicit headed
   opt-out; the user's own headed path is `./run.sh`). NOTE: `SOH3D_HEADLESS=1` is STALE (renamed
   in the SoH3D→Zelda3D refactor) and is SILENTLY IGNORED (bit multiple agents 2026-07-08). The
   embedded-Azahar oracle harness is windowless and uses `SOH3D_HARNESS_HEADLESS=1` (separate var).
-- Run the game via `tools/zelda3d_game.sh` (formerly `soh3d_game.sh`); REPL via
+- Run the game via `tools/zelda3d_game.py start`; REPL via
   `tools/zelda3d_repl.py` (skill soh3d-game-control). Assume every stale `soh3d_*`/`SOH3D_*`
   reference in older notes maps to `zelda3d_*`/`ZELDA3D_*`.
-- Scratch/build artifacts go in the gitignored `scratch/`, never `/tmp`, never committed.
 - Verify quantitatively/visually; send screenshots for any UI/UX call.
