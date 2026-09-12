@@ -103,6 +103,15 @@ bool EnvironmentCallback(unsigned command, void* data) {
                 variable->value = HarnessProcess::TouchscreenLayoutEnabled() ? "default" : "single_screen";
                 return true;
             }
+            if (variable->key && (std::strcmp(variable->key, "citra_enable_mouse_touchscreen") == 0 ||
+                                  std::strcmp(variable->key, "citra_enable_touch_touchscreen") == 0 ||
+                                  std::strcmp(variable->key, "citra_enable_touch_pointer_timeout") == 0)) {
+                // The embedded harness owns its input surface. Keep the fork's
+                // pointer path enabled explicitly instead of relying on
+                // FetchVariable's fallback after a failed frontend lookup.
+                variable->value = "enabled";
+                return true;
+            }
             variable->value = nullptr;
             return false;
         }
