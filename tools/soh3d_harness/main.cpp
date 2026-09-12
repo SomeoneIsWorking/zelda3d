@@ -213,6 +213,7 @@ int main(int argc, char** argv) {
     // ever happens off-main. All present/event-pump work stays here on
     // the main thread; the worker only reads/writes CPU pixel buffers.
     HarnessFrontend::EnsureWindow();
+    HarnessFrontend::EnableOracleCapture();
 
     std::printf("boot succeeded\n");
     std::fflush(stdout);
