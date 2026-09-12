@@ -112,6 +112,11 @@ bool LoadRepoEnvironment() {
     return true;
 }
 
+bool TouchscreenLayoutEnabled() {
+    const char* value = std::getenv("ZELDA3D_HARNESS_TOUCH_LAYOUT");
+    return value && (std::strcmp(value, "1") == 0 || std::strcmp(value, "true") == 0);
+}
+
 bool AcquireSingletonLock() {
     const char* rundir = std::getenv("XDG_RUNTIME_DIR");
     std::string dir = rundir && *rundir ? std::string(rundir) : "scratch/harness/runtime";
