@@ -72,6 +72,14 @@ The harness keeps single-screen output by default for existing parity captures. 
 override `ZELDA3D_HARNESS_TOUCH_LAYOUT=1` selects the fork's `default` two-screen layout so pointer
 coordinates can reach the touchscreen; no game or emulator memory is bypassed.
 
+### Note (2026-09-12)
+The maintained Azahar fork also carries a `PacketType::Touch` UDP-RPC handler, but that server is
+owned by the optional standalone scripting frontend (`ENABLE_SCRIPTING`) and is not started by the
+embedded libretro core. The embedded harness therefore drives the same fork input path through
+`RETRO_DEVICE_POINTER`; this is its in-process frontend adapter, not a second HID implementation.
+The harness now answers the fork's three touchscreen option lookups explicitly, so pointer support is
+enabled by the harness configuration owner rather than by `FetchVariable` fallbacks.
+
 The existing `diag` command now reports pointer poll counts and IDs alongside joypad polling. This
 distinguishes a control that was merely accepted by the REPL from one consumed by the fork's input
 path before any title transition conclusion is drawn.
