@@ -67,7 +67,13 @@ void EnsureWindow() {
 }
 
 void EnableOracleCapture() {
-    g_oracle_capture_enabled = true;
+    // The libretro core can advance CPU/gameplay state without a synchronous
+    // image fence; callers that only need protocol/state observations can
+    // disable capture with an explicit environment override and avoid coupling
+    // those probes to the graphics queue. Capture remains enabled by default
+    // for screenshot/parity tools.
+    const char* disabled = std::getenv("SOH3D_HARNESS_NO_CAPTURE");
+    g_oracle_capture_enabled = !(disabled && *disabled && disabled[0] != '0');
 }
 
 void RequestSohCapture(bool sohBooted) {
