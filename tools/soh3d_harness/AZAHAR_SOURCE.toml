@@ -1,0 +1,9 @@
+# Immutable source declaration for the embedded libretro oracle.
+# The checkout remains local and gitignored; this file is the reproducible
+# dependency contract used to provision it.
+url = "https://github.com/SomeoneIsWorking/azahar.git"
+revision = "d488783b3708339a739dca5e10077cd21cb97226"
+branch = "soh3d-harness"
+upstream = "https://github.com/azahar-emu/azahar.git"
+upstream_base = "7088baae4c2ea48f7dcaf1fb5ea21ed812af2a55"
+purpose = "libretro Vulkan/CPU harness RPC and standalone PICA texture oracle"

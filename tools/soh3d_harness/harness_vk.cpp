@@ -36,6 +36,7 @@ struct State {
     VkImage linImg = VK_NULL_HANDLE;
     VkDeviceMemory linMem = VK_NULL_HANDLE;
     uint32_t linW = 0, linH = 0;
+    VkImageLayout linLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // Latest image handed to us by the core via set_image. Guarded by imgMtx.
     std::mutex imgMtx;
@@ -218,6 +219,7 @@ void DestroyLinearImage() {
         g.linMem = VK_NULL_HANDLE;
     }
     g.linW = g.linH = 0;
+    g.linLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
 bool EnsureLinearImage(uint32_t w, uint32_t h) {
@@ -263,6 +265,7 @@ bool EnsureLinearImage(uint32_t w, uint32_t h) {
     vkBindImageMemory(g.device, g.linImg, g.linMem, 0);
     g.linW = w;
     g.linH = h;
+    g.linLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     return true;
 }
 
@@ -377,9 +380,12 @@ bool Readback(std::vector<uint8_t>& out, uint32_t w, uint32_t h, size_t& pitch) 
     ImageBarrier(g.cmd, src, srcLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                  VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT, VK_ACCESS_TRANSFER_READ_BIT,
                  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-    // Linear staging: UNDEFINED → TRANSFER_DST.
-    ImageBarrier(g.cmd, g.linImg, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
-                 VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+    // Linear staging: discard the previous host-visible contents before the
+    // next copy.  Once initialized, the image is in GENERAL, not UNDEFINED;
+    // using UNDEFINED here would make the tracked Vulkan layout diverge.
+    ImageBarrier(g.cmd, g.linImg, g.linLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                 g.linLayout == VK_IMAGE_LAYOUT_UNDEFINED ? 0 : VK_ACCESS_HOST_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
     VkImageCopy region{};
     region.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
@@ -392,9 +398,17 @@ bool Readback(std::vector<uint8_t>& out, uint32_t w, uint32_t h, size_t& pitch) 
     ImageBarrier(g.cmd, g.linImg, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
                  VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_HOST_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                  VK_PIPELINE_STAGE_HOST_BIT);
-    // Note: we deliberately leave the core's image in TRANSFER_SRC. Its render
-    // pass uses initialLayout=UNDEFINED, so the next frame re-transitions it
-    // regardless — no restore needed.
+    g.linLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    // Return the core-owned image to the layout advertised by set_image.  The
+    // core may submit another render pass or sample this image immediately
+    // after video_refresh returns; leaving it in TRANSFER_SRC violates that
+    // libretro contract.
+    if (srcLayout != VK_IMAGE_LAYOUT_GENERAL) {
+        ImageBarrier(g.cmd, src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, srcLayout, VK_ACCESS_TRANSFER_READ_BIT,
+                     VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                     VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    }
 
     vkEndCommandBuffer(g.cmd);
 
