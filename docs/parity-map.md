@@ -164,14 +164,14 @@ global camera table, global fog path); a multi-scene sweep is the outstanding ch
 
 ## Cross-links (the four-doc orientation system)
 
-- **`docs/codemap.md`** — what CODE exists + coarse subsystem status (find where a thing lives).
+- **`docs/codemap.md`** — responsibility, source placement, and entry points.
 - **`docs/re-frontier.md`** — ordered RE progress: re-verified vs ⛔ hack vs todo, next RE step.
 - **`docs/parity-map.md`** (this) — CLOSED-CASES registry: what's proven at parity, don't revisit.
 - **`docs/parity-workflow.md`** — the METHOD for moving an item from OPEN → CLOSED (oracle A/B at
   content-matched frames).
 - Generated detail feeding this map: **`docs/link_parity_checklist.md`** (auto, `link_sweep.py`) +
-  **`docs/mm_parity_checklist.md`** (hand seed). User-driven work items: the **kanban** (GitHub
-  Issues / `tools/kanban.py`, `KANBAN.md`).
+  **`docs/mm_parity_checklist.md`** (hand seed). Current work belongs in `docs/issues/`;
+  `KANBAN.md` preserves earlier user reports and confirmations.
 
 ## Follow-up (noted, not done this pass)
 
