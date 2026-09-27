@@ -76,6 +76,10 @@ SRCS = {
     0x6210: "FRAG_PRIMARY",   # GL_FRAGMENT_PRIMARY_COLOR_DMP (fragment lighting)
     0x6211: "FRAG_SECONDARY", # GL_FRAGMENT_SECONDARY_COLOR_DMP
 }
+# PICA's fixed-function fragment-lighting outputs. The host maps these to the vertex-lit primary and
+# to black (render.cmb-fragment-lighting), so they are the sources whose emulation is incomplete.
+FRAGMENT_SOURCES = (0x6210, 0x6211)
+
 MODS = {
     0x0300: "C",     # SRC_COLOR
     0x0301: "1-C",   # ONE_MINUS_SRC_COLOR
@@ -272,6 +276,12 @@ def main():
     tex_use = Counter()  # which TEXn actually consumed by any stage
     coordmap_use = Counter()
     coordsrc_use = Counter()
+    # PICA fixed-function fragment outputs consumed by a combiner source. The host maps these to the
+    # vertex-lit primary and to black, so the count is how much material in each game depends on the
+    # unimplemented fragment-lighting path -- and the two games lean on it very differently.
+    frag_src_use = Counter()
+    frag_src_materials = 0
+    frag_src_examples = []
     domain_bad = Counter()  # layout-validation failures
     # PICA combiner-buffer latching. Reported because assuming it away cost a session:
     # the shader documented "the buffer-input selector is 0x8579 corpus-wide (buffer never
@@ -332,6 +342,12 @@ def main():
                         domain_bad[f"a_mod={st.a_mod[k]:04x}"] += 1
                 if st.const_idx > 5:
                     domain_bad[f"const_idx={st.const_idx}"] += 1
+                for k in range(slots_used(st.rgb_op)):
+                    if st.rgb_src[k] in FRAGMENT_SOURCES:
+                        frag_src_use[src_name(st.rgb_src[k])] += 1
+                for k in range(slots_used(st.a_op)):
+                    if st.a_src[k] in FRAGMENT_SOURCES:
+                        frag_src_use[src_name(st.a_src[k])] += 1
                 sig = st.sig()
                 stage_sigs[sig] += 1
                 chain.append(sig)
@@ -348,6 +364,14 @@ def main():
                 for k in range(slots_used(st.a_op)):
                     if 0x84C0 <= st.a_src[k] <= 0x84C3:
                         texs_consumed.add(st.a_src[k] - 0x84C0)
+            if any(
+                s in FRAGMENT_SOURCES
+                for st in stages
+                for s in st.rgb_src[: slots_used(st.rgb_op)] + st.a_src[: slots_used(st.a_op)]
+            ):
+                frag_src_materials += 1
+                if len(frag_src_examples) < 8:
+                    frag_src_examples.append(f"{label} mat{mi} ({len(stages)} stage(s))")
             unsafe = prevbuf_before_latch(stages)
             if unsafe:
                 prevbuf_unsafe_materials += 1
@@ -410,6 +434,15 @@ def main():
     for k in sorted(rd)[:12]:
         print(f"    {k}")
 
+    print("\n== PICA fixed-function fragment outputs consumed as a combiner SOURCE ==")
+    print(
+        f"  materials consuming FRAG_PRIMARY/FRAG_SECONDARY: {frag_src_materials}"
+        f"  of {n_mats} ({100.0 * frag_src_materials / max(n_mats, 1):.2f}%)"
+    )
+    for k, v in sorted(frag_src_use.items()):
+        print(f"  {k}: {v} slot-use(s)")
+    for example in frag_src_examples:
+        print(f"    e.g. {example}")
     print("\n== texture units consumed by combiners ==")
     for k, v in sorted(tex_use.items()):
         print(f"  {k}: {v}")

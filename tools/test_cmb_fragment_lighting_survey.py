@@ -88,5 +88,65 @@ class FragmentLightingSurveyTests(unittest.TestCase):
         self.assertEqual(records[0].secondary_uses, 1)
 
 
+QTRS_CHUNK = 0x40
+MATS_CHUNK = 0x60
+
+
+def _mm3d_material(enabled: bool = True) -> tuple[bytearray, int]:
+    """A version-7 CMB laid out the way MM3D stores it.
+
+    0x28 points at the `qtrs` chunk and 0x2C at the `mats` chunk, because version >= 7 inserts the
+    `qtrs` pointer right after the skeleton and shifts every later chunk pointer by +4. The material
+    records then start at mats_offset + 0x0C.
+    """
+    data = bytearray(0x240)
+    data[:4] = b"cmb "
+    data[0x08:0x0C] = (7).to_bytes(4, "little")
+    data[0x28:0x2C] = QTRS_CHUNK.to_bytes(4, "little")
+    data[0x2C:0x30] = MATS_CHUNK.to_bytes(4, "little")
+    data[QTRS_CHUNK : QTRS_CHUNK + 4] = b"qtrs"
+    data[MATS_CHUNK : MATS_CHUNK + 4] = b"mats"
+    data[MATS_CHUNK + 8 : MATS_CHUNK + 12] = (1).to_bytes(4, "little")
+    material = MATS_CHUNK + 0x0C
+    data[material] = int(enabled)
+    data[material + 0xA0 : material + 0xB4] = bytes(range(1, 21))
+    return data, material
+
+
+class Mm3dMaterialChunkTests(unittest.TestCase):
+    """The MM3D layout is a different container layout, not a different game.
+
+    Reading the material chunk pointer at 0x28 unconditionally points at MM3D's `qtrs` chunk, so
+    every MM3D file parses as ZERO materials. That failure is silent -- no error, just an empty
+    survey that reads like "no material uses fragment lighting" -- which is exactly how MM3D's
+    lighting dependency stayed invisible. These cases pin the version gate.
+    """
+
+    def _stages(self):
+        return [_stage([survey.FRAGMENT_PRIMARY, 0x84C0, 0], [0x8577, 0x84C0, 0])]
+
+    def test_version7_finds_its_material_chunk_past_the_qtrs_pointer(self) -> None:
+        data, _ = _mm3d_material()
+        with mock.patch.object(survey, "parse_mats", return_value=[(0, [], [], [], self._stages())]):
+            records = survey.scan_materials("mm3d.cmb", bytes(data))
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].primary_uses, 1)
+
+    def test_version6_still_uses_the_unshifted_pointer(self) -> None:
+        data, _ = _cmb_material()
+        with mock.patch.object(survey, "parse_mats", return_value=[(0, [], [], [], self._stages())]):
+            records = survey.scan_materials("oot3d.cmb", bytes(data))
+        self.assertEqual(len(records), 1)
+
+    def test_a_version7_file_whose_mats_pointer_is_absent_reports_nothing(self) -> None:
+        data, _ = _mm3d_material()
+        data[0x2C:0x30] = (0).to_bytes(4, "little")
+        with mock.patch.object(survey, "parse_mats", return_value=[(0, [], [], [], self._stages())]):
+            self.assertEqual(survey.scan_materials("broken.cmb", bytes(data)), [])
+
+    def test_non_cmb_input_is_rejected(self) -> None:
+        self.assertEqual(survey.scan_materials("x", b"NOTACMB" + bytes(0x40)), [])
+
+
 if __name__ == "__main__":
     unittest.main()
