@@ -47,6 +47,7 @@ from harness_cache import OracleCache
 from harness_gameplay import GSAVECONTEXT_DAYTIME_VA, boot_to_gameplay
 from harness_paths import CACHE_ROOT, TITLE_STATE
 from harness_process import spawn
+from title_oracle_context import configure_vanilla_title_context
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DECOMP = os.path.join(REPO, "oot3d-decomp")
@@ -195,6 +196,11 @@ def cmd_stats(args) -> None:
 def cmd_warm(args) -> None:
     if not os.environ.get("ZELDA3D_OOT3D_ROM"):
         sys.exit("ZELDA3D_OOT3D_ROM not set — run `source .env` first")
+    # The frames warmed here exist to be compared against the host through
+    # tools/title_host_capture.py, which reads the same cache. That comparison pins the
+    # texture pack OFF, and the pack is part of the cache key, so warming without the
+    # same context writes into a key the comparison cannot find. Warm what will be read.
+    configure_vanilla_title_context(os.environ)
     savestate = _savestate()
     if not savestate.exists():
         sys.exit(f"missing {savestate} — a current-contract title save-state is required")
