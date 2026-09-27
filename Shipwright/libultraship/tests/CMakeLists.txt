@@ -28,6 +28,7 @@ add_executable(lus_tests
     archive_self_tests.cpp
     zelda3d_render_tests.cpp
     pica_texture_decode_tests.cpp
+    zelda3d_sampler_resolution_tests.cpp
     cmb_combiner_parse_tests.cpp
     townsfolk_body_colors_tests.cpp
     fifo_rpc_tests.cpp

@@ -17,7 +17,7 @@ S003 is the current focus.
 | --- | --- | --- | --- | --- |
 | S001 | One launcher provisions, validates, builds, and chooses between the OoT and MM game cores | verified | — | G003 |
 | S002 | 3DS containers, models, animations, scenes, collision, cameras, lighting, and face data are available to both engines | partial | S001 | G001, G002 |
-| S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats: **verified for both games**; material/lighting/fog still partial) | S002 | G001, G002 |
+| S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; material/lighting/fog still partial) | S002 | G001, G002 |
 | S004 | OoT3D actor animation, facial, camera, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G001 |
 | S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G002 |
 | S006 | An embedded Azahar oracle and parity tooling can compare the port with independent 3DS execution | partial | S001 | G001, G002 |
@@ -167,6 +167,18 @@ nibbles fails the order test, a wrong depth fails the per-pixel test) and
 content handled** -- OoT3D 10,538 cmb + 1,650 ctxb textures across 14 distinct formats, MM3D 6,968 + 335
 across 8 -- and that the C++ and Python tables agree, read out of the shipping source rather than
 transcribed.
+
+**Sampler filtering and wrapping, measured the same way, and also complete.** These are named scope
+beside formats and had no evidence either, so `tools/pica_sampler_state_survey.py` walks every bound
+texture unit of every material in both games and reports what the content actually asks for. It covers
+**all three units**, not just unit 0, because multi-stage TEV binds units 1 and 2 and Zora's water is
+the three-stage case. OoT3D uses 5 distinct minification enums, 2 magnification, 3 wrap modes; MM3D the
+same. Every one is a named GL enum and every one the host resolves -- and the mechanism is present end
+to end, not merely table-covered: the sampler gets `maxLod` 0.0 when the material requests no mips and
+1000.0 when it does, so the 8,123 of OoT3D's 12,888 bindings (63%) that ask for mipmapped minification
+get real mip selection over chains uploaded with `ci.num_levels`. The C++ side is pinned as a property
+over the enum *space* rather than a list of the values found, so a sixth minification enum cannot
+silently fall through a default. 20 new tests (5 C++, 15 Python), all mutation-verified.
 
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
