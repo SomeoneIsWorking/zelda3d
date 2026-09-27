@@ -43,9 +43,13 @@ void Zelda3D_MM_EmitModelDraw(void* play, void* actor, int modelId, float worldS
 
 // Per-room scene divert (MM analog of the OoT implementation). Returns 1 when the
 // current MM scene has an MM3D room CMB registered and this call drew it — caller
-// then skips the N64 room mesh. Currently returns 0 unconditionally (no MM3D scene
-// coverage table yet); the guard is wired now so no z_room.c edit is needed the
-// day the first mapping lands. #134-style.
+// then skips the N64 room mesh. The sceneId -> folder-name table IS present
+// (mm3d_scene_names.inc, 102 of 113 sceneIds mapped; the 11 NULLs are MM3D's own
+// SCENE_UNSET ids), and it was measured against the MM3D ROM: all 102 mapped names
+// have a matching /scenes/<name>_<room>_info.zsi, covering 406 of the 424
+// per-room scene files. The older "returns 0 unconditionally" note here was stale --
+// the mapping landed and this comment outlived it. Return 0 now means a real
+// condition: divert disabled, an unmapped sceneId, or no MM3D file for that room.
 int Zelda3D_TryDrawRoom(PlayState* play, Room* room);
 
 // MM3D scene folder name for this scene ("z2_clocktower"), or NULL when the scene has no MM3D
