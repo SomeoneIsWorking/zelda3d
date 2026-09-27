@@ -418,6 +418,43 @@ are recorded because each would otherwise be repeated:
   it and reported "not from the palette" — the opposite of the truth. It now solves for the weight
   analytically and then checks all three channels, and a bounded scan is mutation-verified to fail.
 
+**MM3D scene coverage measured, and the "no coverage table" blocker is refuted.** `mm3d_draw.h` said
+`Zelda3D_TryDrawRoom` "currently returns 0 unconditionally (no MM3D scene coverage table yet)". That
+comment was **stale** — the table landed and the comment outlived it. `tools/mm_scene_coverage_survey.py`
+measures the actual state against the MM3D ROM, in both directions:
+
+| | count |
+|---|---|
+| scene-name table entries | 102 (sceneId `0x00`..`0x70`) |
+| mapped to an MM3D folder | **102** |
+| mapped names with >=1 per-room file | **102** |
+| dead mappings (named but absent from the ROM) | **0** |
+| per-room scene files in the ROM | 424 |
+| reachable through the table | 304 |
+| MM3D-only scene folders (no N64 counterpart) | 9 |
+
+**All 102 N64 MM scenes map to a real MM3D folder that exists.** The generator's claim
+("MM3D reuses the N64 internal scene segment names verbatim, lower-cased: ALL 102 N64 scenes resolve")
+holds exactly — 102 real `DEFINE_SCENE` rows in `scene_table.h`, 102 mapped names, zero dead.
+
+The 9 "unreachable" room files are **not a mapping gap**: `test01`, `test02`, `z2_01keikoku`,
+`z2_02keikoku`, `z2_32kamejimamae`, `z2_meganeana`, `z2_turibori`, `z2_turibori2` and `z2_zolashop`
+appear **nowhere in MM's N64 scene table** — they are MM3D-only scenes with no N64 `sceneNum` to be
+reached from, so the host cannot address them by construction and should not. The separate 111
+no-room-suffix files (`<name>_info.zsi`) are likewise unreachable *by construction*, since
+`Zelda3D_MM_RoomModelId` always appends `room->num`.
+
+So MM's scene divert is structurally complete, and the comment that said otherwise has been corrected
+in place. What remains unproven for MM is not the mapping but the *pixels*: there is still no MM oracle
+capture, so none of this is visually confirmed.
+
+Building the survey also exposed a test-design error worth recording: my first suite exercised only the
+ROM-gated `survey()` entry point, so **two real mutations — transcribing the table instead of parsing
+it, and treating no-suffix files as reachable — both left all 14 tests green**. The classification now
+lives in a pure `classify_scene_files()` that the tests call directly; both mutations fail, and the
+`transcribe instead of parse` shape is the same failure mode as the LA4 format constant that was
+"supported" on paper while `PicaDecode` returned empty.
+
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
 uncaptured runtime register, but `tev_corpus_survey.prevbuf_before_latch` walks each chain in stage
