@@ -47,9 +47,12 @@ bool HandleZelda3dFog(std::istringstream& arguments) {
         gZelda3dFog3dForceOff = *value == 0 ? 1 : 0;
     }
     std::printf("ok soh_fog3d forceOff=%d on=%d a=%.6f b=%.4f near=%.1f far=%.1f "
-                "fwd=(%.3f,%.3f,%.3f) fwdDotEye=%.1f\n",
+                "fwd=(%.3f,%.3f,%.3f) fwdDotEye=%.1f col=(%d,%d,%d)\n",
                 gZelda3dFog3dForceOff, gZelda3dFog3dOn, gZelda3dFog3d[0], gZelda3dFog3d[1], gZelda3dFog3d[2],
-                gZelda3dFog3d[3], gZelda3dFog3d[4], gZelda3dFog3d[5], gZelda3dFog3d[6], gZelda3dFog3d[7]);
+                gZelda3dFog3d[3], gZelda3dFog3d[4], gZelda3dFog3d[5], gZelda3dFog3d[6], gZelda3dFog3d[7],
+                static_cast<int>(gZelda3dFogColor[0] * 255.0F + 0.5F),
+                static_cast<int>(gZelda3dFogColor[1] * 255.0F + 0.5F),
+                static_cast<int>(gZelda3dFogColor[2] * 255.0F + 0.5F));
     return true;
 }
 
