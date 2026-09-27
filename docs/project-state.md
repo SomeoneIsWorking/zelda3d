@@ -63,9 +63,15 @@ the same feature table the GLSL comes from and locked against the generated sour
 
 What that first comparison establishes and does not: the wordmark composition — lockup, sub-lockup,
 shield, sword, credit line — is present at the oracle's scale and placement, so the 3DS-authored
-content is composed correctly (lockup width ~445px host vs ~415px oracle of 800). The glow hue is white where the oracle's is orange, which is the
-**known placeholder combiner** on the unified path (`kCombA` = cycle-0 `TEXEL0 * vColor0`) rather than
-new evidence about the glow; that makes `render.multi-stage-tev` the binding constraint on this frame.
+content is composed correctly (lockup width ~445px host vs ~415px oracle of 800). The glow hue is white
+where the oracle's is orange. Part of that is the **known placeholder combiner** on the unified path
+(`kCombA` = cycle-0 `TEXEL0 * vColor0`), and the exact-cursor draw list bounds it to one draw —
+`draw 99 model=2016 dual=1 tev=0`, the `g_title` quad — while model 2015's 22 groups (shield, sword,
+credit line) already run real per-stage TEV. The sword's white flame and the missing orange around the
+`Z` belong to 2015 and are a **separate, unattributed** delta, so `render.multi-stage-tev` is one
+narrow binding constraint here rather than the whole story. Note also that the tool's `content` metric
+moved 0.4784 → 0.4846 between two identical invocations, so it is a coarse signal and must not be
+used as a tight gate.
 The framing does not match — the host is close to the rider and the oracle's is wide — but that is
 **not** established as a camera divergence: `title.rider-trajectory` already documents a cs-rate
 desync (host 10/s against the oracle's 30/s, user-owned card #149) with this exact symptom, verified

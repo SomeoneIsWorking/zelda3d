@@ -106,13 +106,25 @@ with `scratch/title_host_capture/title_cs1093_sxs.png`. What it shows, and what 
   3DS-authored content agree.
 * **The glow hue does not.** The oracle's sword flame and wordmark glow are orange; the host's are
   white/cyan. The `gold_mean_r` gap (225.5 vs 65.7) is that difference, not a brightness bug.
-* **Attribution, not yet proven.** The unified draw path still installs a placeholder combiner
-  (`kCombA` = cycle-0 `TEXEL0 * vColor0`, with the in-source comment "no real per-material TEV data
-  exists on the CMB side yet"), and the wordmark is the first `kDualTex` draw that has ever rendered
-  here at all — its pipeline used to fault. An additive glow drawn through a `texel * vertex colour`
-  mux reads white. So the hue is *expected* from the placeholder and is not new evidence about the
-  glow mechanism; the closed native-path cases in `docs/parity-map.md` are untouched by this. It is
-  evidence that `render.multi-stage-tev` is now the binding constraint on this frame.
+* **Attribution, bounded by the draw list rather than by pixels.** The exact-cursor host draw list
+  (`title_host_capture.py --draw-list`, 101 groups) shows the placeholder combiner reaches exactly
+  **one** draw:
+
+  ```
+  draw  99 model=2016 group=0 material=0 first=0 count=6 dual=1 tev=0 tex1idx=1 coord0=1 coord1=1
+  ```
+
+  Model 2016 is `g_title` (the wordmark quad: `dualTexMode=1`, `tevGeneric=0`, so `kDualTex`, which
+  reads the hardcoded `kCombA`). Every other 3DS draw that frame — all 22 groups of model 2015, the
+  shield, sword and credit line — reports `tev=1` and therefore runs the **real** per-material chain
+  through `uTevStages`/`uTevConst`/`uTevCtl` on `kGenericTev`. So the placeholder cannot explain the
+  sword's white flame or the orange glow around the `Z`, which belong to model 2015 and are already on
+  the real path. The placeholder explains the wordmark quad only, and the *glow-hue* attribution in
+  the previous revision of this note was too broad: the wider hue/brightness difference is a separate,
+  still-unattributed delta on draws that already use real TEV. Candidates worth measuring, none of
+  them claimed: the PICA distance fog, which `CommonUbo` still carries as size-parity padding with the
+  in-source note that the unified path does not apply it, and the dawn-layer stack. Both need a
+  per-draw oracle read, not a pixel judgement.
 * **The framing differs, and the obvious reading of it is wrong.** The oracle has mounted Link small
   and distant at frame left; the host has him large and close at frame right. It is tempting to call
   that a camera divergence. It is not established as one, and the project already has a documented,
