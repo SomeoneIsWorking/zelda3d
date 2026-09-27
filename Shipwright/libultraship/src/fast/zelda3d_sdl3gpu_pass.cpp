@@ -986,6 +986,13 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             memcpy(uu.common.uTex1Xf, ubo.uTex1Xf, sizeof(uu.common.uTex1Xf));
             memcpy(uu.common.uFog3d0, ubo.uFog3d0, sizeof(uu.common.uFog3d0));
             memcpy(uu.common.uFog3d1, ubo.uFog3d1, sizeof(uu.common.uFog3d1));
+            // The fog MODE gate, carried verbatim from the native packer (uFog.w: 0 none, 1 the
+            // F3DEX ramp, 2 the PICA distance-fog LUT) so one number decides it on either route
+            // rather than each route re-deriving "is this material fogged". The values above are
+            // frame-level and the gate is per-draw, so copying only the parameters left every
+            // unified draw unfogged: measured at title cs=1093, the PICA distance fog is worth
+            // 9.63 mean-abs against the oracle (43.56 with it, 53.19 without, on the native route).
+            Zelda3DUnified::PackCmbFogGate(uu.common, ubo);
             memcpy(uu.common.uSphNrm0, ubo.uSphNrm0, sizeof(uu.common.uSphNrm0));
             memcpy(uu.common.uSphNrm1, ubo.uSphNrm1, sizeof(uu.common.uSphNrm1));
             memcpy(uu.common.uSphNrm2, ubo.uSphNrm2, sizeof(uu.common.uSphNrm2));

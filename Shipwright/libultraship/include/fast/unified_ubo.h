@@ -35,8 +35,7 @@ struct CommonUbo {
     // Mirror of SgUbo::uTex1Xf (coordinator-1 transform), live on generic-TEV draws.
     float uTex1Xf[4];
     // Mirror of SgUbo::uFog3d0/uFog3d1 (OoT3D PICA distance fog, title port — zelda3d_sg_ubo.h).
-    // Size-parity padding today: the (default-off) unified path doesn't apply the 3DS fog yet;
-    // wire these through UNIFIED_COMMON_UBO_BODY when the unified renderer takes over CMB draws.
+    // Carried verbatim; the shader that consumes them is @if(o_fog3d) in the fragment main().
     float uFog3d0[4];
     float uFog3d1[4];
     // Mirror of SgUbo::uSphNrm0/1/2 (oracle uModelView normal transform for sphere mapping).
@@ -56,9 +55,17 @@ struct CommonUbo {
     uint32_t uTevConst[8];
     float uTex2Xf[4];
     float uTevCtl[4];
-    // CommonUbo shares a fixed-size storage envelope with SgUbo, whose native layout carries
-    // both uMatDiffuse and uPrimaryCtl in addition to fields that map differently here.
-    float uNativeLayoutPad[4];
+    // The per-draw fog MODE: the VALUE of SgUbo::uFog[3], assigned component-wise by the packer
+    // (the two structs order their fields differently, so this is a value mirror, not byte parity
+    // — do not memcpy it). One enum shared with the native path, not a second policy: 0 = no fog,
+    // 1 = the F3DEX ramp (N64 draws; uFogColor + the aFog varying), 2 = the OoT3D PICA
+    // distance-fog LUT (CMB draws; uFog3d0/uFog3d1 + uFogColor). Mode 2 also requires
+    // uLightDir[3] < 0.5 — sky is excluded on both routes, so the flag rides the same lane the
+    // native reads it from. uFogColor carries the colour for both modes.
+    //
+    // This replaced the uNativeLayoutPad filler that stood here when the unified route owned no
+    // fog at all: a size-parity hole in the design, in a slot the same fog needed.
+    float uFogCtl[4];
     float uDebug[4]; // Mirror of SgUbo::uDebug; renderer-only selected-fragment probe gate.
 };
 
@@ -78,6 +85,18 @@ inline void CopyCmbVertexLightBank(CommonUbo& target, const Zelda3DSg::SgUbo& so
         target.uLitDif2[component] = source.uLitDif2[component];
         target.uLightDir2[component] = source.uLightDir2[component];
     }
+}
+
+// Carry the per-draw fog MODE from the native packer. The frame-level fog PARAMETERS
+// (uFog3d0/uFog3d1, the colour in uFogColor) are copied field by field because the two structs
+// order their fields differently, and the gate is no different: copying only the parameters left
+// every unified draw unfogged, because the shader's block is gated on the mode. One number, read
+// from the same field the native shader reads, decides it on either route.
+inline void PackCmbFogGate(CommonUbo& target, const Zelda3DSg::SgUbo& source) {
+    target.uFogCtl[0] = source.uFog[3];
+    target.uFogCtl[1] = 0.0f;
+    target.uFogCtl[2] = 0.0f;
+    target.uFogCtl[3] = 0.0f;
 }
 
 // Preserve the native CMB path's per-draw modulation without introducing a second UBO field set.
