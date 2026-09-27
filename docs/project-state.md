@@ -47,11 +47,14 @@ Reached materials preserve multi-stage combiners, multiple texture coordinates a
 fragment lighting, alpha behavior, and scene-authored fog through the native renderer.
 
 Gap: the renderer campaign and current codemap still identify wider material, fragment-lighting, actor,
-and effect families whose parity is partial. Coordinator mapping methods are now recovered from the
-retail shader (`oot3d-decomp/docs/cmb_texcoord_mapping.md`, frontier `render.cmb-texcoord-mapping`):
-ProjectionMap (method 4, 366 consumed OoT3D materials on coordinator 1) is still unimplemented, the
-host does not transport the `ShaderMode.w` value that decides whether a draw even reaches the
-mapping switch, and coordinator 1's per-vertex component step has no host representation.
+and effect families whose parity is partial. Coordinator mapping methods are now recovered from the retail shader
+(`oot3d-decomp/docs/cmb_texcoord_mapping.md`, frontier `render.cmb-texcoord-mapping`): the shader's
+entry point calls one of two mutually exclusive bodies, and only one of them contains the
+texture-coordinator mapping switch. A real oracle capture closed the obvious follow-up by refuting
+it — `ShaderMode.w` is not a synonym for "lit", so the host correctly needs no new transport and
+must not gain a lit-ness gate. ProjectionMap (method 4, 366 consumed OoT3D materials on coordinator
+1) remains unimplemented; its one remaining measurement is now a plain register read
+(`tools/pica_texturing_registers.py`), blocked only on reaching a gameplay draw.
 
 ### S004 — OoT3D behavior coverage
 
@@ -78,6 +81,12 @@ produce a fresh gameplay checkpoint, so no new gameplay oracle observation is ye
 title probe reaches the recovered transition request, but the file-select handoff has no save slots
 and the required system-title app is absent from the harness save directory. The software renderer
 remains too slow for this scenario on the current host. See [issue #23](issues/0023-embedded-oot3d-oracle-cannot-reach-its-boot-hand.md).
+**Gameplay is not the only reachable oracle surface.** Loading the cached title savestate and running
+from a cached title checkpoint does work on this host: `tools/title_oracle_probe.py uniforms 1093`
+completed and cached 102 per-draw uniform records under the current `p45-00401070` contract, and
+`pica-command-list` served draw 77's raw command list from cache. Title-scoped evidence — including
+the `ShaderMode.w` correlation behind S003 — is therefore available now; only gameplay-scoped
+evidence is blocked.
 
 ### S007 — Packaged player setup
 
