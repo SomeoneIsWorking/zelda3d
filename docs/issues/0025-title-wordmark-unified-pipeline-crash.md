@@ -106,25 +106,29 @@ with `scratch/title_host_capture/title_cs1093_sxs.png`. What it shows, and what 
   3DS-authored content agree.
 * **The glow hue does not.** The oracle's sword flame and wordmark glow are orange; the host's are
   white/cyan. The `gold_mean_r` gap (225.5 vs 65.7) is that difference, not a brightness bug.
-* **Attribution, bounded by the draw list rather than by pixels.** The exact-cursor host draw list
-  (`title_host_capture.py --draw-list`, 101 groups) shows the placeholder combiner reaches exactly
-  **one** draw:
-
-  ```
-  draw  99 model=2016 group=0 material=0 first=0 count=6 dual=1 tev=0 tex1idx=1 coord0=1 coord1=1
-  ```
-
-  Model 2016 is `g_title` (the wordmark quad: `dualTexMode=1`, `tevGeneric=0`, so `kDualTex`, which
-  reads the hardcoded `kCombA`). Every other 3DS draw that frame — all 22 groups of model 2015, the
-  shield, sword and credit line — reports `tev=1` and therefore runs the **real** per-material chain
-  through `uTevStages`/`uTevConst`/`uTevCtl` on `kGenericTev`. So the placeholder cannot explain the
-  sword's white flame or the orange glow around the `Z`, which belong to model 2015 and are already on
-  the real path. The placeholder explains the wordmark quad only, and the *glow-hue* attribution in
-  the previous revision of this note was too broad: the wider hue/brightness difference is a separate,
-  still-unattributed delta on draws that already use real TEV. Candidates worth measuring, none of
-  them claimed: the PICA distance fog, which `CommonUbo` still carries as size-parity padding with the
-  in-source note that the unified path does not apply it, and the dawn-layer stack. Both need a
-  per-draw oracle read, not a pixel judgement.
+* **Attribution: RETRACTED, and the correction is itself the useful result.** An earlier revision of
+  this note claimed the hue difference was the unified path's placeholder `kCombA` combiner, bounded
+  to the one `dual=1 tev=0` draw. **That was wrong, and a generated-source test refutes it**
+  (`UnifiedShader.DualTextureVariantsUseClassifiedShapesNotTheCombMuxProgram`): for `kDualTex` /
+  `kDualTexFog` the generated fragment `main()` never calls `evalCycle` at all. It takes an
+  `@if(o_cmbDualTex)` branch that implements the three byte-classified PICA dual-texture shapes
+  (`kDualTexAddMult`, `kDualTexAddThenModulatePrimary`, `kDualTexModulateThenScale`) selected by
+  `uSheen.y`, and its `else` arm is `ADD_MULT` — which is the wordmark's own classified mode
+  (`cmb.h` records `g_title.cmb` as `kDualTexAddMult`). So the wordmark is on the *same proven
+  mechanism as the native path*, and the host's `uCombA` is dead for it. `kCombA` is live only for
+  `kUntextured`, `kSingleTex`, `kSingleTexAlphaTest` and `kGrayscale`, where it evaluates to a single
+  `MODULATE(PRIMARY, TEXEL0)` — which is the trivial shape those variants' materials carry.
+* **What that leaves.** Every 3DS draw on this frame is now accounted for on a proven mechanism: the
+  wordmark on a classified dual-texture shape, model 2015's 22 groups on real per-stage `tevRun()`.
+  The remaining hue/brightness delta therefore cannot be a combiner-selection problem. It has to be
+  in a stage *shared* by both — and the one the host documents as not implemented is PICA distance
+  fog: `CommonUbo` still carries `uFog3d0`/`uFog3d1` as "size-parity padding today; the (default-off)
+  unified path doesn't apply the 3DS fog yet". The host image also carries a broad bright wash across
+  the upper left that the oracle frame does not, which is fog- or dawn-layer-shaped. **Neither is
+  claimed.** The discriminating step is a per-draw split using the unified fragment probes the shader
+  already has (`o_probeTex0` / `o_probePrimary` / `o_probeCombined`, gated by `uDebug.x`) against the
+  oracle's own per-draw `PIXEL` readback, which separates texture, combiner and post-combiner stages
+  without a pixel judgement. `render.fog-3ds` / the dawn-layer rows own those once named.
 * **The framing differs, and the obvious reading of it is wrong.** The oracle has mounted Link small
   and distant at frame left; the host has him large and close at frame right. It is tempting to call
   that a camera divergence. It is not established as one, and the project already has a documented,
