@@ -70,9 +70,23 @@ a branch implementing the three byte-classified PICA dual-texture shapes on `uSh
 wordmark is on the same proven shape mechanism as the native path. Every 3DS draw on this frame is
 therefore accounted for on a proven mechanism, which puts the delta in a stage shared by all of them;
 the PICA distance fog the unified path documents as not applied, and the dawn-layer stack, are the
-candidates and neither is claimed. Note also that the tool's `content` metric
-moved 0.4784 → 0.4846 between two identical invocations, so it is a coarse signal and must not be
-used as a tight gate.
+candidates and neither is claimed. The tool's `content` metric moved
+0.4784 → 0.4846 between two invocations that looked identical; that was **not** run-to-run noise but a
+one-frame shift, since `--draw-list` armed and stepped before capturing. Measured, with the host
+state read at cs=1093 in two separate processes:
+
+| Comparison | mean-abs | pixels differing >16 |
+|---|---|---|
+| two identical runs | 0.73 | 1.9% |
+| `--draw-list` vs plain (one extra frame) | **5.90** | **13.9%** (max 229) |
+| oracle vs host | ~47.6 | — |
+
+So the host title advance *is* reproducible — daytime, skybox, blend, ambient, fog, camera eye/at/
+dir/up/fov and the rider's position and all three yaws are bit-identical across runs from the same
+boot cursor (120) and the same 1945-frame budget — the instrument's noise floor is ~0.7 mean-abs, and
+**one frame is worth ~5.9**. `capture_cursor_image` now takes the comparison image before publishing
+the draw list, and a test locks that order (verified to fail when inverted). Read the metric as
+resolving whole-frame differences only, never sub-frame ones.
 The framing does not match — the host is close to the rider and the oracle's is wide — but that is
 **not** established as a camera divergence: `title.rider-trajectory` already documents a cs-rate
 desync (host 10/s against the oracle's 30/s, user-owned card #149) with this exact symptom, verified

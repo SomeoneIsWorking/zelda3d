@@ -108,6 +108,33 @@ class TitleHostCaptureTests(unittest.TestCase):
             ["soh_drawlist", "soh_step 1", "soh_titlecs"],
         )
 
+    def test_draw_list_is_published_after_the_image_not_before(self) -> None:
+        """The comparison image must be the requested cursor's frame, not one frame past it.
+
+        One frame of this title is worth ~5.9 mean-abs over 14% of the frame, so arming the draw
+        list first silently compared a different frame against the same cached oracle pair.
+        """
+        responses = {
+            "soh_titlecs": "ok soh_titlecs frame=1093 end=2400",
+            "soh_snapshot /tmp/x": "ok soh_snapshot 800x480",
+            "soh_drawlist": "ok soh_drawlist armed",
+            "soh_step 1": "ok soh_step 1",
+        }
+
+        class SnapshotHarness(FakeHarness):
+            def send(self, command: str) -> str:
+                self.commands.append(command)
+                return responses.get(command, "ok")
+
+        with patch.object(title_host_capture, "ppm_to_png", lambda path: Path(path)):
+            harness = SnapshotHarness({})
+            title_host_capture.capture_cursor_image(harness, 1093, Path("/tmp/x"), True)
+        self.assertLess(
+            harness.commands.index("soh_snapshot /tmp/x"),
+            harness.commands.index("soh_drawlist"),
+            "draw list was armed before the image, so the image is one frame past the cursor",
+        )
+
     def test_cache_miss_refuses_to_launch_oracle_work(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             frame = Path(directory) / "az752.png"
