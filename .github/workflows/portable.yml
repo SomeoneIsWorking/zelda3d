@@ -94,5 +94,7 @@ jobs:
           tools.test_mm_bootstrap_assets
           tools.test_fast_contract_structure
           tools.test_sdl3gpu_renderer_structure
+          tools.test_unified_carryage_audit
+          tools.test_gen_scene_names
           tools.test_mm_python_structure
           tools.test_portable_native_contracts

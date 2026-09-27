@@ -324,6 +324,39 @@ only the gate was missing.** `soh_fog3d` now prints the colour alongside the win
 with the right depth and the wrong colour is still wrong and a diagnostic that reports the window
 alone makes that invisible.
 
+**The hand audit became a tool, after it had already found two bugs by hand.** Both carriage bugs
+were found by reading the packer and comparing, which finds the first two and misses the third, so
+`tools/unified_carryage_audit.py` mechanises it: it reads the `SgUbo` field list from its owning
+header, separates what the packer writes per DRAW from what it writes per FRAME, works out which
+fields each route's *generated GLSL* actually reads, and then requires every per-draw field to be
+either carried field-for-field or named in a `SUBSTITUTIONS` table with a reason. It prints what it
+scanned (31 `SgUbo` fields, 17 per-draw, 6 per-frame) and what it matched either way, and exits
+non-zero on a gap. Current verdict: **14 carried, 3 substituted, 0 dropped, 0 dead**; `uShadow` and
+`uFog2` are per-FRAME fields no route reads and are listed as such rather than as gaps.
+
+Writing the tool caught three defects in the tool, each of which would have made it report all clear
+while the fields it was written to check were missing from its own view:
+
+* **Per-draw vs per-frame was inverted for exactly the interesting fields.** The first rule was
+  "written on `ubo`, minus those also written on `base`" — but `uParams`, `uExtra`, `uTintSkin` and
+  `uFog` are all set on `base` for the frame and then *overridden* per group, so the subtraction
+  deleted all four. It reported 10 per-draw fields and consulted no substitution at all. A field is
+  per-draw if any group can override it, full stop.
+* **Carriage was read from helper DEFINITIONS, not call sites.** The first version scanned
+  `unified_ubo.h` for `source.uX`, so `PackCmbFogGate`'s `source.uFog[3]` counted as carried whether
+  or not the packer called it — and deleting the call, which *is* the original bug, still reported
+  clean. A definition nobody invokes is not carriage. Now the packer's unified block is scanned for
+  `Zelda3DUnified::<helper>(` calls and only those helpers' bodies contribute.
+* **The `SgUbo` field list silently dropped `uTevStages`.** The declaration is
+  `uint32_t uTevStages[6 * 4];` and the subscript pattern was numeric-only, so one field was missing
+  from the authority the audit measures against. A test that the parse is non-vacuous caught it.
+
+Mutation-verified against the real tree: deleting the `PackCmbFogGate` call reports `uFog` dropped and
+exits 1; deleting the `CopyCmbVertexLightBank` call reports five fields dropped; deleting a `memcpy`
+reports that field. `tools/test_unified_carryage_audit.py` (13 cases) plus the generator/parser tests
+from the previous turn are now in the hosted CI list, since they are ROM-free structural gates for
+the shipped renderer.
+
 **Majora's Mask has no PICA distance fog at all, and the natural fix is refuted.** `Zelda3D_Fog3dSet` is
 called only from the SoH layer (`title_lighting.cpp`, `lighting/zelda3d_lighting.c`) and never from
 `2ship/`, so `gZelda3dFog3dOn` stays 0 for the whole game and every MM draw is unfogged on both
