@@ -137,7 +137,7 @@ descriptor probe-word argument is **validated by its control** — the u32 `0x62
 `+0xDC` is the most common word at exactly one of 84 sampled offsets in both games (a composite of two
 typed fields, not a named enum). So the `+0xCC` descriptor layout is strongly corroborated and the
 colour block plausible by adjacency, but neither is the binary read, and confirming them in
-`mm3d-decomp` is the named next RE step. The tool prints both verdicts on every run so the
+`mm3d-decomp` is the named next RE step. Separately, the PICA lighting **configuration builder** (`FUN_0040cdd8`) is now executed rather than described: it is transcribed to `oot3d-decomp/tools/pica_lighting_config.py` and reproduces all three oracle-observed registers for the grounded fixture from decompiled source (`config0=0x80000400`, `config1=0xff7fffff`, `light_enable=0x00000010`) under 13 mutation-verified tests. So the fragment-lighting *formula* and its *mode selection* are both portable; the one remaining unknown is the **producer** of the builder's input object — which CMB material fields populate the mode bytes, the eight slot-enable bytes and the three flag planes. That is a transport question, and it is what gates implementing `FRAG_PRIMARY`. The tool prints both verdicts on every run so the
 disagreement stays visible. Getting to MM3D at all also required fixing MM3D's silent-zero class in the
 tool itself (the material chunk pointer at `0x28` is `qtrs` for version ≥ 7, so the entire MM3D survey
 had been returning nothing), now routed through the single layout owner and pinned by a test verified
