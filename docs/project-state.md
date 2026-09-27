@@ -107,6 +107,22 @@ no `w`, so the question that seemed to need a PICA register measurement is not o
 at all. The shader's uniform inputs are now readable offline too: `tools/pica_shader_uniforms.py`
 replays the whole vertex float-uniform array out of a cached command list, so `uInvView` (identity on
 every title draw) and the missing `TexMtx` third row (`(0,0,1,0)`) are measured rather than assumed.
+**The two games are not equally placed, and the measurement says which side to work.**
+`tools/cmb_fragment_lighting_survey.py --game oot|mm` measures both retail corpora with identical
+definitions: **OoT3D has 197 of 11,172 materials (1.8%) consuming an enabled PICA `FRAGMENT_PRIMARY`;
+MM3D has 2,283 of 2,968 (76.9%)**, plus 503 vs 69 for `FRAGMENT_SECONDARY`. The host maps those to the
+vertex-lit primary and to black, so this is a rounding error on OoT3D and the **dominant lighting
+mechanism of MM3D being essentially unimplemented** — which contradicts any reading of S003/S005 as
+symmetric. It is also cheap to fix and rankable: **1,069 MM3D materials (36% of the corpus) use only
+`MODULATE[C(FRAG_PRIMARY),C(TEX0)]`-family chains**, so one correct `FRAG_PRIMARY` is worth more on the
+MM side than every other open graphics row combined. The OoT3D figures reconcile exactly with the
+existing row (202 consumers, `source_without_flag=5`, 202−5=197). The `+0` flag and `+0xA0..+0xB3`
+colour block are OoT3D-recovered and **unverified for MM3D** — the survey warns for `--game mm`, and
+confirming those offsets in `mm3d-decomp` is the named next RE step. Getting there also required
+fixing MM3D's silent-zero class in this very tool (the material chunk pointer at `0x28` is `qtrs` for
+version ≥ 7, so the entire MM3D survey had been returning nothing), now routed through the single
+layout owner and pinned by a test verified to fail on the old read.
+
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
 uncaptured runtime register, but `tev_corpus_survey.prevbuf_before_latch` walks each chain in stage

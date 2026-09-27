@@ -18,8 +18,12 @@ import sys
 from collections import Counter
 from dataclasses import dataclass
 
-from cmb_corpus import iter_oot_cmbs
-from tev_corpus_survey import parse_mats, slots_used
+from cmb_corpus import iter_corpus
+from tev_corpus_survey import (
+    material_chunk_pointer,
+    parse_mats,
+    slots_used,
+)
 
 FRAGMENT_PRIMARY = 0x6210
 FRAGMENT_SECONDARY = 0x6211
@@ -64,8 +68,10 @@ def scan_materials(label: str, data: bytes) -> list[MaterialLighting]:
     if data[:4] != b"cmb ":
         return []
     version = _u32(data, 0x08)
-    mats_offset = _u32(data, 0x28)
-    if mats_offset == 0 or data[mats_offset : mats_offset + 4] != b"mats":
+    # The single owner of the material chunk pointer. Reading 0x28 unconditionally points at MM3D's
+    # `qtrs` chunk (version >= 7 inserts it), which is how every MM3D material used to parse as zero.
+    mats_offset = material_chunk_pointer(data)
+    if mats_offset is None:
         return []
     stride = 0x15C if version <= 6 else 0x16C
     records: list[MaterialLighting] = []
@@ -103,20 +109,41 @@ def _format_rgba(color: tuple[int, int, int, int]) -> str:
 def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--details", action="store_true", help="print every relevant material")
+    parser.add_argument(
+        "--game",
+        choices=("oot", "mm"),
+        default="oot",
+        help="retail corpus to survey (default: oot)",
+    )
     args = parser.parse_args(arguments)
+
+    if args.game != "oot":
+        # The CONSUMER counts below are certain for any game: they come from the material's own
+        # combiner stage records through the shared parser, with no layout assumption. The `+0`
+        # fragment-lighting flag and the +0xA0..+0xB3 color block are OO3D-RECOVERED (OoT3D
+        # FUN_003fa5d0 consuming five RGBA8 material colors) and have NOT been confirmed for MM3D, so
+        # read fragment_enabled / emission / ambient / diffuse / specular0 / specular1 / descriptor_words
+        # as OoT3D-derived. mm3d-decomp/docs has no fragment-lighting recovery, and the MM3D binary's
+        # equivalent function is unlocated. Confirming those offsets is the named next RE step; until
+        # then the MM3D numbers that decide effort are the consumer counts, not the flag counts.
+        print(
+            f"WARNING game={args.game}: consumer counts are certain; the +0 flag and +0xA0..+0xB3 "
+            "color block are OoT3D-recovered and UNVERIFIED for this game",
+            file=sys.stderr,
+        )
 
     files = 0
     materials = 0
     failures = 0
     records: list[MaterialLighting] = []
     try:
-        for label, data in iter_oot_cmbs():
+        for label, data in iter_corpus(args.game)():
             files += 1
             try:
                 parsed = scan_materials(label, data)
                 records.extend(parsed)
-                mats_offset = _u32(data, 0x28)
-                if mats_offset != 0 and data[mats_offset : mats_offset + 4] == b"mats":
+                mats_offset = material_chunk_pointer(data)
+                if mats_offset is not None:
                     materials += _u32(data, mats_offset + 8)
             except (AssertionError, IndexError, KeyError, struct.error, ValueError):
                 failures += 1
