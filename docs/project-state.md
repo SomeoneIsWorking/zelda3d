@@ -47,7 +47,11 @@ Reached materials preserve multi-stage combiners, multiple texture coordinates a
 fragment lighting, alpha behavior, and scene-authored fog through the native renderer.
 
 Gap: the renderer campaign and current codemap still identify wider material, fragment-lighting, actor,
-and effect families whose parity is partial.
+and effect families whose parity is partial. Coordinator mapping methods are now recovered from the
+retail shader (`oot3d-decomp/docs/cmb_texcoord_mapping.md`, frontier `render.cmb-texcoord-mapping`):
+ProjectionMap (method 4, 366 consumed OoT3D materials on coordinator 1) is still unimplemented, the
+host does not transport the `ShaderMode.w` value that decides whether a draw even reaches the
+mapping switch, and coordinator 1's per-vertex component step has no host representation.
 
 ### S004 — OoT3D behavior coverage
 
