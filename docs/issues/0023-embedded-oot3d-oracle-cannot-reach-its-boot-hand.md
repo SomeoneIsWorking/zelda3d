@@ -67,6 +67,15 @@ The pre-handshake Vulkan work recorded below stays valid and stays fixed; it was
 * `scratch/gameplay_settled.state` is a hand-made symlink to that raw state, not a state the current
   build wrote. Treating it as a cached gameplay state is what made the route look broken rather than
   merely unseeded.
+* **The title demo is not a substitute route, measured.** `harness_gameplay.in_gameplay` deliberately
+  refuses the title demo's PlayState (its docstring: "`playstate` deliberately falls back to the title
+  demo's PlayState, so it cannot establish the loaded-save precondition required by `warp`"), so the
+  demo could at best supply renderer frames rather than a warpable save. Whether it even supplies
+  frames is now measured: a cold oracle run of **900 frames** with capture disabled stayed
+  `gameplay=ok no`, `scene=ok 0x006b`, `playstate=ok 0x0871e840 mode=title` at every 150-frame
+  sample. The demo does not self-start within that budget. That does not prove the demo is
+  unreachable — it may need input or a longer idle — so this is a bounded negative, not a refutation,
+  and nobody should spend time on it again without a named input sequence to try.
 
 
 ## Resolution
