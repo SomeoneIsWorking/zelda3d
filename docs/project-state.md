@@ -140,11 +140,20 @@ and carries positive/negative controls for its trusted comparison instruments. T
 fork now provides ordered Vulkan frame handoff; a validation-enabled run of 30 captured frames and the
 ordinary harness CLI both complete successfully.
 
-Gap: the current title-driving recipe still does not reach the current-contract gameplay PlayState or
-produce a fresh gameplay checkpoint, so no new gameplay oracle observation is yet valid. The cold
-title probe reaches the recovered transition request, but the file-select handoff has no save slots
-and the required system-title app is absent from the harness save directory. The software renderer
-remains too slow for this scenario on the current host. See [issue #23](issues/0023-embedded-oot3d-oracle-cannot-reach-its-boot-hand.md).
+Gap: **gameplay observation is blocked on one artifact, not on the route.** The cold title recipe does
+not reach the current-contract gameplay PlayState (the file-select handoff has no save slots and the
+required system-title app is absent from the harness save directory), so no fresh gameplay checkpoint
+can be written and `GAMEPLAY_STATE` is absent. The gameplay *route* is sound and has been used:
+`boot_to_gameplay` loads a cached state and skips the title entirely, and it produced every cached
+gameplay capture under the render-contract marker in force today. The only gameplay state on disk is
+an unmarked predecessor, and the current Azahar build **cannot deserialize it** —
+`terminate called after throwing an instance of 'boost::archive::archive_exception'` — so it is stale
+rather than misnamed. Reseeding it needs the cold title route, which is what fails. That single missing
+savestate is what `render.cmb-texcoord-mapping` items (1), (2) and (4) are waiting on, and
+`tools/cmb_shader_uniform_coverage.py` now names the other half of their requirement: a capture that
+also records the bound C material, because float-uniform indices are per-material and Azahar's
+per-draw log prints `idx` as `is_indexed`, not a material. See
+[issue #23](issues/0023-embedded-oot3d-oracle-cannot-reach-its-boot-hand.md).
 **Gameplay is not the only reachable oracle surface.** Loading the cached title savestate and running
 from a cached title checkpoint does work on this host: `tools/title_oracle_probe.py uniforms 1093`
 completed and cached 102 per-draw uniform records under the current `p45-00401070` contract, and
