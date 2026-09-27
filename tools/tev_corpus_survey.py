@@ -283,6 +283,8 @@ def main():
     frag_src_materials = 0
     frag_src_examples = []
     domain_bad = Counter()  # layout-validation failures
+    # Materials whose combiner names a texture unit they never declared: named, not just counted.
+    undeclared_tex_use = Counter()
     # PICA combiner-buffer latching. Reported because assuming it away cost a session:
     # the shader documented "the buffer-input selector is 0x8579 corpus-wide (buffer never
     # latches PREVIOUS)" and evaluated PREVBUF as vec4(0) on the strength of it. It is not
@@ -388,6 +390,21 @@ def main():
                 if t < 3:
                     coordmap_use[f"tex{t} coordmap={cmap[t]}"] += 1
                     coordsrc_use[f"tex{t} coordsrc={csrc[t]}"] += 1
+            # A material whose combiner chain names a texture unit its own bindings never declared.
+            # NAMED, not just counted: a bare count is what let this sit unnoticed. The host
+            # substitutes its dummy (opaque white) for an unbound slot, and white is the identity
+            # element for MODULATE and for MULT_ADD/ADD_MULT's first factor, so every hit found is
+            # neutral -- but that is a property of those ops, so an op that is NOT neutral would
+            # change the verdict, and this list is where that would show up first.
+            for si, st in enumerate(stages):
+                for unit in range(3):
+                    if tex[unit] >= 0:
+                        continue
+                    for kind, srcs, op in (("rgb", st.rgb_src, st.rgb_op), ("a", st.a_src, st.a_op)):
+                        if unit + 0x84C0 in srcs[: slots_used(op)]:
+                            undeclared_tex_use[
+                                f"{label} mat{mi}: stage{si} {kind}_src uses tex{unit} (undeclared)"
+                            ] += 1
             csig = " | ".join(chain) if chain else "(no stages)"
             chain_sigs[csig] += 1
             chain_example.setdefault(csig, f"{label} mat{mi}")
@@ -443,6 +460,11 @@ def main():
         print(f"  {k}: {v} slot-use(s)")
     for example in frag_src_examples:
         print(f"    e.g. {example}")
+    print("\n== materials consuming a texture unit they do NOT declare ==")
+    for _k, _v in sorted(undeclared_tex_use.items()):
+        print(f"   {_v}x {_k}")
+    if not undeclared_tex_use:
+        print("   none")
     print("\n== texture units consumed by combiners ==")
     for k, v in sorted(tex_use.items()):
         print(f"  {k}: {v}")
