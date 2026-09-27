@@ -172,6 +172,26 @@ def require_cached_oracle_frames(
     return resolved
 
 
+def capture_cursor_image(harness, title_cs: int, base: Path, draw_list: bool) -> Path:
+    """Capture the comparison image at title_cs, then optionally publish that cursor's draw list.
+
+    The image comes first on purpose. Publishing the draw list costs one more frame
+    (arm_host_draw_list steps once), and one frame of this title is worth ~5.9 mean-abs over 14% of
+    the frame -- 12% of the ~47.6 oracle-vs-host difference the metric reports. Arming first made
+    `--draw-list` produce a DIFFERENT frame from a plain run while both still reported the same cs,
+    which is how a single frame of drift was read as run-to-run noise (content 0.4784 vs 0.4846 for
+    "identical" runs).
+
+    The list is a diagnostic, not the comparison subject: it is published on the following half-rate
+    tick, so it describes the same script cursor one frame later, and the per-group material identity
+    is stable across that.
+    """
+    host_path = capture_host_frame(harness, title_cs, base)
+    if draw_list:
+        arm_host_draw_list(harness, title_cs)
+    return host_path
+
+
 def run(title_frames: list[int], name: str, unified_renderer: int, draw_list: bool) -> None:
     apply_repo_environment(REPO, os.environ)
     # The historical title anchors being consumed here are vanilla ROM frames.
@@ -206,10 +226,8 @@ def run(title_frames: list[int], name: str, unified_renderer: int, draw_list: bo
         for title_cs in ordered_frames:
             oracle_frame, oracle_path = cached[title_cs]
             current_cs = advance_host_title(harness, current_cs, title_cs)
-            if draw_list:
-                arm_host_draw_list(harness, title_cs)
             base = OUTDIR / f"{name}_cs{title_cs}"
-            host_path = capture_host_frame(harness, title_cs, base)
+            host_path = capture_cursor_image(harness, title_cs, base, draw_list)
             oracle_output = Path(str(base) + ".az.png")
             Image.open(oracle_path).convert("RGB").save(oracle_output)
             score = content_score(oracle_output, host_path)

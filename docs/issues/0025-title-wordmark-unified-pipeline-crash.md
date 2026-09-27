@@ -148,6 +148,46 @@ with `scratch/title_host_capture/title_cs1093_sxs.png`. What it shows, and what 
   it is not, then the desync is segment-dependent and the camera becomes a live suspect. **Do not tune
   the camera before that A/B** — `title.epona-gallop-rate` and the rate decision are the owning rows.
 
+### The instrument's resolution, measured
+
+Because the first comparison produced a number, its resolution had to be measured before anything
+could be built on it. Two host processes were driven to the same cursor and both the game state and
+the image were compared:
+
+| Comparison | mean-abs | pixels differing >16 |
+|---|---|---|
+| two identical runs | 0.73 | 1.9% |
+| one extra frame (`--draw-list` arm, then capture) | **5.90** | **13.9%** (max 229) |
+| plain run vs the sweep's own cs=1093 sample | 0.50 | 0.2% |
+| oracle vs host | ~47.6 | - |
+
+**The host title advance is reproducible.** Every state readout is bit-identical across the two
+processes: `daytime=0x3d67 skybox1=3 skybox2=0 blend=224.000 ambient=(96,99,68) fog=(154,114,57)
+fogNear=996 fogFar=12800`, camera `eye=(-655.1,-7.3,8428.8) at=(-668.8,-5.0,8354.4) fov=45.40`, and
+rider `pos=(-604.8,-64.2,8310.5)` with all three yaws at 494. Same boot cursor (120), same 1945-frame
+step budget, chunking irrelevant.
+
+**And the tool had a one-frame bug that made a frame look like noise.** `arm_host_draw_list` steps
+once to publish the identity list, and it ran *before* the capture, so `--draw-list` compared a
+different frame against the same cached oracle pair while still reporting the same `cs`. That is where
+`content` 0.4784 vs 0.4846 came from - a real 5.90 mean-abs frame shift read as run-to-run variation,
+and recorded as such in an earlier revision of this note. `capture_cursor_image` now captures the
+image first and publishes the list afterwards (the list then describes the same script cursor one
+half-rate tick later, and the per-group material identity is stable across that). The ordering is
+locked by `test_draw_list_is_published_after_the_image_not_before`, which was confirmed to fail when
+the order is inverted.
+
+Consequence for anyone gating on this metric: the noise floor is ~0.7 mean-abs and one frame is
+~5.9, so it resolves whole-frame differences and nothing finer.
+
+### Draw 99 is the sword/shield quad, not the wordmark
+
+The unified fragment probes (`ZELDA3D_SG_FRAGDBG` + `_DRAW`) resolved an identity question the draw
+list could not. Draw 99 in TEX0-only mode (`o_probeTex0`) renders as a **sword blade and a shield** -
+a 6-vertex quad carrying a logo-atlas texture - not the `THE LEGEND OF ZELDA` lettering, which is
+drawn elsewhere. So `g_title.cmb` is the sword/shield/logo quad, the lettering is model 2015, and any
+future statement about "the wordmark draw" needs the draw index, not the model name.
+
 ## What was tried / dead ends
 
 * `SDL_GPU_DEVICE="AMD Radeon RX 6700 XT (RADV NAVI22)"` — no effect; still lavapipe.
