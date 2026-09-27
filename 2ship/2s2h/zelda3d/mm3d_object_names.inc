@@ -1,5 +1,16 @@
 // Generated from 2ship/include/tables/object_table.h — objectId -> short name.
-// Used by Zelda3D_LookupModel to auto-probe /actors/zelda2_<name>.gar.lzs.
+// Used by Zelda3D_LookupModel to auto-probe the actor archive for this object.
+//
+// TWO prefixes, tried in this order, because MM3D is not uniform here (measured against the ROM):
+//   1. /actors/zelda2_<name>.gar.lzs  -- MM-only actors (387 of 460 archives). Resolves 324 of 460.
+//   2. /actors/zelda_<name>.gar.lzs   -- actors MM3D SHARES with OoT3D, which keep OoT3D's archive
+//                                         name (72 archives). Adds 60 more, for 384 of 460.
+// The shared prefix is consulted only after the MM one misses, so the five names present under BOTH
+// prefixes (gi_ocarina, mag, mir_ray, ny, sb) keep resolving to their zelda2_ archive.
+// The remaining 76 names have no archive under either prefix and fall back to the N64 actor. Do not
+// fuzzy-match them: geldb~gelb, gi_rupy~gi_ruppy, gi_shield_2/gi_shield_3~gi_shield_02,
+// gi_golonmask~gi_goronmask and gi_bottle_22~gi_bottle_21 are near-misses that would bind an object to
+// the WRONG archive, which is worse than the N64 fallback.
 static const struct { int id; const char* name; } kObjectNames[] = {
     { 0x004, "nb" },
     { 0x005, "okuta" },
