@@ -116,9 +116,15 @@ mechanism of MM3D being essentially unimplemented** — which contradicts any re
 symmetric. It is also cheap to fix and rankable: **1,069 MM3D materials (36% of the corpus) use only
 `MODULATE[C(FRAG_PRIMARY),C(TEX0)]`-family chains**, so one correct `FRAG_PRIMARY` is worth more on the
 MM side than every other open graphics row combined. The OoT3D figures reconcile exactly with the
-existing row (202 consumers, `source_without_flag=5`, 202−5=197). The `+0` flag and `+0xA0..+0xB3`
-colour block are OoT3D-recovered and **unverified for MM3D** — the survey warns for `--game mm`, and
-confirming those offsets in `mm3d-decomp` is the named next RE step. Getting there also required
+existing row (202 consumers, `source_without_flag=5`, 202−5=197). Whether the OoT3D-recovered `+0` flag and `+0xA0..+0xB3`
+colour block are even valid for MM3D was tested with a control against each argument, and they disagree:
+the "authored colours are spiky" argument is **refuted by its own control** (the material record is mostly
+constant, so other offsets hold a median of only 4–8 distinct values, and MM3D's `specular0` is more varied
+than that), while the descriptor-enum argument is **validated by its control** — `0x62C884C0` is the most
+common word at exactly one of 84 sampled offsets, `+0xDC`, in both games. So the `+0xCC` descriptor layout is
+strongly corroborated and the colour block plausible by adjacency, but neither is the binary read, and
+confirming them in `mm3d-decomp` is the named next RE step. The tool prints both verdicts on every run so
+the disagreement stays visible. Getting there also required
 fixing MM3D's silent-zero class in this very tool (the material chunk pointer at `0x28` is `qtrs` for
 version ≥ 7, so the entire MM3D survey had been returning nothing), now routed through the single
 layout owner and pinned by a test verified to fail on the old read.

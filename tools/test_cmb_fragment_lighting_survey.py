@@ -148,5 +148,44 @@ class Mm3dMaterialChunkTests(unittest.TestCase):
         self.assertEqual(survey.scan_materials("x", b"NOTACMB" + bytes(0x40)), [])
 
 
+def _one_material_corpus(offset_pairs: dict[int, int]) -> list[tuple[str, bytes]]:
+    """A one-material version-7 corpus whose material record holds `offset -> u32` values."""
+    data, _ = _mm3d_material()
+    material = MATS_CHUNK + 0x0C
+    for offset, value in offset_pairs.items():
+        data[material + offset : material + offset + 4] = value.to_bytes(4, "little")
+    return [("synthetic.cmb", bytes(data))]
+
+
+class DescriptorEnumSweepTests(unittest.TestCase):
+    """The enum sweep is what licenses the cross-game structural claim, so it needs its own controls.
+
+    A sweep that returned "distinctive" for any input would let the MM3D conclusion through on
+    nothing, so both the positive and the negative shape are pinned.
+    """
+
+    def test_finds_the_enum_at_exactly_one_offset(self) -> None:
+        corpus = _one_material_corpus({0xDC: survey.FRAGMENT_LIGHT_AMB_COLOR, 0xE0: 0})
+        hits = [(offset, count) for offset, count in survey.descriptor_enum_sweep(corpus) if count]
+        self.assertEqual([offset for offset, _count in hits], [0xDC])
+
+    def test_reports_not_distinctive_when_the_enum_repeats(self) -> None:
+        """The same enum at two offsets must NOT read as distinctive, or the claim is vacuous."""
+        corpus = _one_material_corpus(
+            {0xDC: survey.FRAGMENT_LIGHT_AMB_COLOR, 0xE8: survey.FRAGMENT_LIGHT_AMB_COLOR}
+        )
+        hits = [(offset, count) for offset, count in survey.descriptor_enum_sweep(corpus) if count]
+        self.assertGreaterEqual(len(hits), 2)
+
+    def test_the_measured_block_is_excluded_from_its_own_control(self) -> None:
+        """+0xA0..+0xB0 is the block under test; sampling it as a 'control' would be circular."""
+        offsets = [offset for offset, _value in survey.offset_control_sweep(_one_material_corpus({}))]
+        self.assertFalse([o for o in offsets if 0xA0 <= o <= 0xB0])
+
+    def test_control_sweep_reads_more_offsets_than_the_record_padding(self) -> None:
+        offsets = [offset for offset, _value in survey.offset_control_sweep(_one_material_corpus({}))]
+        self.assertGreater(len(offsets), 10)
+
+
 if __name__ == "__main__":
     unittest.main()
