@@ -296,6 +296,34 @@ TEST(Zelda3DUnifiedUbo, FogGateCarriesTheNativeMode) {
     EXPECT_FLOAT_EQ(unified.uFogCtl[3], 0.0f);
 }
 
+// The per-draw texcoord SCROLL is a per-DRAW input the unified route dropped: it carried the
+// per-group coordinator transform (uTex0Xf) but not the draw's own scroll, so every scrolling draw
+// sat still. Measured live at title cs=1093, 2 of 101 draws carry a non-zero scroll — both
+// (0.57222, 0), the OoT3D sky cloud band's .cmab rate. Lock the term into BOTH non-sphere tex0
+// branches, because a draw that lands on the variant without it would lose the scroll purely
+// through classification.
+TEST(UnifiedShader, ThePerDrawUvScrollIsAddedOnEveryNonSphereTex0Path) {
+    for (int index = 0; index < static_cast<int>(Fast::Unified::Variant::kCount); ++index) {
+        const auto variant = static_cast<Fast::Unified::Variant>(index);
+        const std::string vertex = Fast::Unified::BuildVertexSource(variant);
+        const std::string label = Fast::Unified::VariantName(variant);
+        // The sphere-mapped branch is the one place the scroll must NOT appear: the native derives
+        // that UV from the normal and the coordinator matrix, and a sphere has no texcoord to
+        // scroll. Exactly one of the two plain forms must be present per variant.
+        const bool flipped =
+            vertex.find("vUv0 = vec2(aUv0.x + ubo.uUvScroll.x, 1.0 - aUv0.y + ubo.uUvScroll.y);") != std::string::npos;
+        const bool unflipped =
+            vertex.find("vUv0 = vec2(aUv0.x + ubo.uUvScroll.x, aUv0.y + ubo.uUvScroll.y);") != std::string::npos;
+        EXPECT_TRUE(flipped != unflipped)
+            << label << ": expected exactly one plain tex0 form, got " << (flipped ? "the flipped one" : "nothing")
+            << (flipped && unflipped ? " AND the unflipped one" : "");
+        // The native adds the scroll AFTER the flip (it writes `1.0 - aUv.y + uExtra.z`), so a
+        // pre-flip subtract would land the same value by accident on a symmetric UV and be wrong
+        // everywhere else. The term must be an add on the already-flipped coordinate.
+        EXPECT_EQ(vertex.find("1.0 - aUv0.y - ubo.uUvScroll.y"), std::string::npos) << label;
+    }
+}
+
 // BUG 3: neither pushed uniform block may exceed SDL3 GPU's MAX_UBO_SECTION_SIZE. If this fails, the
 // renderer silently reads 0 for everything past the cap -> black world, T-posed actors.
 TEST(Zelda3DUboLayout, PushBlocksFitSdl3GpuSectionCap) {

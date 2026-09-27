@@ -272,6 +272,36 @@ something), plus three new Python cases on the fog latch — including the one t
 refuses a capture labelled "fog off" when the host reports the fog still on, because a fog can be off
 for an unrelated reason and then the A/B has silently measured nothing.
 
+**The same bug class had a second instance: the per-draw texcoord scroll, also live on the title.**
+Having found one "the unified route copies the frame-level values and drops the per-draw value", the
+next question is how many more there are, so the audit was run by hand over the native per-group
+writes against the unified packer's copies. The fog gate was one; the **UV scroll** is another, and
+the field it needed was already in the UBO as dead weight: `uEnvColor` was written as `0.0` and read
+by nothing on either route — a size-parity filler in exactly the slot a real input wanted.
+
+The native applies the scroll in its vertex stage as `aUv + uExtra.yz`, i.e. an ADD after the V
+flip (`1.0 - aUv.y + uExtra.z`). The unified's non-sphere tex0 path was `vec2(aUv0.x, 1.0 - aUv0.y)`
+with no term at all, and the per-*group* coordinator transform it did carry (`uTex0Xf`) is a
+different, per-group input, so it could not stand in. That the omission was **visible content** and
+not a dead field needed a number rather than a reading, so `uvScroll` was added to the per-draw
+`[Zelda3D_SG] draw N` list — the per-group `uv=` in an `sgdump` row is the group's own UV, not the
+draw's scroll, so a capture without it cannot tell "the band does not scroll" from "no draw asked it
+to". At title cs=1093: **2 of 101 draws carry a non-zero scroll, both `(0.57222, 0)`, on models 2002
+and 2004** — the OoT3D sky cloud band's `.cmab` rate, i.e. 37500/65536 of a texture width.
+
+The port adds the term after the flip, in **both** non-sphere tex0 branches, because a draw that
+lands on the variant without it would lose the scroll purely through classification. It is added
+unconditionally because it is zero for every draw that did not ask for one, which is what makes that
+safe rather than a second policy. `UnifiedShader.ThePerDrawUvScrollIsAddedOnEveryNonSphereTex0Path`
+locks both branches and forbids the pre-flip form; mutation-verified — turning the post-flip add into
+a pre-flip subtract fails, and removing the term fails.
+
+What is **not** claimed: a pixel win. At cs=1093 `union_rgb_mae` moves 38.23 → 38.09 and `content`
+0.4807 → 0.4760. This instrument's measured noise floor is **0.73 mean-abs** and one frame is worth
+~5.9, so 0.14 is five times below the floor and the sign of the `content` move is opposite. The claim
+is that the unified route now does what the native route does, on an input measured to be live; the
+metric does not resolve it and is not cited as if it did.
+
 **The fog port is closed at the PICA registers, not only in pixels — and the fog COLOUR is a trap, not
 a bug.** The oracle's per-draw fog field at the title (`vsuni_log`, 102 draws at az=2016) reads
 **`fog=5/0(129,96,53)` on 59 draws and `fog=0/0` on 43**. So the 3DS programs exactly one fog mode

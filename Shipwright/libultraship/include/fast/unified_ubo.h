@@ -18,7 +18,15 @@ struct CommonUbo {
     float uLightDir[4];
     int32_t uCombA[16]; // combMux[2][2][4] flattened
     float uPrimColor[4];
-    float uEnvColor[4];
+    // The per-draw texcoord SCROLL: the native applies it as `aUv + uExtra.yz` in the vertex stage
+    // (a post-flip ADD, since it writes `1.0 - aUv.y + uExtra.z`), so it is added after the V flip
+    // here too. Zero for every draw that did not ask for a scroll, which is why adding the term
+    // unconditionally is safe rather than a second policy. It is what animates the OoT3D sky cloud
+    // band per its .cmab rate (#28b), and it is per DRAW, so it cannot ride the per-group
+    // coordinator transform in uTex0Xf.
+    //
+    // This field was the dead `uEnvColor`, written as 0 and read by nothing on either route.
+    float uUvScroll[4];
     float uFogColor[4];
     float uParams0[4]; // x=alphaRef, y=lightingMode, z=cycleCount, w=frame_count
     float uParams1[4]; // x=noise_scale, y=polygonOffset, z=hasSkin, w=alreadyTransformed (N64)
