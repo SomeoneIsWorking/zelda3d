@@ -272,6 +272,28 @@ something), plus three new Python cases on the fog latch — including the one t
 refuses a capture labelled "fog off" when the host reports the fog still on, because a fog can be off
 for an unrelated reason and then the A/B has silently measured nothing.
 
+**The fog port is closed at the PICA registers, not only in pixels — and the fog COLOUR is a trap, not
+a bug.** The oracle's per-draw fog field at the title (`vsuni_log`, 102 draws at az=2016) reads
+**`fog=5/0(129,96,53)` on 59 draws and `fog=0/0` on 43**. So the 3DS programs exactly one fog mode
+per draw and "not this material" is a real per-draw mode-0 — the host's `fogEnabled` boolean models
+the oracle's own field rather than approximating it — and `flip=0` everywhere, so the host's single
+no-offset window is the only shape in this frame. The host's recovered LUT lands where the oracle's
+does: node 127 = **+0.9803** at eyeDist **871.8** against the recorded oracle 0.979 at eye 834.
+
+The colour nearly produced a fix to a non-bug. Read at *unmatched* points — the oracle at az=2016,
+the host at cs=120 — the fog colour is (129,96,53) against (24,18,34), which reads exactly like a
+wrong colour source and would have justified changing code. Both are time-blended, so two different
+instants are not a disagreement. At a matched pair (host cs=1093 vs oracle az=2016) the host is
+**(154,114,57)** against the oracle's (129,96,53): same hue, ~19% apart, and the *ambient* shows the
+identical offset already recorded above (host palette w=0.875 against the oracle's w=0.125). Both
+paths already feed the 3DS palette into the one field the shader reads — the title through
+`ApplyPalette` -> `envCtx.lightSettings.fogColor`, gameplay through the `pal[...].fogCol` two-stage
+blend in `Zelda3D_SceneLightSettingsOverride`, whose comment carries the same Zora measurement
+(N64 (25,100,100) teal against the oracle's live PICA (104,135,181)). **The colour was never wrong;
+only the gate was missing.** `soh_fog3d` now prints the colour alongside the window, because a fog
+with the right depth and the wrong colour is still wrong and a diagnostic that reports the window
+alone makes that invisible.
+
 **Majora's Mask has no PICA distance fog at all, and the natural fix is refuted.** `Zelda3D_Fog3dSet` is
 called only from the SoH layer (`title_lighting.cpp`, `lighting/zelda3d_lighting.c`) and never from
 `2ship/`, so `gZelda3dFog3dOn` stays 0 for the whole game and every MM draw is unfogged on both
