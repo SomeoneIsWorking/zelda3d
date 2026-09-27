@@ -263,6 +263,35 @@ Fragment lighting remains the dependency, not the combiners: **89.13%** of MM3D 
 6,791) consume `FRAG_PRIMARY`/`FRAG_SECONDARY` as a combiner source, which is the unimplemented
 `FRAG_PRIMARY` path recorded below.
 
+**The fragment-lighting blocker moved: the search it was stuck on was looking in the wrong place.**
+The recorded blocker for `FRAG_PRIMARY` turned on finding a 0x4C8-byte "toolchain-authored template" by
+searching the code image, and that search had dead-ended at "27 hits, no stride". The reason is now
+measured: **the template is not reached through an address table at all.** `FUN_00308498`, which is on
+the confirmed chain, passes its `arg1` **straight through** to both the pre-pass and the builder as the
+builder's object pointer; the only preparation is three byte stores at the object's offsets 0-2. That
+pointer is then forwarded down at least three frames (`0x003f9f68`'s `mov r6, r1`, and its single
+caller at `0x003f9d58` setting `r1 = r6`) without ever being computed from a table. An address-table
+search over `code.bin` could not have found it, because there is nothing to find.
+
+Getting there also exposed a measurement trap worth keeping: `disasm.py` establishes
+`byte offset = vaddr - 0x00100000`, and computing an ARM `BL` target in *offset* space while searching
+for a VA returns **zero callers for every function** -- including the builder, which is provably
+called. That reads exactly like "nothing calls this", and it is how a whole recovered chain can look
+refuted when it is not. I made that mistake first this session. `oot3d-decomp/tools/callers_bl.py` now
+does the search exactly and **self-validates on every run** (a correct ARM scan sends 70.6% of its
+targets back inside the code image; a wrong decoder is refused rather than reported), with 14 tests in
+`oot3d-decomp/tests/test_callers_bl.py`. It **independently confirms the recorded chain from the
+binary** -- `FUN_00308498` <- `0x003fa5a8`, `FUN_0040cdd8` <- `0x003084c4`, `FUN_0040d040` <-
+`0x003084b4`, `FUN_004c6264` <- `0x004c3528`, `FUN_004c6364` <- `0x004c3644`, each with exactly one
+caller.
+
+**And one load-bearing claim in the blocker record does not survive: `FUN_00371758` has zero ARM `BL`
+callers.** The record names it as "the delivery mechanism" for the 0x4C8-byte copy. Thumb and
+indirect/function-pointer calls remain open -- my Thumb-1 `BL`/`BLX` decoder produced a 1:1 target
+ratio with 2.2% in-image, which is garbage, so no Thumb negative is claimed -- but the ARM evidence is
+zero callers, and that identification is now marked **unproven** rather than load-bearing. Full record
+in `oot3d-decomp/docs/fragment_lighting.md`.
+
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
 uncaptured runtime register, but `tev_corpus_survey.prevbuf_before_latch` walks each chain in stage
