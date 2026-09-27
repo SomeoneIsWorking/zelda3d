@@ -481,12 +481,13 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getUnifiedPipeline(const SgGroup
         }
         std::string vsrc = Fast::Unified::BuildVertexSource((Fast::Unified::Variant)variant);
         std::string fsrc = Fast::Unified::BuildFragmentSource((Fast::Unified::Variant)variant, fragmentProbeMode);
-        // 1 UBO (UnifiedCommon) + 1 UBO (bones) for vertex; 1 sampler (untextured variant needs 0)
+        // 1 UBO (UnifiedCommon) + 1 UBO (bones) for vertex; the variant's own sampler count
         // + 1 UBO (UnifiedCommon) for fragment — mirrors makeShader's existing (numSamplers, numUbo)
-        // convention for the old fixed CMB shader.
-        uint32_t numSamplers = variant == (int)Fast::Unified::Variant::kUntextured
-                                   ? 0
-                                   : (variant == (int)Fast::Unified::Variant::kGenericTev ? 3 : 1);
+        // convention for the old fixed CMB shader. The count comes from the shader contract because
+        // SDL3 builds the bind-group layout from it: declaring 1 for the two-sampler dual-tex
+        // variants built a layout the SPIR-V read past, which faulted in pipeline creation on the
+        // title wordmark (issue #25).
+        const uint32_t numSamplers = Fast::Unified::VariantSamplerCount((Fast::Unified::Variant)variant);
         g_uniVert[variant] = makeShader(vsrc.c_str(), EShLangVertex, 0, 2);
         g_uniFrag[variant] = makeShader(fsrc.c_str(), EShLangFragment, numSamplers, 1);
         if (!g_uniVert[variant] || !g_uniFrag[variant])
@@ -558,6 +559,16 @@ SDL_GPUGraphicsPipeline* Fast::Zelda3DRenderer::getUnifiedPipeline(const SgGroup
     pci.target_info.has_depth_stencil_target = true;
     pci.target_info.depth_stencil_format = api->GpuDepthFormat();
 
+    // Name the pipeline being created. A driver fault inside SDL_CreateGPUGraphicsPipeline
+    // leaves nothing else to identify which material's descriptor died, and the variant is
+    // what distinguishes the sampler count from a plain one.
+    std::fprintf(stderr,
+                 "[Zelda3D_SG] unified pipeline create: variant=%d(%s) samplers=%u blend=%d depthWrite=%d "
+                 "depthTest=%d cull=%d frontCW=%d attrs=%u\n",
+                 variant, Fast::Unified::VariantName((Fast::Unified::Variant)variant),
+                 (unsigned)Fast::Unified::VariantSamplerCount((Fast::Unified::Variant)variant), g.blendEnable ? 1 : 0,
+                 g.depthWrite ? 1 : 0, g.depthTest ? 1 : 0, doCull ? 1 : 0, frontCW ? 1 : 0,
+                 (unsigned)pci.vertex_input_state.num_vertex_attributes);
     SDL_GPUGraphicsPipeline* pipe = SDL_CreateGPUGraphicsPipeline(g_device, &pci);
     if (!pipe)
         fprintf(stderr, "[Zelda3D_SG] unified pipeline create failed: %s\n", SDL_GetError());

@@ -186,11 +186,18 @@ def run(title_frames: list[int], name: str, unified_renderer: int, draw_list: bo
     os.environ.setdefault(
         "HARNESS_STDERR", str(REPO / "scratch" / "logs" / "title_host_capture.log")
     )
-    # OracleCache stores native 400x240 title frames. Pin the host capture to
-    # the same raster instead of comparing a scaled 800x480 default.
-    os.environ["ZELDA3D_HARNESS_RES_FACTOR"] = "1"
-    os.environ["ZELDA3D_HARNESS_SOH_W"] = "400"
-    os.environ["ZELDA3D_HARNESS_SOH_H"] = "240"
+    # Pin the host capture to the raster the cached oracle frames were actually captured at, rather
+    # than to a constant. The oracle's own frame size is the authority for a pixel comparison — the
+    # host has to produce the same array shape, and a hardcoded 400x240 silently contradicted the
+    # cache once a frame had been warmed at citra_resolution_factor 2 (800x480).
+    oracle_width, oracle_height = Image.open(next(iter(cached.values()))[1]).size
+    os.environ["ZELDA3D_HARNESS_RES_FACTOR"] = str(max(1, oracle_width // 400))
+    os.environ["ZELDA3D_HARNESS_SOH_W"] = str(oracle_width)
+    os.environ["ZELDA3D_HARNESS_SOH_H"] = str(oracle_height)
+    print(
+        f"[title_host_capture] pinned host raster {oracle_width}x{oracle_height} "
+        f"to the cached oracle frames"
+    )
 
     print(f"[title_host_capture] oracle cache hit key={cache.key}")
     harness = spawn()
