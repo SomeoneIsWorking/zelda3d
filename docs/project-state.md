@@ -120,8 +120,9 @@ existing row (202 consumers, `source_without_flag=5`, 202−5=197). Whether the 
 colour block are even valid for MM3D was tested with a control against each argument, and they disagree:
 the "authored colours are spiky" argument is **refuted by its own control** (the material record is mostly
 constant, so other offsets hold a median of only 4–8 distinct values, and MM3D's `specular0` is more varied
-than that), while the descriptor-enum argument is **validated by its control** — `0x62C884C0` is the most
-common word at exactly one of 84 sampled offsets, `+0xDC`, in both games. So the `+0xCC` descriptor layout is
+than that), while the descriptor probe-word argument is **validated by its control** — the u32 `0x62C884C0` at material
+`+0xDC` is the most common word at exactly one of 84 sampled offsets in both games (a composite
+of two typed fields, not a named enum). So the `+0xCC` descriptor layout is
 strongly corroborated and the colour block plausible by adjacency, but neither is the binary read, and
 confirming them in `mm3d-decomp` is the named next RE step. The tool prints both verdicts on every run so
 the disagreement stays visible. Getting there also required

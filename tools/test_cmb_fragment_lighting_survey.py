@@ -158,21 +158,21 @@ def _one_material_corpus(offset_pairs: dict[int, int]) -> list[tuple[str, bytes]
 
 
 class DescriptorEnumSweepTests(unittest.TestCase):
-    """The enum sweep is what licenses the cross-game structural claim, so it needs its own controls.
+    """The probe-word sweep is what licenses the cross-game structural claim, so it needs its own controls.
 
     A sweep that returned "distinctive" for any input would let the MM3D conclusion through on
     nothing, so both the positive and the negative shape are pinned.
     """
 
-    def test_finds_the_enum_at_exactly_one_offset(self) -> None:
-        corpus = _one_material_corpus({0xDC: survey.FRAGMENT_LIGHT_AMB_COLOR, 0xE0: 0})
+    def test_finds_the_probe_word_at_exactly_one_offset(self) -> None:
+        corpus = _one_material_corpus({0xDC: survey.DESCRIPTOR_PROBE_WORD, 0xE0: 0})
         hits = [(offset, count) for offset, count in survey.descriptor_enum_sweep(corpus) if count]
         self.assertEqual([offset for offset, _count in hits], [0xDC])
 
-    def test_reports_not_distinctive_when_the_enum_repeats(self) -> None:
-        """The same enum at two offsets must NOT read as distinctive, or the claim is vacuous."""
+    def test_reports_not_distinctive_when_the_probe_word_repeats(self) -> None:
+        """The same probe word at two offsets must NOT read as distinctive, or the claim is vacuous."""
         corpus = _one_material_corpus(
-            {0xDC: survey.FRAGMENT_LIGHT_AMB_COLOR, 0xE8: survey.FRAGMENT_LIGHT_AMB_COLOR}
+            {0xDC: survey.DESCRIPTOR_PROBE_WORD, 0xE8: survey.DESCRIPTOR_PROBE_WORD}
         )
         hits = [(offset, count) for offset, count in survey.descriptor_enum_sweep(corpus) if count]
         self.assertGreaterEqual(len(hits), 2)
