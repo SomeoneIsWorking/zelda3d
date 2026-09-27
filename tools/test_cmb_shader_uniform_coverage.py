@@ -20,6 +20,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
 
 from cmb_shader_uniform_coverage import (
+    CAPTURE_REQUIREMENTS,
     INDEX_SCOPE_NOTE,
     UNIFORM_BLOCKS,
     UNIFORM_QUESTIONS,
@@ -210,6 +211,13 @@ class ShippedQuestionWiring(unittest.TestCase):
         )
         report = CoverageReport(captures=[capture])
         self.assertIn(self.QUESTION_ONE, report.answered())
+
+    def test_report_states_every_capture_requirement(self) -> None:
+        text = format_report(CoverageReport(), Path("/nonexistent"))
+        self.assertIn("what a capture must provide", text)
+        for requirement in CAPTURE_REQUIREMENTS:
+            head = requirement.split(" (")[0].split(" (")[0]
+            self.assertIn(head[:40], text)
 
     def test_texcoordslot_question_carries_its_denominator(self) -> None:
         capture = self._title_like_capture(
