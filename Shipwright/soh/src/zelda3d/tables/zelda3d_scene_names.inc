@@ -2,7 +2,7 @@
 // SoH sceneNum (SceneID enum, == scene_table.h row index) -> OoT3D scene
 // folder name (for /scene/<name>_<R>_info.zsi). NULL = no OoT3D scene
 // (fall back to the N64 room). Names only; no ROM-derived assets.
-// 101/110 scenes mapped.
+// 102/111 scenes mapped.
 static const char* const kZelda3dSceneNames[] = {
     /* 0x00 SCENE_DEKU_TREE                          (ydan) */ "ydan",
     /* 0x01 SCENE_DODONGOS_CAVERN                    (ddan) */ "ddan",

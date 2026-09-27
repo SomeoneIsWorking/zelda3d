@@ -44,6 +44,26 @@ class TheTableIsParsedFromItsOneOwner(unittest.TestCase):
         self.assertGreater(total, 0)
         self.assertEqual(total, len(mapped) + len(unset))
 
+    def test_the_unset_rows_are_actually_matched(self) -> None:
+        """MM3D's own empty slots are written `((unset))`, and a `[^)]*` group skips them.
+
+        The original parser used one, so all 11 UNSET rows failed to match and the survey reported
+        "MM3D's own SCENE_UNSET scene ids: 0" for a table that has 11. That is the bucket that has to
+        stay separate from the mapping-gap count, so a silent undercount there is a wrong verdict, not
+        a cosmetic one.
+        """
+        _mapped, unset, _total = survey.parse_scene_table()
+        self.assertEqual(len(unset), 11, "the 11 SCENE_UNSET rows must be matched and bucketed")
+
+    def test_the_table_header_agrees_with_the_parse(self) -> None:
+        """The generator writes `102/113` into the file; the parse must reproduce those numbers."""
+        text = survey.SCENE_NAMES_INC.read_text()
+        header = re.search(r"(\d+)/(\d+) scenes mapped", text)
+        self.assertIsNotNone(header)
+        mapped, unset, total = survey.parse_scene_table()
+        self.assertEqual(int(header.group(1)), len(mapped))
+        self.assertEqual(int(header.group(2)), total)
+
     def test_ids_are_unique_and_in_range(self) -> None:
         mapped, _unset, _total = survey.parse_scene_table()
         self.assertEqual(len(mapped), len(set(mapped)))
