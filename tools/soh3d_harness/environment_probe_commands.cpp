@@ -18,10 +18,21 @@ bool HandleZelda3dLight() {
     float ambient[3] = {};
     float light1[3] = {};
     float light2[3] = {};
-    SohState_Zelda3DLive(ambient, light1, light2);
-    std::printf("ok soh_z3dlive ambient=(%.3f,%.3f,%.3f) "
-                "light1Col=(%.3f,%.3f,%.3f) light2Col=(%.3f,%.3f,%.3f)\n",
-                ambient[0], ambient[1], ambient[2], light1[0], light1[1], light1[2], light2[0], light2[1], light2[2]);
+    float n64Ambient[3] = {};
+    const int live = SohState_Zelda3DLive(ambient, light1, light2, n64Ambient);
+    if (!live) {
+        HarnessRepl::PrintErr("soh_z3dlive: no live environment (still in a menu?)");
+        return true;
+    }
+    // `ambient` is the SUBMITTED scene ambient (what Zelda3D_GL_SetLightParams received, and at the
+    // title the 3DS title-palette blend). `worldAmbColor` is gZelda3dWorldAmbColor, which the shader
+    // also reads but which is only written when gZelda3dWorldAmbOverride is 0 -- it defaults to 1, so
+    // it normally sits at its init (0,0,1). Both are printed and labelled because each has been
+    // mistaken for the other.
+    std::printf("ok soh_z3dlive submittedAmbient=(%.3f,%.3f,%.3f) light1=(%.3f,%.3f,%.3f) "
+                "light2=(%.3f,%.3f,%.3f) worldAmbColorOverrideGated=(%.3f,%.3f,%.3f)\n",
+                ambient[0], ambient[1], ambient[2], light1[0], light1[1], light1[2], light2[0], light2[1],
+                light2[2], n64Ambient[0], n64Ambient[1], n64Ambient[2]);
     return true;
 }
 

@@ -386,6 +386,38 @@ fixed in `80c95d21` is *discarded* for vertex-lit draws, because the lit branch 
 wholesale — consistent with the native path, and why that fix's measured effect is confined to
 non-vertex-lit scene geometry and the title fire-glow.
 
+**The title ambient compared host-vs-oracle, camera-independently — and the apparent hue bug is
+refuted.** Since the title image comparison is dominated by the demo camera, I compared the one
+lighting term that does not depend on the camera. It is worth comparing: per
+`spot00_field_lighting_ground_truth.md` the terrain class has `matDiffuse = BLACK`, which makes every
+directional term a provable no-op and leaves
+`colour = saturate(2.0 * texel * bakedVertexColor * sceneAmbient/255)` as the whole result — so for
+OoT3D's largest vertex-lit material class the ambient *is* the lighting.
+
+At title cs=1093 the host **submits ambient (96,99,68)**, and the 3DS title palette in
+`/scene/spot99_info.zsi` (the 4×28-byte entries before `" BDQ"`, ambient at `+0x0A`) reproduces that
+exactly as slot 3→0 at w=0.875. The oracle's live `amb0` at daytime `0x2d95` is (48,66,111), which the
+same four slots reproduce as slot 3→0 at w≈0.125. **Both engines sample one authored ramp at different
+points of the dayTime cycle** — they run different title demos, so that is expected and is not a
+colour divergence. `tools/test_title_ambient_parity.py` (9 cases, mutation-verified) locks it.
+
+**Three of my own instruments lied on the way, and all three produced a convincing false bug.** They
+are recorded because each would otherwise be repeated:
+
+* `gZelda3dWorldAmbColor` is what the shader reads for ambient, but it is only written when
+  `gZelda3dWorldAmbOverride` is 0 and that **defaults to 1** — so it sits at its init `(0,0,1)` forever.
+  A probe reading it reports a pure-blue ambient the renderer never used. I "fixed" the probe to read
+  it and briefly believed a blue-vs-grey bug; the submitted value is `gZelda3dAmbient`, which
+  `Zelda3D_GL_SetLightParams` writes. `soh_z3dlive` now reports both, labelled.
+* The host title cutscene clock does **not** advance under a bare `run N` — `soh_titlecs` reads
+  `frame=0` for an entire session — so the 3DS palette is never submitted and the host reports
+  whatever was left over. Driving the title with `advance_host_title` (as the parity tool does) is
+  required, or the probe manufactures a divergence.
+* My first blend matcher scanned only the first 512 daytimes of each schedule span. Slot 3→0 reaches
+  its interesting weights around daytime `0x3d46`, some 4,762 past the span start, so the scan missed
+  it and reported "not from the palette" — the opposite of the truth. It now solves for the weight
+  analytically and then checks all three channels, and a bounded scan is mutation-verified to fail.
+
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
 uncaptured runtime register, but `tev_corpus_survey.prevbuf_before_latch` walks each chain in stage
