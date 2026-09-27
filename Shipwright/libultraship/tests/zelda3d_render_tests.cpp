@@ -337,6 +337,34 @@ TEST(UnifiedShader, DeclaredSamplerCountMatchesGeneratedBindings) {
 
 // The two-sampler variants are the ones that were under-declared (they were told 1). Pin them
 // explicitly so a future edit to the feature table cannot quietly drop them back.
+// A dual-texture variant does NOT evaluate the combiner at all: the generated fragment stage
+// supersedes the N64-shaped uCombA program with the three byte-classified PICA dual-texture shapes
+// (kDualTexAddMult / kDualTexAddThenModulatePrimary / kDualTexModulateThenScale) selected by
+// uSheen.y. So whatever the host packs into uCombA is DEAD for those variants. This is the check
+// that keeps a host-side placeholder from being mistaken for the mechanism a dual-texture draw
+// actually uses.
+TEST(UnifiedShader, DualTextureVariantsUseClassifiedShapesNotTheCombMuxProgram) {
+    const std::string dualTex = Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kDualTex, 0);
+    const std::string singleTex = Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kSingleTex, 0);
+
+    const auto mainBody = [](const std::string& source) {
+        const std::size_t at = source.find("void main()");
+        EXPECT_NE(at, std::string::npos);
+        return source.substr(at);
+    };
+
+    // The three shapes, keyed on the classified mode the host packs into uSheen.y.
+    EXPECT_NE(dualTex.find("ubo.uSheen.y > 2.5"), std::string::npos) << "kDualTex lost the scale2 shape";
+    EXPECT_NE(dualTex.find("ubo.uSheen.y > 1.5"), std::string::npos) << "kDualTex lost the add-then-modulate shape";
+    EXPECT_NE(dualTex.find("clamp(t0.rgb + t1, 0.0, 1.0) * t0.rgb"), std::string::npos)
+        << "kDualTex lost the ADD_MULT shape";
+
+    EXPECT_EQ(mainBody(dualTex).find("evalCycle("), std::string::npos)
+        << "kDualTex reached the uCombA program, so the host's uCombA is not dead for it";
+    EXPECT_NE(mainBody(singleTex).find("evalCycle("), std::string::npos)
+        << "kSingleTex stopped evaluating its combiner";
+}
+
 TEST(UnifiedShader, DualTextureVariantsDeclareTwoSamplers) {
     EXPECT_EQ(Fast::Unified::VariantSamplerCount(Fast::Unified::Variant::kDualTex), 2u);
     EXPECT_EQ(Fast::Unified::VariantSamplerCount(Fast::Unified::Variant::kDualTexFog), 2u);

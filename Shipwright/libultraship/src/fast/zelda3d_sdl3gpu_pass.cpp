@@ -928,8 +928,15 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             Zelda3DUnified::UnifiedDrawUbo uu{};
             memcpy(uu.common.uMvp, base.uMP, sizeof(uu.common.uMvp));
             memcpy(uu.common.uMv, base.uMV, sizeof(uu.common.uMv));
-            // Cycle 0 = texel0 * vColor0 (matches the old fixed shader's `t.rgb * vColor.rgb`); no
-            // real per-material TEV data exists on the CMB side yet to derive a richer mux from.
+            // Cycle 0 = texel0 * vColor0, i.e. one MODULATE(PRIMARY, TEXEL0) — the shape the
+            // kUntextured/kSingleTex/kSingleTexAlphaTest/kGrayscale materials carry.
+            //
+            // This program is DEAD for kDualTex, kDualTexFog and kGenericTev: their generated
+            // fragment main() never calls evalCycle, taking the @if(o_cmbDualTex) branch (the three
+            // byte-classified PICA dual-texture shapes, selected by uSheen.y) or @if(o_genericTev)
+            // (real per-stage tevRun over tevStagePack) instead. Do not read a colour difference on
+            // one of those variants as this table's fault.
+            // Locked by UnifiedShader.DualTextureVariantsUseClassifiedShapesNotTheCombMuxProgram.
             static const int32_t kCombA[16] = {
                 /* cyc0 rgb */ 8 /*TEXEL0*/,
                 0 /*0*/,

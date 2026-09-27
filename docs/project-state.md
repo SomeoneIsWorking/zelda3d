@@ -63,13 +63,14 @@ the same feature table the GLSL comes from and locked against the generated sour
 
 What that first comparison establishes and does not: the wordmark composition — lockup, sub-lockup,
 shield, sword, credit line — is present at the oracle's scale and placement, so the 3DS-authored
-content is composed correctly (lockup width ~445px host vs ~415px oracle of 800). The glow hue is white
-where the oracle's is orange. Part of that is the **known placeholder combiner** on the unified path
-(`kCombA` = cycle-0 `TEXEL0 * vColor0`), and the exact-cursor draw list bounds it to one draw —
-`draw 99 model=2016 dual=1 tev=0`, the `g_title` quad — while model 2015's 22 groups (shield, sword,
-credit line) already run real per-stage TEV. The sword's white flame and the missing orange around the
-`Z` belong to 2015 and are a **separate, unattributed** delta, so `render.multi-stage-tev` is one
-narrow binding constraint here rather than the whole story. Note also that the tool's `content` metric
+content is composed correctly (lockup width ~445px host vs ~415px oracle of 800). The glow hue is white where the oracle's
+is orange, and it is **unattributed**: it was first blamed on the unified path's placeholder combiner,
+but a generated-source test refutes that — `kDualTex`/`kDualTexFog` never call `evalCycle`, they take
+a branch implementing the three byte-classified PICA dual-texture shapes on `uSheen.y`, so the
+wordmark is on the same proven shape mechanism as the native path. Every 3DS draw on this frame is
+therefore accounted for on a proven mechanism, which puts the delta in a stage shared by all of them;
+the PICA distance fog the unified path documents as not applied, and the dawn-layer stack, are the
+candidates and neither is claimed. Note also that the tool's `content` metric
 moved 0.4784 → 0.4846 between two identical invocations, so it is a coarse signal and must not be
 used as a tight gate.
 The framing does not match — the host is close to the rider and the oracle's is wide — but that is
