@@ -106,12 +106,27 @@ int ResolveObjectModel(int objectId) {
         return -1;
     }
 
-    const std::string path = std::string("/actors/zelda2_") + name + ".gar.lzs";
+    // MM3D keeps its MM-only actor models under /actors/zelda2_<name>.gar.lzs, but actors it SHARES
+    // with OoT3D keep OoT3D's archive name and live at /actors/zelda_<name>.gar.lzs -- 72 of the 460
+    // archives in the MM3D ROM use that prefix. Probing only zelda2_ therefore left 60 object-table
+    // ids with no MM3D model at all, silently falling back to the N64 actor: measured against the
+    // ROM, 324 of 460 object-table names resolve under zelda2_ and 60 more under zelda_.
+    //
+    // The shared prefix is tried SECOND, so the five names that exist under BOTH prefixes
+    // (gi_ocarina, mag, mir_ray, ny, sb) keep resolving to their zelda2_ archive exactly as before.
+    // Only a miss on the MM prefix consults the shared one, so this cannot change any id that already
+    // resolved.
     bool skinned = false;
     std::size_t boneCount = 0;
+    std::string path = std::string("/actors/zelda2_") + name + ".gar.lzs";
     if (!ProbeModel(path, "", skinned, boneCount)) {
-        g_objectToModel[objectId] = -1;
-        return -1;
+        path = std::string("/actors/zelda_") + name + ".gar.lzs";
+        skinned = false;
+        boneCount = 0;
+        if (!ProbeModel(path, "", skinned, boneCount)) {
+            g_objectToModel[objectId] = -1;
+            return -1;
+        }
     }
 
     if (skinned) {
@@ -137,8 +152,11 @@ int ResolveObjectModel(int objectId) {
     g_models.push_back({ path, initialScale, skinned, "" });
     g_objectToModel[objectId] = modelId;
     g_objectName[objectId] = name;
-    fprintf(stderr, "[MM3D] mapped obj=0x%03X (%s) -> modelId=%d (%s, %zu bones) scale=%.4f\n", objectId, name, modelId,
-            skinned ? "skinned" : "rigid", boneCount, initialScale);
+    // The archive path is named explicitly because it is no longer implied by the object name: an id
+    // resolved under the shared zelda_ prefix is a different archive from the same-named zelda2_ one,
+    // and without the path a log line cannot tell the two apart.
+    fprintf(stderr, "[MM3D] mapped obj=0x%03X (%s) -> modelId=%d [%s] (%s, %zu bones) scale=%.4f\n", objectId, name,
+            modelId, path.c_str(), skinned ? "skinned" : "rigid", boneCount, initialScale);
     return modelId;
 }
 

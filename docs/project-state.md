@@ -455,6 +455,40 @@ lives in a pure `classify_scene_files()` that the tests call directly; both muta
 `transcribe instead of parse` shape is the same failure mode as the LA4 format constant that was
 "supported" on paper while `PicaDecode` returned empty.
 
+**A real Majora's Mask coverage bug: 60 actor models were never found.** MM3D is not uniform in how it
+names actor archives. Actors that are MM-only live at `/actors/zelda2_<name>.gar.lzs` (387 of the ROM's
+460 archives); actors MM3D **shares with OoT3D keep OoT3D's archive name** and live at
+`/actors/zelda_<name>.gar.lzs` (72 archives). `ResolveObjectModel` probed only the `zelda2_` prefix, so
+every shared actor missed and silently fell back to the N64 model. Measured against the MM3D ROM:
+
+| | object-table names resolved |
+|---|---|
+| `/actors/zelda2_<name>` only (before) | **324 of 460** |
+| with the shared-prefix fallback | **384 of 460** (+60) |
+
+The shared prefix is tried **second**, so the five names present under *both* prefixes
+(`gi_ocarina`, `mag`, `mir_ray`, `ny`, `sb`) keep resolving to their `zelda2_` archive — no id that
+already resolved changes which archive it gets. The mapping log now prints the archive path, because a
+short name no longer identifies the archive.
+
+The remaining **76** names have no archive under either prefix and still fall back to the N64 actor.
+That is left deliberately unresolved, and the reason is recorded in
+`2ship/2s2h/zelda3d/mm3d_object_names.inc`: six of them are *near-misses* of real stems
+(`geldb`~`gelb`, `gi_rupy`~`gi_ruppy`, `gi_shield_2`/`gi_shield_3`~`gi_shield_02`,
+`gi_golonmask`~`gi_goronmask`, `gi_bottle_22`~`gi_bottle_21`). Fuzzy-matching those would attach an
+object to the **wrong archive**, which is worse than falling back to the N64 model. The other 70 are
+simply absent from the MM3D ROM.
+
+`tools/test_mm_actor_prefix_fallback.py` (10 cases) pins the ordering against the **shipping source**
+rather than a paraphrase, that the fallback only adds ids and never drops one, that the five ambiguous
+names keep their MM archive, and that the near-misses resolve to nothing. Mutation-verified: probing
+the shared prefix first fails 1 case and errors 1. Both MM builds compile and both MM tests pass
+(`mm_gfx_print_test`, `mm3d_player_animation_policy_test`).
+
+Worth noting how this was found: it is the same shape as the LA4 defect — a value that exists and is
+reachable, behind a name the host does not construct. Neither was visible from the code, only from
+enumerating the ROM and comparing it against the table the game indexes.
+
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
 uncaptured runtime register, but `tev_corpus_survey.prevbuf_before_latch` walks each chain in stage
