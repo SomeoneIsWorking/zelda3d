@@ -98,6 +98,36 @@ def _is_ok_terminal(command: str, line: str) -> bool:
     return line == f"ok {name}" or line.startswith(f"ok {name} ")
 
 
+LOG_TAIL_BYTES = 256 * 1024
+
+
+def _log_diagnosis() -> str:
+    """Describe why the harness process died, from its own stderr log.
+
+    A closed stdout pipe is only the symptom. The harness logs a fatal-signal
+    backtrace when it crashes, and that backtrace names the frame in the game that
+    died. Reporting a bare "closed stdout unexpectedly" hides a reproducible
+    product crash behind a transport message, so the log is the authority here.
+    Only the tail is read: these logs run to thousands of lines.
+    """
+    path = os.environ.get("HARNESS_STDERR")
+    if not path or not os.path.isfile(path):
+        return ""
+    try:
+        with open(path, "rb") as stream:
+            stream.seek(0, os.SEEK_END)
+            stream.seek(max(0, stream.tell() - LOG_TAIL_BYTES))
+            tail = stream.read().decode("utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+    for index, line in enumerate(tail):
+        if "FATAL signal" not in line:
+            continue
+        frames = [entry.strip() for entry in tail[index + 1 : index + 6] if entry.strip()]
+        return f"harness logged a fatal signal; log {path}; top frames: " + " | ".join(frames)
+    return f"harness stderr log carries no fatal-signal marker; see {path}"
+
+
 def _read_streaming_response(
     read_line: ReadLine,
     command: str,
@@ -177,7 +207,9 @@ class Harness:
                 return None
             chunk = os.read(fd, 8192)
             if not chunk:
-                raise RuntimeError("harness closed stdout unexpectedly")
+                diagnosis = _log_diagnosis()
+                raise RuntimeError("harness closed stdout unexpectedly"
+                                   + (f"; {diagnosis}" if diagnosis else ""))
             self._buf += chunk
         line, self._buf = self._buf.split(b"\n", 1)
         return line.decode("utf-8", errors="replace")

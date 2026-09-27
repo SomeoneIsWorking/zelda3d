@@ -47,7 +47,12 @@ Reached materials preserve multi-stage combiners, multiple texture coordinates a
 fragment lighting, alpha behavior, and scene-authored fog through the native renderer.
 
 Gap: the renderer campaign and current codemap still identify wider material, fragment-lighting, actor,
-and effect families whose parity is partial. Coordinator mapping methods are now recovered from the retail shader
+and effect families whose parity is partial. The title-scoped oracle half of the host-vs-oracle
+comparison now works, but the **host** half faults on the title wordmark's unified pipeline under the
+software Vulkan driver this host falls back to, so no host title image exists to compare against (see
+[issue #25](issues/0025-title-wordmark-unified-pipeline-crash.md)). That crash gates closure of the
+`cmb-unlit-primary`, `cmb-lit-primary-alpha` and `cmb-fragment-lighting` families, whose remaining gap
+is exactly "ported and close-tested on retail data, no oracle comparison made". Coordinator mapping methods are now recovered from the retail shader
 (`oot3d-decomp/docs/cmb_texcoord_mapping.md`, frontier `render.cmb-texcoord-mapping`): the shader's
 entry point calls one of two mutually exclusive bodies, and only one of them contains the
 texture-coordinator mapping switch. A real oracle capture closed the obvious follow-up by refuting
