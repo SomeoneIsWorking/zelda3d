@@ -109,7 +109,16 @@ replays the whole vertex float-uniform array out of a cached command list, so `u
 every title draw) and the missing `TexMtx` third row (`(0,0,1,0)`) are measured rather than assumed.
 What remains is confirming `uInvView`'s relationship to the view matrix on a draw whose model-view
 rows are not identity, coordinator 1's per-vertex component step, and one gameplay-only measurement
-for every method-4 material.
+for every method-4 material. `tools/cmb_shader_uniform_coverage.py` now states what the cached corpus
+can and cannot settle: it walks every cached command list and reports which CmbVShader uniform blocks
+each one wrote, and it finds exactly **one** layout-identified capture (the title wordmark). Two
+consequences were corrections rather than confirmations — a written index is not a readable one
+because **float-uniform indices are per-material** (a gameplay `c92` reads 1065353216.0 where the
+title's reads 3.0, so the same index carries different quantities for different materials), and block
+presence is not answerability (the one identified capture has an *identity* model-view, which is
+exactly the case question (1) excludes). Items (1), (2) and (4) therefore share one capture
+requirement: a gameplay capture recording the material identity and spanning c4..c7, c76..c78, c89
+and c92..c95.
 
 ### S004 — OoT3D behavior coverage
 
