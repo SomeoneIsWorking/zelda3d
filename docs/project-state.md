@@ -110,30 +110,38 @@ every title draw) and the missing `TexMtx` third row (`(0,0,1,0)`) are measured 
 **The two games are not equally placed, and the measurement says which side to work.**
 `tools/cmb_fragment_lighting_survey.py --game oot|mm` measures both retail corpora with identical
 definitions: **OoT3D has 197 of 11,172 materials (1.8%) consuming an enabled PICA `FRAGMENT_PRIMARY`;
-MM3D has 2,283 of 2,968 (76.9%)**, plus 503 vs 69 for `FRAGMENT_SECONDARY`. The host maps those to the
+MM3D has 5,993 of 6,791 (88.2%)**, plus 691 vs 69 for `FRAGMENT_SECONDARY`. The host maps those to the
 vertex-lit primary and to black, so this is a rounding error on OoT3D and the **dominant lighting
 mechanism of MM3D being essentially unimplemented** — which contradicts any reading of S003/S005 as
-symmetric. **But the two populations are not the same shape, and the tool prints that on every run:**
-OoT3D reaches 1,387 archive members plus 610 inline `.zsi` scene CMBs, while MM3D's iterator reaches
-1,448 actor members and **zero scene files** (MM3D ships no `.zsi` equivalent under `/actors/`). So
-76.9% is an **actor-material** figure and MM3D's scene/environment materials are unmeasured — extending
-`iter_mm3d_cmbs` to MM3D's scene container is a named gap, and the same limit applies to the other
-"MM3D's corpus" figures in the frontier. It is also cheap to fix and rankable: **1,069 MM3D materials (36% of the corpus) use only
-`MODULATE[C(FRAG_PRIMARY),C(TEX0)]`-family chains**, so one correct `FRAG_PRIMARY` is worth more on the
-MM side than every other open graphics row combined. The OoT3D figures reconcile exactly with the
-existing row (202 consumers, `source_without_flag=5`, 202−5=197). Whether the OoT3D-recovered `+0` flag and `+0xA0..+0xB3`
-colour block are even valid for MM3D was tested with a control against each argument, and they disagree:
-the "authored colours are spiky" argument is **refuted by its own control** (the material record is mostly
-constant, so other offsets hold a median of only 4–8 distinct values, and MM3D's `specular0` is more varied
-than that), while the descriptor probe-word argument is **validated by its control** — the u32 `0x62C884C0` at material
-`+0xDC` is the most common word at exactly one of 84 sampled offsets in both games (a composite
-of two typed fields, not a named enum). So the `+0xCC` descriptor layout is
-strongly corroborated and the colour block plausible by adjacency, but neither is the binary read, and
-confirming them in `mm3d-decomp` is the named next RE step. The tool prints both verdicts on every run so
-the disagreement stays visible. Getting there also required
-fixing MM3D's silent-zero class in this very tool (the material chunk pointer at `0x28` is `qtrs` for
-version ≥ 7, so the entire MM3D survey had been returning nothing), now routed through the single
-layout owner and pinned by a test verified to fail on the old read.
+symmetric. It is also cheap to fix and rankable: **MM3D's single most common chain covers 2,978
+materials (44% of its corpus) and the top five cover 3,692 (54%)**. The OoT3D figures reconcile exactly
+with the existing row (202 consumers, `source_without_flag=5`, 202−5=197).
+
+**The first MM3D number was an undercount caused by the iterator, not a property of the game, and
+every "MM3D's corpus" figure recorded before this is understated the same way.** `cmb_corpus` claimed
+MM3D "ships no `.zsi`-equivalent in `/actors/`" and concluded its population was actor archives only.
+The qualifier was true and the conclusion was not: MM3D ships **424** `.zsi` files under `/scenes/`,
+241 carrying a valid inline CMB (183 do not, exactly as 114 of OoT3D's 724 do not, so the extraction is
+consistent rather than lossy). `iter_mm3d_cmbs` now also walks `/scenes/*.gar` and the inline scene
+CMBs, both games share one `_iter_zsi_inline_cmbs`, and the populations are the same shape
+(OoT3D 1,387 archive + 610 scene; MM3D 1,463 archive + 241 scene). That raised MM3D from
+2,283/2,968 (76.9%) to 5,993/6,791 (88.2%). The surveys print their `corpus:` composition on every
+run and derive the note from what was walked, never asserting it per game — a hardcoded per-game note
+is precisely what went stale.
+
+Whether the OoT3D-recovered `+0` flag and `+0xA0..+0xB3` colour block are even valid for MM3D was
+tested with a control against each argument, and they disagree: the "authored colours are spiky"
+argument is **refuted by its own control** (the material record is mostly constant, so other offsets
+hold a median of only 4–8 distinct values, and MM3D's `specular0` is more varied than that), while the
+descriptor probe-word argument is **validated by its control** — the u32 `0x62C884C0` at material
+`+0xDC` is the most common word at exactly one of 84 sampled offsets in both games (a composite of two
+typed fields, not a named enum). So the `+0xCC` descriptor layout is strongly corroborated and the
+colour block plausible by adjacency, but neither is the binary read, and confirming them in
+`mm3d-decomp` is the named next RE step. The tool prints both verdicts on every run so the
+disagreement stays visible. Getting to MM3D at all also required fixing MM3D's silent-zero class in the
+tool itself (the material chunk pointer at `0x28` is `qtrs` for version ≥ 7, so the entire MM3D survey
+had been returning nothing), now routed through the single layout owner and pinned by a test verified
+to fail on the old read.
 
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an

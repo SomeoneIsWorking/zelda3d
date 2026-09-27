@@ -403,12 +403,16 @@ def main(arguments: list[str] | None = None) -> int:
             "  verdict: NOT distinctive -- the word is common at several offsets, so this proves"
             " nothing"
         )
+    # Derived from what was actually walked, never asserted per game: a hardcoded "this game has no
+    # scene materials" note is exactly the kind of claim that goes stale and then misleads.
+    scene_files = corpus_kinds.get("zsi-scene", 0)
     print(
         f"corpus: {dict(corpus_kinds)}"
         + (
-            "  <- ACTOR MATERIALS ONLY; MM3D scene/environment materials are NOT in this population"
-            if args.game == "mm"
-            else "  (actors + inline scene CMBs)"
+            f"  ({scene_files} of {files} are inline scene CMBs)"
+            if scene_files
+            else "  <- ARCHIVE MEMBERS ONLY; this game's scene/environment materials are NOT in"
+            " this population, so every percentage here is an actor-material figure"
         )
     )
     print(
