@@ -35,7 +35,7 @@ import sys
 from collections import Counter, defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from cmb_corpus import iter_oot_cmbs  # noqa: E402
+from cmb_corpus import iter_corpus  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -60,6 +60,10 @@ OPS = {
     0x6401: "MULT_ADD",
     0x6402: "ADD_MULT",
 }
+# Combiner-buffer selectors, named because prevbuf_before_latch() reasons about them per channel.
+PREVIOUS = 0x8578        # buf_rgb/buf_a: latch this stage's output into the combiner buffer
+PREVIOUS_BUFFER = 0x8579  # a SOURCE selector: read the combiner buffer
+
 SRCS = {
     0x8577: "PRIMARY",
     0x8578: "PREVIOUS",
@@ -96,6 +100,40 @@ def src_name(v):
 
 def mod_name(v):
     return MODS.get(v, f"mod{v:04x}")
+
+
+def prevbuf_before_latch(stages):
+    """Return the PREVBUF reads that happen BEFORE this chain ever latches the combiner buffer.
+
+    This is the question the PREVIOUS_BUFFER gap actually turns on, and the corpus counts of
+    "materials latching" and "materials reading" cannot answer it: a material can do both and still
+    read the buffer before any latch.
+
+    PICA's `tev_combiner_buffer_color` is a runtime register the host does not carry, so the evaluator
+    substitutes vec4(0). That substitution is EXACT for every read that a latch has already written,
+    and wrong only for a read that reaches the un-latched register. Walking the chain in stage order
+    and tracking whether a latch has happened turns "an approximation" into a measured count with a
+    denominator.
+
+    Latching is per channel: `buf_rgb` writes the RGB buffer and `buf_a` the alpha buffer, so an RGB
+    read is only safe once a stage set buf_rgb == 0x8578 (PREVIOUS). Each channel is tracked
+    separately and a stage that reads PREVBUF is judged against its own channel.
+    """
+    latched_rgb = False
+    latched_a = False
+    unsafe = []
+    for index, stage in enumerate(stages):
+        reads_rgb = PREVIOUS_BUFFER in stage.rgb_src[: slots_used(stage.rgb_op)]
+        reads_a = PREVIOUS_BUFFER in stage.a_src[: slots_used(stage.a_op)]
+        if reads_rgb and not latched_rgb:
+            unsafe.append((index, "rgb"))
+        if reads_a and not latched_a:
+            unsafe.append((index, "a"))
+        if stage.buf_rgb == PREVIOUS:
+            latched_rgb = True
+        if stage.buf_a == PREVIOUS:
+            latched_a = True
+    return unsafe
 
 
 def slots_used(op):
@@ -217,8 +255,13 @@ def parse_mats(b):
 
 def main():
     filt = None
-    if len(sys.argv) > 2 and sys.argv[1] == "--file":
-        filt = sys.argv[2]
+    game = "oot"
+    argv = sys.argv[1:]
+    if len(argv) >= 2 and argv[0] == "--game":
+        game = argv[1]
+        argv = argv[2:]
+    if len(argv) >= 2 and argv[0] == "--file":
+        filt = argv[1]
 
     n_files = 0
     n_mats = 0
@@ -238,12 +281,20 @@ def main():
     # decides to ignore is exactly the field the survey has to keep counting.
     buf_latch = Counter()   # per-stage buffer-input selector values
     buf_readers = Counter() # materials whose chain SOURCES PREVBUF
+    # The count that decides the PREVIOUS_BUFFER approximation: reads that reach the un-latched
+    # runtime register, where the host's vec4(0) substitution is wrong. Tracked per channel because
+    # latching is per channel.
+    prevbuf_unsafe_materials = 0
+    prevbuf_safe_materials = 0
+    prevbuf_unsafe_examples = []
 
     op_domain = set(OPS)
     src_domain = set(SRCS)
     mod_domain = set(MODS)
 
-    for label, cmb in iter_oot_cmbs():
+    print(f"== corpus: {game} ==")
+
+    for label, cmb in iter_corpus(game)():
         if filt and filt not in label:
             continue
         try:
@@ -288,8 +339,8 @@ def main():
                 buf_latch[f"a={st.buf_a:04x}"] += 1
                 if st.buf_rgb == 0x8578 or st.buf_a == 0x8578:
                     buf_readers[f"LATCHES at stage{si}: {label} mat{mi}"] += 1
-                if 0x8579 in st.rgb_src[:slots_used(st.rgb_op)] or \
-                   0x8579 in st.a_src[:slots_used(st.a_op)]:
+                if PREVIOUS_BUFFER in st.rgb_src[:slots_used(st.rgb_op)] or \
+                   PREVIOUS_BUFFER in st.a_src[:slots_used(st.a_op)]:
                     buf_readers[f"READS PREVBUF at stage{si}: {label} mat{mi}"] += 1
                 for k in range(slots_used(st.rgb_op)):
                     if 0x84C0 <= st.rgb_src[k] <= 0x84C3:
@@ -297,6 +348,17 @@ def main():
                 for k in range(slots_used(st.a_op)):
                     if 0x84C0 <= st.a_src[k] <= 0x84C3:
                         texs_consumed.add(st.a_src[k] - 0x84C0)
+            unsafe = prevbuf_before_latch(stages)
+            if unsafe:
+                prevbuf_unsafe_materials += 1
+                prevbuf_unsafe_examples.append(
+                    f"{label} mat{mi}: reads PREVBUF at " +
+                    ", ".join(f"stage{si} ({channel})" for si, channel in unsafe)
+                )
+            elif PREVIOUS_BUFFER in [
+                s for st in stages for s in st.rgb_src + st.a_src
+            ]:
+                prevbuf_safe_materials += 1
             for t in sorted(texs_consumed):
                 tex_use[f"tex{t} consumed (declared={tex[t] >= 0 if t < 3 else '?'})"] += 1
                 if t < 3:
@@ -329,6 +391,20 @@ def main():
     rd = [k for k in buf_readers if k.startswith("READS")]
     print(f"  materials latching the buffer: {len(lat)}")
     print(f"  materials reading PREVBUF:     {len(rd)}")
+    print(
+        f"  of those reads, SAFE (a latch already wrote the channel): {prevbuf_safe_materials}"
+    )
+    print(
+        f"  of those reads, UNSAFE (reaches the un-latched runtime register): "
+        f"{prevbuf_unsafe_materials}"
+    )
+    for example in sorted(prevbuf_unsafe_examples)[:12]:
+        print(f"    UNSAFE {example}")
+    if not prevbuf_unsafe_materials:
+        print(
+            "    -> the evaluator's vec4(0) for the combiner buffer is EXACT for every PREVBUF read"
+            " in this corpus"
+        )
     for k in sorted(lat)[:12]:
         print(f"    {k}")
     for k in sorted(rd)[:12]:

@@ -107,6 +107,18 @@ no `w`, so the question that seemed to need a PICA register measurement is not o
 at all. The shader's uniform inputs are now readable offline too: `tools/pica_shader_uniforms.py`
 replays the whole vertex float-uniform array out of a cached command list, so `uInvView` (identity on
 every title draw) and the missing `TexMtx` third row (`(0,0,1,0)`) are measured rather than assumed.
+One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
+`PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
+uncaptured runtime register, but `tev_corpus_survey.prevbuf_before_latch` walks each chain in stage
+order tracking the latch per channel and counts only the reads that reach the un-latched register —
+**OoT3D 14/14 safe, MM3D 7/7 safe, zero unsafe in either**, so the `vec4(0)` substitution is exact for
+every `PREVBUF` read in both retail corpora. Tracking per channel is what makes that true: a chain-wide
+"does this material ever latch?" check is wrong, because a stage latches its own output and cannot read
+what it has not written. The survey gained `--game oot|mm` so both games are measured by one walk, and
+`TEXTURE3`'s remaining fallback is now grounded at **1 consumed OoT3D material and 0 MM3D**. What
+remains of the approximation list is fragment-lighting's `FRAGMENT_PRIMARY`/`FRAGMENT_SECONDARY` and
+ProjectionMap.
+
 What remains is confirming `uInvView`'s relationship to the view matrix on a draw whose model-view
 rows are not identity, coordinator 1's per-vertex component step, and one gameplay-only measurement
 for every method-4 material. `tools/cmb_shader_uniform_coverage.py` now states what the cached corpus
