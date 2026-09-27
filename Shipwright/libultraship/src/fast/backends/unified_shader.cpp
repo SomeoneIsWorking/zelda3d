@@ -245,10 +245,21 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         vColor2 = aColor2;
         vColor3 = aColor3;
         vFog = aFog;
-        // Native CMB per-draw RGB modulation applies to its flat/force-unlit and character-tint
-        // PRIMARY paths, but not to vertexLighting=1 (whose PRIMARY comes from the PICA light
-        // bank). N64 draws are already transformed and use uPrimColor as a combiner source.
-        if (ubo.uParams1.w < 0.5 && ubo.uParams1.x > 0.5 && ubo.uParams0.y < 1.5) {
+        // Native CMB per-draw RGB modulation, mirroring the native path's UNCONDITIONAL
+        // `vec3 shade = ubo.uTintSkin.xyz` flat modulator. Two exclusions, and only two:
+        //   - alreadyTransformed (uParams1.w): an N64 draw uses uPrimColor as a combiner source,
+        //     not as a modulation, so it must not be multiplied.
+        //   - lightingMode 2 (uParams0.y): vertexLighting=1 takes PRIMARY from the PICA light
+        //     bank, which the modulation would double-apply.
+        // The `lit` term is deliberately NOT a condition. `lit` means "apply the character/prop
+        // lighting term", which is a different question from "apply this draw's RGB modulation",
+        // and ZELDA3D_HANDLE_FORCE_UNLIT suppresses the first without touching the second. Gating
+        // on `lit` silently dropped the modulation for every lit=0 CMB draw: scene geometry
+        // (Zelda3D_SceneTint hands it a real ambient-tinted value) and the title fire-glow (the
+        // orange ConstColor from g_title_fire.cmab). The fire-glow is additively blended, so an
+        // untinted white texture saturated all three channels where the oracle's amber kept blue
+        // at 58% of red -- measured, not inferred.
+        if (ubo.uParams1.w < 0.5 && ubo.uParams0.y < 1.5) {
             vColor0.rgb *= ubo.uPrimColor.rgb;
         }
         // The title wordmark is deliberately submitted force-unlit so world lighting cannot

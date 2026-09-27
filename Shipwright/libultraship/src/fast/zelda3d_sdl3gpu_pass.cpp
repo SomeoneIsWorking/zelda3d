@@ -956,7 +956,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                 0,
             };
             memcpy(uu.common.uCombA, kCombA, sizeof(uu.common.uCombA));
-            Zelda3DUnified::PackCmbDrawModulation(uu.common, r8, g8, b8, a8, lit != 0);
+            Zelda3DUnified::PackCmbDrawModulation(uu.common, r8, g8, b8, a8);
             uu.common.uEnvColor[0] = uu.common.uEnvColor[1] = uu.common.uEnvColor[2] = uu.common.uEnvColor[3] = 0.0f;
             uu.common.uFogColor[0] = base.uFog[0];
             uu.common.uFogColor[1] = base.uFog[1];
@@ -968,8 +968,8 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             uu.common.uParams0[1] = (float)lightingMode;
             uu.common.uParams0[2] = 1.0f; // cycleCount — CMB never needs the N64 2-cycle shape
             uu.common.uParams0[3] = 0.0f; // frame_count — CMB draws don't use SHADER_NOISE
-            // uParams1.x carries the CMB draw-tint gate installed above; N64 noise scale occupies
-            // the same mutually exclusive field when alreadyTransformed is true.
+            // uParams1.x is the N64 noise scale on the N64 route; CMB draws have frame_count 0 so
+            // SHADER_NOISE never reads it, and PackCmbDrawModulation writes it deterministically.
             uu.common.uParams1[1] = grp.polygonOffset;
             uu.common.uParams1[2] = (boneData && boneCnt > 0) ? 1.0f : 0.0f;
             uu.common.uParams1[3] = 0.0f;

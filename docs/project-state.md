@@ -180,6 +180,42 @@ get real mip selection over chains uploaded with `ci.num_levels`. The C++ side i
 over the enum *space* rather than a list of the values found, so a sixth minification enum cannot
 silently fall through a default. 20 new tests (5 C++, 15 Python), all mutation-verified.
 
+**The title fire-glow's colour, root-caused and fixed.** The wordmark glow was recorded as
+"unattributed — white where the oracle's is orange". It is now attributed, and the cause was a
+**gate on the wrong variable**. The unified render path applied a CMB draw's per-draw RGB modulation
+only when `lit` was set. `lit` means *"apply the character/prop lighting term"*, which is a different
+question from *"apply this draw's RGB modulation"*, and `ZELDA3D_HANDLE_FORCE_UNLIT` clears the
+first while leaving the second intact. The authoritative native path applies the same modulation
+**unconditionally** (`vec3 shade = ubo.uTintSkin.xyz`), so the unified path was the divergent one.
+
+Two things were wrong because of it, and both are user-visible:
+
+* **The fire-glow lost its tint.** The glow is additively blended, so an untinted white texture drove
+  all three channels to saturation. Measured over the brightest tenth of the halo: host
+  **1 : 1.00 : 0.99** with 3809 saturated pixels, oracle **1 : 0.93 : 0.58** with 2571. Absolute
+  brightness cannot see this — a saturated white and a saturated orange have the same luminance —
+  which is why it survived every brightness metric recorded against this frame.
+* **Every scene-geometry draw lost its scene tint.** `Zelda3D_SceneTint` hands geometry a real
+  ambient-tinted value from the environment palette, those draws are `lit=0` too, so the whole world
+  was rendering at full brightness regardless of the scene's light. That is a large part of why the
+  host title reads hazier and brighter than the oracle's.
+
+The gate is now the two conditions that actually mean something — `alreadyTransformed` (an N64 draw
+uses `uPrimColor` as a combiner *source*) and `lightingMode 2` (a vertex-lit PRIMARY comes from the
+PICA light bank) — and `PackCmbDrawModulation` lost its `tintEnabled` parameter rather than keep a
+switch that encoded the wrong policy. After the fix: host **1 : 0.95 : 0.72**, 1837 saturated pixels
+(green matches the oracle's 0.93 almost exactly). The residual blue ratio, 0.72 against 0.58, is
+**not** closed and is not claimed; the tool now prints `glow_b/r` and `glow_sat_px` so the remaining
+step is a number rather than an impression. `glow_metrics` is a first-class metric for exactly this
+reason and is covered by `tools/test_title_glow_metrics.py` (8 cases).
+
+The attribution came from the project's own instrument, not from reading the shader: `log fireglow`
+reports the sampled `g_title_fire.cmab` ConstColor at the exact cursor, and at cs=1093 it reads
+`rgb=(0.8000,0.4300,0.0000)` — correct orange — which placed the fault strictly downstream of the
+draw call. The whole-image `union_rgb_mae` moved 47.80 → 48.14 and is **not** evidence either way:
+that frame's dominant delta is the title-demo camera, since the host runs the N64 demo and the
+oracle the 3DS demo.
+
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
 uncaptured runtime register, but `tev_corpus_survey.prevbuf_before_latch` walks each chain in stage
