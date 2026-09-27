@@ -20,7 +20,7 @@ import sys
 from dataclasses import dataclass
 
 from cmb import Cmb, MODE_ARRAY, MODE_CONSTANT
-from cmb_corpus import iter_cmbs
+from cmb_corpus import iter_oot_cmbs
 from tev_corpus_survey import parse_mats, slots_used
 
 
@@ -98,7 +98,7 @@ def main() -> int:
     scanned = 0
     failed = 0
     try:
-        corpus = iter_cmbs()
+        corpus = iter_oot_cmbs()
         for label, data in corpus:
             scanned += 1
             try:

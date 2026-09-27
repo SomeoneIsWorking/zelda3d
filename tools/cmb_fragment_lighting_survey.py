@@ -18,7 +18,7 @@ import sys
 from collections import Counter
 from dataclasses import dataclass
 
-from cmb_corpus import iter_cmbs
+from cmb_corpus import iter_oot_cmbs
 from tev_corpus_survey import parse_mats, slots_used
 
 FRAGMENT_PRIMARY = 0x6210
@@ -110,7 +110,7 @@ def main(arguments: list[str] | None = None) -> int:
     failures = 0
     records: list[MaterialLighting] = []
     try:
-        for label, data in iter_cmbs():
+        for label, data in iter_oot_cmbs():
             files += 1
             try:
                 parsed = scan_materials(label, data)

@@ -35,7 +35,7 @@ import sys
 from collections import Counter, defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from cmb_corpus import iter_cmbs  # noqa: E402
+from cmb_corpus import iter_oot_cmbs  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -164,14 +164,30 @@ class MaterialRecord:
         return (self.index, self.tex, self.coord_mapping, self.coord_source, self.stages)
 
 
+def material_chunk_pointer(b):
+    """Return the offset of the `mats` chunk, or None when the file is not a CMB.
+
+    Majora's Mask CMBs (version >= 7) insert a `qtrs` chunk pointer at 0x28 right after
+    the skeleton, shifting every later chunk pointer by +4. The shipping parser is the
+    authority for that gate (`Shipwright/cmb3d/asset/cmb.cpp`: `d = version >= 7 ? 4 : 0`).
+    Reading 0x28 unconditionally pointed at MM3D's `qtrs` chunk, so every MM3D material
+    parsed as zero materials instead of erroring.
+    """
+    if b[0:4] != b"cmb ":
+        return None
+    shift = 4 if _u32(b, 0x08) >= 7 else 0
+    p = _u32(b, 0x28 + shift)
+    if p == 0 or b[p : p + 4] != b"mats":
+        return None
+    return p
+
+
 def parse_material_records(b):
     """Yield a :class:`MaterialRecord` per material. The one material-layout walk."""
-    if b[0:4] != b"cmb ":
+    p = material_chunk_pointer(b)
+    if p is None:
         return
     version = _u32(b, 0x08)
-    p = _u32(b, 0x28)
-    if p == 0 or b[p : p + 4] != b"mats":
-        return
     n = _u32(b, p + 8)
     stride = 0x15C if version <= 6 else 0x16C
     comb_base = p + 0x0C + n * stride
@@ -227,7 +243,7 @@ def main():
     src_domain = set(SRCS)
     mod_domain = set(MODS)
 
-    for label, cmb in iter_cmbs():
+    for label, cmb in iter_oot_cmbs():
         if filt and filt not in label:
             continue
         try:

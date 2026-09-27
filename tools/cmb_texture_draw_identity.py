@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass
 
 from cmb import Cmb
-from cmb_corpus import iter_cmbs
+from cmb_corpus import iter_oot_cmbs
 from cmb_fragment_lighting_survey import scan_materials
 from oracle_compare import GLFMT_TO_PICA
 
@@ -60,7 +60,7 @@ def source_textures(
     stable game data rather than a scene-dependent actor address.
     """
     textures: list[SourceTexture] = []
-    for label, data in iter_cmbs():
+    for label, data in iter_oot_cmbs():
         if label != archive_path and not label.startswith(f"{archive_path}:"):
             continue
         records = scan_materials(label, data)

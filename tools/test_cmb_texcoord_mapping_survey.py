@@ -25,7 +25,9 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "tools"))
 
 import cmb_texcoord_mapping_survey as mapping
-from tev_corpus_survey import MaterialRecord, parse_material_records, slots_used
+from cmb_corpus import CORPORA, iter_corpus, iter_mm3d_cmbs, iter_oot_cmbs
+from tev_corpus_survey import (MaterialRecord, material_chunk_pointer, parse_material_records,
+                               slots_used)
 
 COORD_OFFSET = 0x58
 COORD_STRIDE = 0x18
@@ -75,7 +77,22 @@ def _record(**kwargs):
     return MaterialRecord(**defaults)
 
 
+def _mm_cmb(materials):
+    """A Majora's Mask CMB: version 10, with a `qtrs` chunk pointer at 0x28."""
+    payload = bytearray(_cmb(materials))
+    struct.pack_into("<I", payload, 0x08, 10)  # MM3D version
+    struct.pack_into("<I", payload, 0x28, 0x80)  # `qtrs` chunk now occupies 0x28
+    payload[0x80:0x84] = b"qtrs"
+    struct.pack_into("<I", payload, 0x2C, 0x40)  # ...so `mats` moved to 0x2C
+    return bytes(payload)
+
+
 class TexcoordMappingSurveyTests(unittest.TestCase):
+    @staticmethod
+    def _corpus(*items):
+        """A stub for `iter_corpus(game)`: the survey calls the result with no arguments."""
+        return lambda: iter(items)
+
     def test_consumed_units_reads_every_combiner_slot(self) -> None:
         # Pinned because the slot count is op-dependent: a fixture that assumed three
         # sources for MODULATE would have counted two and reported a unit as unused.
@@ -90,10 +107,10 @@ class TexcoordMappingSurveyTests(unittest.TestCase):
             mapping.consumed_units([_Stage([0x8577, 0x8577, 0x8577], op=0x2100)]), set())
 
     def test_only_methods_three_and_four_are_reported(self) -> None:
-        with mock.patch.object(mapping, "iter_cmbs", return_value=iter([("m.cmb", _cmb([
+        with mock.patch.object(mapping, "iter_corpus", return_value=self._corpus(("m.cmb", _cmb([
             {"fragment_lighting": True, "vertex_lighting": True,
              "methods": [3, 4, 1], "sources": [0x84C0, 0x8577, 0x8577]},
-        ]))])), mock.patch.object(mapping, "parse_material_records", side_effect=lambda b: [
+        ])))), mock.patch.object(mapping, "parse_material_records", side_effect=lambda b: [
             _record(index=0, coord_mapping=[3, 4, 1], fragment_lighting=True,
                     vertex_lighting=True, stages=[_Stage([0x84C0, 0x84C1, 0x8577])]),
         ]):
@@ -105,10 +122,10 @@ class TexcoordMappingSurveyTests(unittest.TestCase):
 
     def test_a_unit_no_combiner_samples_is_reported_as_declared_only(self) -> None:
         # tex1 declares method 4 but the chain only samples tex0, so it cannot change a pixel.
-        with mock.patch.object(mapping, "iter_cmbs", return_value=iter([("m.cmb", _cmb([
+        with mock.patch.object(mapping, "iter_corpus", return_value=self._corpus(("m.cmb", _cmb([
             {"fragment_lighting": False, "vertex_lighting": True,
              "methods": [1, 4, 1], "sources": [0x84C0, 0x8577, 0x8577]},
-        ]))])), mock.patch.object(mapping, "parse_material_records", side_effect=lambda b: [
+        ])))), mock.patch.object(mapping, "parse_material_records", side_effect=lambda b: [
             _record(index=0, coord_mapping=[1, 4, 1], vertex_lighting=True,
                     stages=[_Stage([0x84C0, 0x8577, 0x8577])]),
         ]):
@@ -128,11 +145,11 @@ class TexcoordMappingSurveyTests(unittest.TestCase):
                     stages=[_Stage([0x84C0, 0x84C1, 0x8577])])
             for i, (f, v, m) in enumerate(specs)
         ]
-        with mock.patch.object(mapping, "iter_cmbs", return_value=iter([("m.cmb", _cmb([
+        with mock.patch.object(mapping, "iter_corpus", return_value=self._corpus(("m.cmb", _cmb([
             {"fragment_lighting": f, "vertex_lighting": v, "methods": m,
              "sources": [0x84C0, 0x84C1, 0x8577]}
             for f, v, m in specs
-        ]))])), mock.patch.object(mapping, "parse_material_records",
+        ])))), mock.patch.object(mapping, "parse_material_records",
                                   side_effect=lambda b: records):
             table = mapping.survey()
         counts = table["tex1 ProjectionMap [consumed]"]
@@ -152,6 +169,45 @@ class TexcoordMappingSurveyTests(unittest.TestCase):
         self.assertTrue(record.vertex_lighting)
         self.assertFalse(record.fragment_lighting)
         self.assertTrue(record.lit)
+
+    def test_both_games_are_reachable_corpora(self) -> None:
+        # One survey, two populations: which container each game uses is the corpus
+        # owner's decision, not something each survey re-derives.
+        self.assertEqual(sorted(CORPORA), ["mm", "oot"])
+        self.assertIs(iter_corpus("oot"), iter_oot_cmbs)
+        self.assertIs(iter_corpus("mm"), iter_mm3d_cmbs)
+        with self.assertRaises(ValueError):
+            iter_corpus("mm3d")
+
+    def test_majoras_mask_qtrs_insertion_is_honoured(self) -> None:
+        # MM3D (version >= 7) inserts a `qtrs` pointer at 0x28, so `mats` is at 0x2C.
+        # Reading 0x28 unconditionally pointed at `qtrs` and every MM3D material parsed as
+        # zero materials — a silent zero, not an error. Both halves are pinned here.
+        payload = _mm_cmb([{"fragment_lighting": True, "vertex_lighting": False,
+                            "methods": [1, 4, 1], "sources": [0x84C0, 0x84C1, 0x8577]}])
+        self.assertEqual(material_chunk_pointer(payload), 0x40)
+        records = list(parse_material_records(payload))
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].coord_mapping, [1, 4, 1])
+        self.assertTrue(records[0].fragment_lighting)
+        # The OoT3D layout must still read at its own offset, unchanged.
+        oot = _cmb([{"fragment_lighting": True, "vertex_lighting": True,
+                     "methods": [3, 1, 1], "sources": [0x84C0, 0x8577, 0x8577]}])
+        self.assertEqual(material_chunk_pointer(oot), 0x40)
+        self.assertEqual(list(parse_material_records(oot))[0].coord_mapping, [3, 1, 1])
+
+    def test_a_non_cmb_reports_no_chunk_rather_than_a_wild_offset(self) -> None:
+        self.assertIsNone(material_chunk_pointer(b"not a cmb at all" + bytes(0x100)))
+        # A truncated/garbage payload must not be probed at a random offset either.
+        self.assertIsNone(material_chunk_pointer(b"cmb " + bytes(0x40)))
+
+    def test_an_empty_corpus_is_refused_not_reported_as_an_answer(self) -> None:
+        # "This game uses no mapped coordinators" is a claim; a broken container or a
+        # wrong layout read produces the same empty table. The survey must refuse it.
+        with mock.patch.object(mapping, "iter_corpus",
+                               return_value=self._corpus(("only.cmb", b"garbage"))):
+            with self.assertRaises(RuntimeError):
+                mapping.survey(game="mm")
 
 
 if __name__ == "__main__":
