@@ -56,8 +56,12 @@ must not gain a lit-ness gate; Majora's Mask's asset corpus refutes it a second 
 mapped materials are fragment-lit where OoT3D's are vertex-lit. ProjectionMap (method 4) is the one
 unimplemented mapping, and both games' corpora put it on coordinator 1 only — where the shader emits
 no `w`, so the question that seemed to need a PICA register measurement is not on the critical path
-at all. What remains is the value of `uInvView` and coordinator 1's per-vertex component step, both
-reachable only from a gameplay draw.
+at all. The shader's uniform inputs are now readable offline too: `tools/pica_shader_uniforms.py`
+replays the whole vertex float-uniform array out of a cached command list, so `uInvView` (identity on
+every title draw) and the missing `TexMtx` third row (`(0,0,1,0)`) are measured rather than assumed.
+What remains is confirming `uInvView`'s relationship to the view matrix on a draw whose model-view
+rows are not identity, coordinator 1's per-vertex component step, and one gameplay-only measurement
+for every method-4 material.
 
 ### S004 — OoT3D behavior coverage
 
