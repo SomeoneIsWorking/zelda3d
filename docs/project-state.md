@@ -352,6 +352,40 @@ fragment lighting enabled" — indistinguishable from the finding above. It was 
 `tools/test_lit_pica_capture.py` (8 cases, mutation-verified) locks it, along with the rule that
 `picaLit` must never be read as `vLit`/`fLit`.
 
+**Vertex lighting measured for both games — and it is the mirror image of fragment lighting.** The
+scope bullet is "vertex and fragment lighting", and until now only the fragment half had been
+investigated. Measured over every material:
+
+| | OoT3D | MM3D |
+|---|---|---|
+| **vertex**-lit (`material +0x01`) | **9,931 / 11,172 (88.9%)** | 122 / 6,791 (1.8%) |
+| **fragment**-lit (`+0x00`) | 205 (1.8%) | **6,428 (94.7%)** |
+| neither | 1,036 (9.3%) | 245 (3.6%) |
+| both flags set | 0 | 4 |
+
+This reframes the campaign's two biggest lighting items. `FRAG_PRIMARY` is not a long-tail gap in
+Majora's Mask — it is **94.7% of its materials** — while for Ocarina of Time the dominant path is the
+*vertex* one, at 88.9%. Corroborated independently and live: 159 of 207 draws across two `vsuni_log`
+samples at the title carry `vLit=1`, which matches OoT3D's corpus share.
+
+**The two render paths agree on the vertex-lit term**, verified by reading both rather than assumed.
+Native gates the lit branch on `uAmbient.w > 0` and unified on `uParams0.y > 1.5`, and both are the
+*same* predicate — `grp.vertexLighting && gZelda3dWorldLit && !forceUnlit`. The lit formula, the
+diffuse-alpha rule (accumulated once per enabled light, no NdotL), the HasColor gate and the clamp
+order (`min(abs(primary), 1.0)`, PICA clamping `o1` on register write) are identical. This is a
+**verified agreement, not a claim of oracle parity**: no per-draw comparison of the lit term exists,
+because every reachable oracle scene is vertex-lit while the only host frame with a paired oracle image
+is dominated by the title-demo camera difference. Closing that needs a per-draw `PIXEL`/`vsuni_log`
+comparison on a frame whose camera already matches.
+
+Two facts worth having before anyone attributes a brightness difference: `matAmbient` is `ffffff00` for
+**8,883 of OoT3D's 9,931** vertex-lit materials, so for 89% of them the ambient term is a no-op and the
+whole result rests on the diffuse term; and `matAmbient`/`matDiffuse` span only 11 and 19 distinct RGBA8
+values, so this is a small enumerable input space. Also worth recording: the per-draw RGB modulation
+fixed in `80c95d21` is *discarded* for vertex-lit draws, because the lit branch overwrites `vColor0`
+wholesale — consistent with the native path, and why that fix's measured effect is confined to
+non-vertex-lit scene geometry and the title fire-glow.
+
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
 uncaptured runtime register, but `tev_corpus_survey.prevbuf_before_latch` walks each chain in stage

@@ -611,6 +611,23 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - gap: The exact binary mechanism, cached per-slot alpha state, and parser-to-shader transport are ported and close-tested on retail data. No like-for-like live item-model image has been captured, so user-visible parity remains unclaimed. The host-vs-oracle title comparison is now runnable (see render.cmb-unlit-primary for the image and its two open deltas), but the title wordmark carries no lit PRIMARY alpha, so this family still needs its own content-matched frame rather than the title's.
 - notes: Lit PRIMARY alpha is the sum of `MatDiffuse.a * LightDiffuseColor_i.a` over enabled slots, without NdotL. The completed RGBA result is multiplied by aColor only when HasColor is true. Twenty of the 24 retail consumers remain below full alpha under the observed two-slot configuration.
 
+### render.cmb-vertex-lighting — the vertex-lit path, which is most of Ocarina of Time
+- status: re-verified
+- deps:
+- evidence: corpus measurement over every material of both games, plus agreement between the two render paths. **The two games are mirror images**, and this is the single most consequential thing measured about lighting in this project:
+
+  | | OoT3D | MM3D |
+  |---|---|---|
+  | vertex-lit (`material +0x01`) | **9,931 / 11,172 (88.9%)** | 122 / 6,791 (1.8%) |
+  | fragment-lit (`+0x00`) | 205 (1.8%) | **6,428 (6,791) = 94.7%** |
+  | neither | 1,036 (9.3%) | 245 (3.6%) |
+  | both flags set | 0 | 4 |
+
+  Independently corroborated live: 159 of 207 draws in two `vsuni_log` samples at the title carry `vLit=1` (`tools/lit_pica_capture.py`), consistent with OoT3D's 88.9%. **Path agreement verified by reading both implementations**: native (`zelda3d_sdl3gpu_shaders.cpp`) gates the lit branch on `uAmbient.w > 0` and unified (`unified_shader.cpp`) on `uParams0.y > 1.5`; both are the *same* predicate, `grp.vertexLighting && gZelda3dWorldLit && !forceUnlit`. The lit formula (`uMatAmbient + uLitDif1*NdotL1 + uLitDif2*NdotL2`), the diffuse-alpha rule (`uLitDif1.a + uLitDif2.a`, accumulated once per enabled light with no NdotL), the HasColor gate (`uPrimaryCtl.x` multiplies the completed RGBA by `aColor0`) and the clamp order (`min(abs(primary), 1.0)`, PICA clamping `o1` on register write) are identical in both.
+- where: `Shipwright/cmb3d/asset/cmb.{h,cpp}` (`vertex_lighting` at material `+0x01`, the one owner of the flag), `Shipwright/libultraship/src/fast/zelda3d_sdl3gpu_shaders.cpp` (native lit branch), `Shipwright/libultraship/src/fast/backends/unified_shader.cpp` (unified lit branch), `Shipwright/libultraship/src/fast/zelda3d_sdl3gpu_pass.cpp` (`ambGroup` / `lightingMode`, the shared predicate)
+- gap: none found. This is a **verified agreement, not a claim of correctness against the oracle** — no per-draw oracle comparison of the lit term exists, because every reachable oracle scene is vertex-lit yet the only host frame with a paired oracle image is dominated by the title-demo camera difference. What would close it is a per-draw `PIXEL`/`vsuni_log` comparison on a host frame whose camera already matches.
+- notes: `matAmbient` is `ffffff00` for **8,883 of OoT3D's 9,931** vertex-lit materials (89%), so for the overwhelming majority the ambient term is a no-op and the whole result rests on the `NdotL * matDiffuse * sceneDif` term — worth knowing before attributing a brightness difference to the ambient path. `matAmbient`/`matDiffuse` together span only 11 and 19 distinct RGBA8 values in OoT3D (7 and 4 in MM3D), so this is a small, enumerable input space. The per-draw RGB modulation gate fixed in `80c95d21` is *discarded* for vertex-lit draws, because the lit branch overwrites `vColor0` wholesale; that is consistent with the native path and is why that fix's measured effect is confined to non-vertex-lit scene geometry and the title fire-glow.
+
 ### render.cmb-fragment-lighting — PICA fixed-function fragment primary / secondary
 - status: re-partial
 - deps: render.multi-stage-tev
