@@ -839,7 +839,13 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                         matConstMap ? matConstMap->size() : 0u);
             }
             // Coordinator-1/2 transforms for the extra units. Mapping 4 (ProjectionMap) is not
-            // emulated and falls back to plain UV.
+            // emulated and falls back to plain UV. oot3d-decomp/docs/cmb_texcoord_mapping.md
+            // recovers what the retail shader actually does: the mapping switch only exists in
+            // CmbVShader body@14, which the entry point selects on ShaderMode.w (0 or 1), so a
+            // material on body@214 is plain regardless of its mapping byte. The host does not
+            // transport ShaderMode.w yet, which is why the sphere map above is applied
+            // unconditionally on method 3 — see the render.cmb-texcoord-mapping frontier row
+            // before changing any of this.
             ubo.uTex1Xf[0] = grp.uv1Scale[0];
             ubo.uTex1Xf[1] = grp.uv1Scale[1];
             ubo.uTex1Xf[2] = uvOverride
