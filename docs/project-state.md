@@ -327,6 +327,31 @@ per-slot enable bytes for a *lit* material. The live cases to resolve are slot 0
 remains the dominant renderer dependency for both games — **89.13%** of MM3D materials — so this is the
 right next thread, but it is no longer blocked on finding a file.
 
+**The title demo never enables PICA fragment lighting — measured, with a denominator.** With the
+configuration object located, the next step was a ground-truth triple for a *lit* material. The oracle
+exposes exactly that: `vsuni_log <path>` for per-draw discovery and `lighting_capture <draw> <path>` for
+one draw's raw `config0`/`config1`, light-slot map and activated LUTs. `tools/lit_pica_capture.py`
+drives both directly, bypassing `tools/cmb_fragment_lighting_oracle_probe.py` — which starts from the
+absent `GAMEPLAY_STATE` and so cannot run at all.
+
+Over **207 draws at two points in the title demo: `picaLit=1` on ZERO of them, with 159 vertex-lit**,
+and 34 of one sample's draws untextured. `picaLit` is the authoritative `regs.lighting.disable` register,
+not the independent CmbVShader boolean, so this is real state and not a logging artefact.
+
+That is the explanation for this project's whole run of fragment-lighting negatives: the committed
+probe's own `kokiri-save-overlay` fixture is labelled a PICA-disabled negative control, and so is
+everything derived from it. The capture path is not broken — **the reachable scenes are vertex-lit.**
+The two open questions (`+0x18A` → `config0` bit `0x11`, and per-slot enables for a lit material)
+therefore need a *gameplay* scene and inherit
+[issue #23](issues/0023-embedded-oot3d-oracle-cannot-reach-its-boot-hand.md). The object-location result
+itself is not blocked and stands on its own. Recorded so no further title-side effort is spent here.
+
+One more false-negative trap, now pinned: the `vsuni_log` draw id lives in **`n=`**, not `draw=`.
+Matching the wrong token parses a log full of draws as *empty*, and the tool then reports "no draw has
+fragment lighting enabled" — indistinguishable from the finding above. It was the wrong token first;
+`tools/test_lit_pica_capture.py` (8 cases, mutation-verified) locks it, along with the rule that
+`picaLit` must never be read as `vLit`/`fLit`.
+
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
 uncaptured runtime register, but `tev_corpus_survey.prevbuf_before_latch` walks each chain in stage
