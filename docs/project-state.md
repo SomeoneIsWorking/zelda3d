@@ -218,6 +218,51 @@ draw call. The whole-image `union_rgb_mae` moved 47.80 → 48.14 and is **not** 
 that frame's dominant delta is the title-demo camera, since the host runs the N64 demo and the
 oracle the 3DS demo.
 
+**Majora's Mask is inside the same gate as Ocarina of Time — checked, because I assumed otherwise
+for a while.** The root `CMakeLists.txt` is the only supported configure root and it adds BOTH
+games into one tree (`add_subdirectory(${ZELDA3D_OOT_DIR} .../soh)` and
+`add_subdirectory(${ZELDA3D_MM_DIR} .../mm)`), so `Shipwright/build-cmake` is not a SoH-only gate.
+Two facts make a shared-renderer change safe for MM without a second build tree:
+
+* `Shipwright/libultraship` is the **single** shared renderer owner, added once and linked by both
+  games, so a change to it is built once and cannot leave MM holding a stale copy.
+* `mm_lib` is a **static** archive of MM's own objects and links no copy of libultraship, so it is
+  correctly up to date when only shared code changed.
+
+The suite carries MM's own tests too (`mm_gfx_print_test`, `mm3d_player_animation_policy_test`) —
+515 tests total. Configuring 2ship *standalone* (`cmake -S 2ship`) does not work on Fedora and its
+CMakeLists explicitly does not support it ("the root CMakeLists already add_subdirectory'd these"),
+so that failure is not a gate and is not worth fixing.
+
+**Multi-stage combiners — the first item in this campaign's scope — measured for Majora's Mask for
+the first time.** `tools/tev_corpus_survey.py` had only ever been run against OoT3D. MM3D over 1,704
+files / 6,791 materials: **zero layout-domain violations**, stage counts 1 through 6 all present
+(653 / 4,083 / 1,497 / 440 / 107 / 11), 123 materials latch the combiner buffer and 46 read
+`PREVBUF` with **0 unsafe reads**. That last one matters: the evaluator's `vec4(0)` for the combiner
+buffer is now measured exact for *both* corpora, so the earlier OoT3D-only justification generalises
+instead of being an unverified assumption about MM.
+
+A content shape the survey was counting but not naming: **materials whose combiner chain reads a
+texture unit their own bindings never declare.** The survey printed a bare count, which is why it sat
+unnoticed; it now names each one, and there are exactly three across both games — OoT3D
+`/scene/hiral_demo_0_info.zsi mat0` (stage0 `rgb_src` reads an undeclared **tex0**) and MM3D
+`zelda_gi_bigbomb.cmb mat1` + `bb_model_model.cmb mat1` (stage1 `rgb_src` read an undeclared
+**tex2** under `MULT_ADD`). All three are **neutral by construction**: the host substitutes its dummy
+texture, which is uploaded opaque white, and white is the identity element for `MODULATE` and for
+`MULT_ADD`/`ADD_MULT`'s first factor, so each evaluates as if the unused slot were absent. That is a
+property of those ops rather than of the dummy, so the named list is where a non-neutral op would
+surface.
+
+Getting that number right needed `slots_used(op)`: PICA ops consume 1, 2 or 3 sources, and a
+`TEXTUREn` sitting in an *ignored* slot is not consumed at all. A naive slot scan reported **6** MM
+materials; the survey's own rule reports **2**, and the naive scan was the wrong one. I also claimed
+mid-investigation that the dummy texture was uninitialised GPU memory — it is not; it is uploaded
+opaque white a few lines past the creation call, and I had stopped reading too early.
+
+Fragment lighting remains the dependency, not the combiners: **89.13%** of MM3D materials (6,053 of
+6,791) consume `FRAG_PRIMARY`/`FRAG_SECONDARY` as a combiner source, which is the unimplemented
+`FRAG_PRIMARY` path recorded below.
+
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
 uncaptured runtime register, but `tev_corpus_survey.prevbuf_before_latch` walks each chain in stage
