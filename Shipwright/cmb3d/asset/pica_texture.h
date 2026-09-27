@@ -8,6 +8,11 @@ namespace Zelda3D {
 
 // Decode raw texture bytes of the given glFormat ((dataType<<16)|formatConstant)
 // into width*height*4 RGBA8 bytes. Returns empty on unknown/short input.
+// Bits per pixel for formats whose payload is a straight per-pixel read; 0 for ETC1/ETC1A4 (which
+// validate their own length) and for anything unrecognised. PicaDecode's buffer-length check derives
+// from this, so the sizes live in one place.
+int PicaBitsPerPixel(uint32_t glFormat);
+
 std::vector<uint8_t> PicaDecode(uint32_t glFormat, int width, int height, const std::vector<uint8_t>& data);
 
 // Reproduce the exact byte buffer Citra/Azahar feed to their legacy custom-texture hash
@@ -15,7 +20,6 @@ std::vector<uint8_t> PicaDecode(uint32_t glFormat, int width, int height, const 
 // to GL bottom-up, width*height*bpp). The 5 plain color formats (RGBA8/RGB8/RGB565/RGBA5551/
 // RGBA4) keep native bytes; every other format is decoded to RGBA8 (R,G,B,A). Returns empty
 // on unknown/short input. Used to look up replacement PNGs by their Citra legacy hash.
-std::vector<uint8_t> PicaLegacyHashBytes(uint32_t glFormat, int width, int height,
-                                         const std::vector<uint8_t>& data);
+std::vector<uint8_t> PicaLegacyHashBytes(uint32_t glFormat, int width, int height, const std::vector<uint8_t>& data);
 
 } // namespace Zelda3D

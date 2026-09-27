@@ -121,6 +121,14 @@ def decode(glformat:int, width:int, height:int, data:bytes)->bytearray:
         def f(i):
             a=d[i*2]; L=d[i*2+1]; return (L,L,L,a)
         return _tiled(width,height,f)
+    if name=="LA4":
+        # 3dstool LA4: 4-bit luminance (HIGH nibble) + 4-bit alpha (LOW nibble) in ONE byte per
+        # pixel. Nibble order is Azahar's `Common::DecodeIA4` (src/common/color.h) -- the oracle's own
+        # decoder. Both retail users are 1 byte/pixel: acto_magic_fire 64x64/4096, m_shield_2_modelT
+        # 32x64/2048.
+        def f(i):
+            p=d[i]; L=e4((p>>4)&0xF); a=e4(p&0xF); return (L,L,L,a)
+        return _tiled(width,height,f)
     if name=="HILO8":
         def f(i):
             hi=d[i*2+1]; lo=d[i*2]; return (hi,lo,0xFF,0xFF)

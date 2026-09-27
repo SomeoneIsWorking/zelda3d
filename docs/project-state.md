@@ -17,7 +17,7 @@ S003 is the current focus.
 | --- | --- | --- | --- | --- |
 | S001 | One launcher provisions, validates, builds, and chooses between the OoT and MM game cores | verified | — | G003 |
 | S002 | 3DS containers, models, animations, scenes, collision, cameras, lighting, and face data are available to both engines | partial | S001 | G001, G002 |
-| S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial | S002 | G001, G002 |
+| S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats: **verified for both games**; material/lighting/fog still partial) | S002 | G001, G002 |
 | S004 | OoT3D actor animation, facial, camera, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G001 |
 | S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G002 |
 | S006 | An embedded Azahar oracle and parity tooling can compare the port with independent 3DS execution | partial | S001 | G001, G002 |
@@ -142,6 +142,31 @@ disagreement stays visible. Getting to MM3D at all also required fixing MM3D's s
 tool itself (the material chunk pointer at `0x28` is `qtrs` for version ≥ 7, so the entire MM3D survey
 had been returning nothing), now routed through the single layout owner and pinned by a test verified
 to fail on the old read.
+
+**A real, user-visible texture bug, found by measuring the formats both games actually use.**
+`tools/pica_texture_format_survey.py` walks every texture in both containers the host reads (`cmb`
+model textures and `ctxb` banks) for **both** games and checks each distinct `(data_type<<16)|fmt`
+against the shipping decoder. It found `0x67606758` -- 3dstool's **LA4**, 4-bit luminance + 4-bit alpha
+in one byte per pixel -- **declared in `pica_texture.cpp`'s format table but never switched on**, so
+`PicaDecode` returned empty and the texture was dropped. Two OoT3D textures use it:
+`magic_fire/model/acto_magic_fire.cmb` (64x64, data_len 4096) and
+`magic_love/model/m_shield_2_modelT.cmb` (32x64, data_len 2048) -- the Great Deku Tree's magic-fire and
+magic-love **effects**, so this was visible gameplay content decoding to nothing. The Python mirror
+`tools/pica_texture.py` listed the same format with no decoder either, which is why no earlier
+measurement caught it: both sides *looked* like they supported LA4.
+
+The depth is 8 bits per pixel (4 per **channel**) -- the byte counts are per-pixel, and reading "4 bits
+per pixel" off the name looks for half the buffer. Nibble order is not a guess: it is Azahar's own
+`Common::DecodeIA4` (`src/common/color.h`), high nibble luminance / low nibble alpha, the decoder the
+oracle runs. Fixing it also exposed a **memory-safety hole**: only `GF_RGBA8` and `GF_RGB8` ever
+length-checked their buffer, so every other format read `d[i*2]` with no guard and a truncated payload
+was an out-of-bounds read. There is now one guard derived from a `PicaBitsPerPixel` table, covered by
+`PicaTextureDecode.*` (7 tests, mutation-verified: removing the LA4 case fails 4 of them, swapping the
+nibbles fails the order test, a wrong depth fails the per-pixel test) and
+`test_pica_texture_format_survey.py` (10 tests). The survey now reports **every format in both games'
+content handled** -- OoT3D 10,538 cmb + 1,650 ctxb textures across 14 distinct formats, MM3D 6,968 + 335
+across 8 -- and that the C++ and Python tables agree, read out of the shipping source rather than
+transcribed.
 
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
