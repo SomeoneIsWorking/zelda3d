@@ -134,8 +134,38 @@ class Stage:
         return s
 
 
-def parse_mats(b):
-    """Yield (mat_index, tex_idx[3], coord_mapping[3], coord_srcuv[3], stages[list[Stage]])."""
+class MaterialRecord:
+    """One material's header fields, from the single material walk below.
+
+    `index`/`tex`/`coord_mapping`/`coord_source`/`stages` are what the combiner surveys need;
+    `fragment_lighting` and `vertex_lighting` are material bytes +0x00/+0x01, which the lighting
+    and mapping surveys need. Keeping them on one record means the 0x15C/0x16C stride walk and the
+    `+0x58 + 0x18*t` coordinator offsets are written down exactly once.
+    """
+
+    __slots__ = ("index", "tex", "coord_mapping", "coord_source", "stages",
+                 "fragment_lighting", "vertex_lighting")
+
+    def __init__(self, index, tex, coord_mapping, coord_source, stages,
+                 fragment_lighting, vertex_lighting):
+        self.index = index
+        self.tex = tex
+        self.coord_mapping = coord_mapping
+        self.coord_source = coord_source
+        self.stages = stages
+        self.fragment_lighting = fragment_lighting
+        self.vertex_lighting = vertex_lighting
+
+    @property
+    def lit(self):
+        return self.fragment_lighting or self.vertex_lighting
+
+    def as_tuple(self):
+        return (self.index, self.tex, self.coord_mapping, self.coord_source, self.stages)
+
+
+def parse_material_records(b):
+    """Yield a :class:`MaterialRecord` per material. The one material-layout walk."""
     if b[0:4] != b"cmb ":
         return
     version = _u32(b, 0x08)
@@ -158,8 +188,15 @@ def parse_mats(b):
         for s in range(min(cnt, 6)):
             cidx = _u16(b, o + 0x124 + 2 * s)
             stages.append(Stage(b, comb_base + cidx * 0x28))
-        yield i, tex, coord_map, coord_src, stages
+        yield MaterialRecord(i, tex, coord_map, coord_src, stages,
+                             bool(b[o + 0x00]), bool(b[o + 0x01]))
         o += stride
+
+
+def parse_mats(b):
+    """Yield (mat_index, tex_idx[3], coord_mapping[3], coord_srcuv[3], stages[list[Stage]])."""
+    for record in parse_material_records(b):
+        yield record.as_tuple()
 
 
 def main():
