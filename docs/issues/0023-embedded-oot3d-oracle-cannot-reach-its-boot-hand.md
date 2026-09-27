@@ -104,6 +104,19 @@ image carrying `title/0004000e/00033500`, or a valid 3DS save-data `system.dat` 
 its own slot. Neither is something to fabricate — the first is Nintendo system-title content, the
 second is a hand-built binary filesystem.
 
+### A second concrete dependent, measured 2026-09-27
+
+The lit-material ground truth for `render.cmb-fragment-lighting` needs a gameplay scene, and this
+issue is why it cannot be had. Measured over **207 draws at two points in the title demo: `picaLit=1`
+on zero of them, 159 vertex-lit** (`tools/lit_pica_capture.py`, selecting on the authoritative
+`regs.lighting.disable`, not the independent CmbVShader boolean). The title demo is simply not a
+fragment-lit scene, which is why every fragment-lighting capture in this project is a negative control.
+
+So the two open questions on that frontier step -- the `+0x18A` byte's contribution to `config0` bit
+`0x11`, and the per-slot enable bytes for a lit material -- are behind this issue, not behind more RE.
+Unblocking it needs an Azahar image carrying `title/0004000e/00033500`, or a valid 3DS save-data
+`system.dat` so the game creates its own slot; neither is derivable here.
+
 ### Consequence for the renderer campaign
 
 The title screen remains available as an oracle, and the corpus surveys do not need one at all, so
