@@ -292,6 +292,41 @@ ratio with 2.2% in-image, which is garbage, so no Thumb negative is claimed -- b
 zero callers, and that identification is now marked **unproven** rather than load-bearing. Full record
 in `oot3d-decomp/docs/fragment_lighting.md`.
 
+**The fragment-lighting blocker's central unknown is resolved: the configuration object was live
+runtime state the whole time.** The blocker said the 0x4C8-byte "toolchain-authored template" could not
+be found. It is not in the data because it is not in the data — it is a **per-material runtime struct
+at `CmbRenderer + 0x400 + material_index * 0x4C8`**, readable from the oracle on demand. The address was
+never guessed: the record already mapped CMB `+0x00` to `CmbRenderer + 0x400` and named the live
+renderer at `0x081d3aa0`; `tools/lit_object_dump.py` dumps four consecutive slots at the **title
+screen** (no gameplay save needed — the title demo renders the same fragment path) with the harness's
+bulk `dumprange`.
+
+Consecutive slots differ in nonzero density (24.2% / 15.3% / 14.5% / 29.4%) and in their leading
+floats — slot 2 holds a `0.7` / `0.3` material blend — so this is genuinely per-material authored data.
+**`+0x18A` reads `0x80` on slot 0**: authored, non-zero, per-material. The old framing "no function on the
+chain writes `+0x18A`" was never the obstacle; the byte is *source data*, exactly as the record's
+"provenance question about the source bytes" argued, and the source can now be re-read whenever needed.
+
+**The recovered builder is now validated end to end against live bytes**, which it never was before.
+Feeding the dumps through `pica_lighting_config.py`, material slot 1 returns **exactly** the
+`config0`/`config1` pair the oracle's own registers were recorded at (`0x80000400` / `0xff7fffff`). Its
+`light_enable` of 0 against the fixture's `0x00000010` is **not** a discrepancy: the recorded fixture
+is a one-light Gravekeeper's Hut material and slot 1 is an unlit title material. That reproduction is
+now a standing test written against an all-zero object, so it needs neither captured data nor a ROM.
+
+Two more of this project's recurring traps bit and are now recorded. The chain's top,
+`FUN_003f9b5c`, has **zero ARM callers** — as does the `FUN_00371758` the record called the "delivery
+mechanism" — so nothing in the ARM code image constructs this object; it arrives from outside as an
+argument. And a `capstone` linear sweep **stops at the first literal pool**, which is how a function
+prologue search came back empty: the start address had to be found by matching the ARM
+`PUSH {...lr}` byte pattern instead.
+
+**Still open, and now narrow:** the `+0x18A` byte's contribution to `config0` bit `0x11`, and the
+per-slot enable bytes for a *lit* material. The live cases to resolve are slot 0
+(`light_enable=0x76`, five slots occupied) and slot 3 (`0x7632`) of the title dump. Fragment lighting
+remains the dominant renderer dependency for both games — **89.13%** of MM3D materials — so this is the
+right next thread, but it is no longer blocked on finding a file.
+
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
 uncaptured runtime register, but `tev_corpus_survey.prevbuf_before_latch` walks each chain in stage
