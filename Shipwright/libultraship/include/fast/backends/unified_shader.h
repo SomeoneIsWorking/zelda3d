@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -27,6 +28,16 @@ enum class Variant {
 };
 
 const char* VariantName(Variant v);
+
+// How many set=2 sampler bindings this variant's fragment stage actually declares.
+//
+// SDL3 builds the shader's bind-group layout from the count the caller passes to
+// SDL_CreateGPUShader, so a count that disagrees with the generated GLSL produces a pipeline whose
+// layout has fewer sampler bindings than the SPIR-V reads. That is not a validation error -- SDL3
+// derives the layout from its own count -- and on a driver that trusts it the draw faults inside
+// pipeline creation. Derive the count from the same feature table the GLSL is generated from so
+// the two cannot drift.
+uint32_t VariantSamplerCount(Variant v);
 
 // Returns the GLSL source for one stage of one variant. The combiner arithmetic itself is NOT
 // baked per-variant text (that's the old per-permutation-compiled approach this replaces) — it's a

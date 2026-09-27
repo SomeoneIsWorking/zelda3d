@@ -47,12 +47,34 @@ Reached materials preserve multi-stage combiners, multiple texture coordinates a
 fragment lighting, alpha behavior, and scene-authored fog through the native renderer.
 
 Gap: the renderer campaign and current codemap still identify wider material, fragment-lighting, actor,
-and effect families whose parity is partial. The title-scoped oracle half of the host-vs-oracle
-comparison now works, but the **host** half faults on the title wordmark's unified pipeline under the
-software Vulkan driver this host falls back to, so no host title image exists to compare against (see
-[issue #25](issues/0025-title-wordmark-unified-pipeline-crash.md)). That crash gates closure of the
-`cmb-unlit-primary`, `cmb-lit-primary-alpha` and `cmb-fragment-lighting` families, whose remaining gap
-is exactly "ported and close-tested on retail data, no oracle comparison made". Coordinator mapping methods are now recovered from the retail shader
+and effect families whose parity is partial. **Both halves of the title-scoped host-vs-oracle
+comparison now work, and the first host title image against a cached oracle frame exists**
+(`tools/title_host_capture.py 1093` → `cs=1093` / `az=2016`, `content=0.4784`, `union_rgb_mae=47.80`;
+`scratch/title_host_capture/title_cs1093_sxs.png`). Getting there took two fixes rather than a
+capability change: the wordmark's unified pipeline faulted on a **sampler count that disagreed with
+its own shader** — `kDualTex`/`kDualTexFog` were declared as binding one sampler while their generated
+GLSL binds two, which SDL3 turns into a too-small bind-group layout — and the host half was capturing
+at a shape the oracle never had, first because the harness wrote its `shipofharkinian.json` to a cwd
+that SoH no longer reads (configuration resolves to the OS user-data dir, which also meant every run
+rewrote the player's real config), and then because the tool hardcoded a 400x240 raster the cache had
+stopped matching. Both are recorded and closed in
+[issue #25](issues/0025-title-wordmark-unified-pipeline-crash.md); the sampler count is now derived from
+the same feature table the GLSL comes from and locked against the generated source.
+
+What that first comparison establishes and does not: the wordmark composition — lockup, sub-lockup,
+shield, sword, credit line — is present at the oracle's scale and placement, so the 3DS-authored
+content is composed correctly (lockup width ~445px host vs ~415px oracle of 800). The glow hue is white where the oracle's is orange, which is the
+**known placeholder combiner** on the unified path (`kCombA` = cycle-0 `TEXEL0 * vColor0`) rather than
+new evidence about the glow; that makes `render.multi-stage-tev` the binding constraint on this frame.
+The framing does not match — the host is close to the rider and the oracle's is wide — but that is
+**not** established as a camera divergence: `title.rider-trajectory` already documents a cs-rate
+desync (host 10/s against the oracle's 30/s, user-owned card #149) with this exact symptom, verified
+benign at cs=1407. A five-cursor host sweep (cs 1069…1117) shows the mismatch exceeds a frame-domain
+residue while being exactly the size a rate desync would be, so the discriminating step is a
+cs-frame-locked A/B at cs=1093, not a camera change. Until it is,
+`cmb-unlit-primary`, `cmb-lit-primary-alpha` and `cmb-fragment-lighting` stay open: they now have a
+working comparison, not a passing one. Coordinator mapping methods are now recovered from the retail
+shader
 (`oot3d-decomp/docs/cmb_texcoord_mapping.md`, frontier `render.cmb-texcoord-mapping`): the shader's
 entry point calls one of two mutually exclusive bodies, and only one of them contains the
 texture-coordinator mapping switch. A real oracle capture closed the obvious follow-up by refuting

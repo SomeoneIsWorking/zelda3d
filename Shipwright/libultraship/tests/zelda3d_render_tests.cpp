@@ -313,3 +313,34 @@ TEST(Zelda3DWinding, DefaultIsCounterClockwiseFront) {
     EXPECT_FALSE(FrontFaceIsCW(/*faceCullFlip=*/0)); // default -> CCW front
     EXPECT_TRUE(FrontFaceIsCW(/*faceCullFlip=*/1));  // explicit override flips to CW
 }
+
+// The sampler count SDL3 is told about becomes the shader's bind-group layout, so a count smaller
+// than the generated GLSL's sampler declarations builds a layout the SPIR-V reads past. That is not a
+// validation error, and it faulted inside pipeline creation on the title wordmark's dual-texture
+// draw (issue #25). Assert the declared count against the generated source itself, so the two
+// cannot drift again the way a hand-maintained table did.
+TEST(UnifiedShader, DeclaredSamplerCountMatchesGeneratedBindings) {
+    for (int index = 0; index < static_cast<int>(Fast::Unified::Variant::kCount); ++index) {
+        const auto variant = static_cast<Fast::Unified::Variant>(index);
+        const std::string fragment = Fast::Unified::BuildFragmentSource(variant, 0);
+        std::size_t declared = 0;
+        for (std::size_t at = fragment.find("uniform sampler2D"); at != std::string::npos;
+             at = fragment.find("uniform sampler2D", at + 1)) {
+            ++declared;
+        }
+        EXPECT_EQ(static_cast<uint32_t>(declared), Fast::Unified::VariantSamplerCount(variant))
+            << "variant " << index << " (" << Fast::Unified::VariantName(variant) << "): declared "
+            << Fast::Unified::VariantSamplerCount(variant) << " samplers but the "
+            << "generated fragment stage binds " << declared;
+    }
+}
+
+// The two-sampler variants are the ones that were under-declared (they were told 1). Pin them
+// explicitly so a future edit to the feature table cannot quietly drop them back.
+TEST(UnifiedShader, DualTextureVariantsDeclareTwoSamplers) {
+    EXPECT_EQ(Fast::Unified::VariantSamplerCount(Fast::Unified::Variant::kDualTex), 2u);
+    EXPECT_EQ(Fast::Unified::VariantSamplerCount(Fast::Unified::Variant::kDualTexFog), 2u);
+    EXPECT_EQ(Fast::Unified::VariantSamplerCount(Fast::Unified::Variant::kGenericTev), 3u);
+    EXPECT_EQ(Fast::Unified::VariantSamplerCount(Fast::Unified::Variant::kSingleTex), 1u);
+    EXPECT_EQ(Fast::Unified::VariantSamplerCount(Fast::Unified::Variant::kUntextured), 0u);
+}

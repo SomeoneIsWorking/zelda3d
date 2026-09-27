@@ -485,6 +485,14 @@ std::string BuildSource(Variant v, bool vertex, int fragmentProbeMode = 0) {
 
 } // namespace
 
+// Mirrors the @if(o_tex0/o_tex1/o_tex2) sampler block in the fragment template: tex0 is binding 0,
+// and the second slot is uTex1 at binding 1 unless the generic-TEV variant is present, which adds a
+// third at binding 2.
+uint32_t VariantSamplerCount(Variant v) {
+    const VariantFeatures f = FeaturesFor(v);
+    return (f.hasTex0 ? 1u : 0u) + (f.hasTex2 ? 2u : (f.hasTex1 ? 1u : 0u));
+}
+
 const char* VariantName(Variant v) {
     switch (v) {
         case Variant::kUntextured:

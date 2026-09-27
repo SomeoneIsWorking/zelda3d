@@ -84,11 +84,18 @@ void PrepareWorkingDirectory() {
     if (chdir(sohCwd.c_str()) == 0) {
         std::fprintf(stderr, "harness: SoH cwd isolated -> %s\n", sohCwd.c_str());
     } else {
-        std::fprintf(stderr,
-                     "harness: WARNING could not chdir to %s — the embedded SoH "
-                     "will read/WRITE shipofharkinian.json in the launch cwd\n",
-                     sohCwd.c_str());
+        std::fprintf(stderr, "harness: WARNING could not chdir to %s\n", sohCwd.c_str());
     }
+
+    // Point SoH's configuration and saves at the same isolated directory. On Linux
+    // Ship::Context::GetAppDirectoryPath resolves $XDG_CONFIG_HOME/soh (or ~/.config/soh), not the
+    // cwd, so without this the harness wrote shipofharkinian.json somewhere nothing reads and the
+    // embedded game then read — and rewrote at shutdown — the player's real config. That silently
+    // voided the harness's ZELDA3D_HARNESS_SOH_W/H raster override, so the host title captured at the
+    // 640x480 default while the tool compared it against the oracle's native 400x240 frame. SHIP_HOME
+    // is the product's own override for exactly this directory, and the archives linked above are
+    // already here, so isolation costs no re-extraction.
+    setenv("SHIP_HOME", sohCwd.c_str(), 1);
 }
 
 void ConfigureEnvironment() {
