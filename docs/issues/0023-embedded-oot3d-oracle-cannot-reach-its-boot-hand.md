@@ -1,12 +1,12 @@
 ---
 id: 23
-title: Embedded OoT3D oracle cannot reach its boot handshake on this host
+title: Gameplay oracle is one missing savestate away; the cold title-to-gameplay route cannot reseed it
 status: investigating
-symptom: The harness now completes its Vulkan handshake and captured frame runs, but the title-driving recipe still does not reach a gameplay PlayState or produce a fresh gameplay checkpoint. The software renderer remains too slow for the same scenario on this host.
+symptom: The cold title-to-gameplay route does not reach a gameplay PlayState (missing system title app, empty save slots), so no fresh gameplay checkpoint can be written, and `GAMEPLAY_STATE` (scratch/gameplay_settled.<render-contract>.state) is absent. The gameplay oracle route itself is sound -- `boot_to_gameplay` loads a cached state and skips the title, and it produced every cached gameplay capture under the current render-contract marker. The only gameplay state on disk is an unmarked predecessor that the current Azahar build cannot deserialize (`boost::archive::archive_exception`), so it is stale, not misnamed.
 state_items: S006
-tags: oracle,harness,renderer,vulkan,software
+tags: oracle,harness,savestate,render-contract,title-route
 created: 2026-09-12
-updated: 2026-09-12
+updated: 2026-09-27
 ---
 
 ## Root cause
@@ -25,7 +25,48 @@ directory has no save slots and Azahar reports the required system title
 the 3DS live-play global (`play + 0x14`) as the PlayState base, causing `scene` to report `0x05c0`
 instead of the actual title scene `0x006b`; that diagnostic error is now corrected in the harness.
 
+## Scope correction (2026-09-27): the gameplay route works; one state file is what is missing
+
+The issue had been carried as "the gameplay oracle is unreachable", which is wrong and was making
+more capabilities look blocked than are. Measured:
+
+* **The gameplay route is a real, working route.** `harness_gameplay.boot_to_gameplay` loads a cached
+  gameplay savestate, runs 60 frames, and checks `in_gameplay` — its own docstring says "the cached
+  state avoids title input entirely... future boots skip the title entirely". It is how every
+  `c57f33c936bb6002_*` gameplay cache was produced, and those caches carry keys
+  `p39`..`p45-00401070` — the **current** render-contract marker. So gameplay captures have been
+  taken under the contract in force today.
+* **What is missing is one file, and the reason is exact.** `GAMEPLAY_STATE` resolves to
+  `scratch/gameplay_settled.p45-00401070.state` and does not exist. The only gameplay state on disk is
+  `scratch/gameplay_settled.state`, a symlink to `raw/fd2-oracle-fixed.state` — an *unmarked
+  predecessor*. Loading it does not fail a check, it **kills the oracle**:
+
+  ```
+  terminate called after throwing an instance of 'boost::archive::archive_exception'
+  ```
+
+  That is Azahar's boost serialization refusing a savestate written by an incompatible build, i.e. the
+  render-contract/version invalidation the `azahar_render_contract_marker()` filename encodes. The
+  marker is doing its job; the state is genuinely stale, not misnamed.
+* **And it cannot simply be re-made.** Writing a fresh gameplay state requires reaching gameplay,
+  which is the cold title route this issue already documents as failing (the missing system title
+  `title/0004000e/00033500/content/00000000.app` and the empty save slots).
+
+So the residual blocker is precisely: **produce one gameplay savestate for the current Azahar build.**
+Everything downstream of that — the material-identified gameplay command lists that
+`tools/cmb_shader_uniform_coverage.py` says `render.cmb-texcoord-mapping` items (1), (2) and (4)
+need, and any gameplay-scoped host-vs-oracle image — is waiting on that one artifact, not on new RE.
+
+The pre-handshake Vulkan work recorded below stays valid and stays fixed; it was never this blocker.
+
 ## What was tried / dead ends
+
+* Loading `raw/fd2-oracle-fixed.state` directly as `boot_to_gameplay`'s state: the harness closes
+  stdout and the oracle log ends in `boost::archive::archive_exception`. Confirms staleness at the
+  mechanism level rather than by inference from the filename.
+* `scratch/gameplay_settled.state` is a hand-made symlink to that raw state, not a state the current
+  build wrote. Treating it as a cached gameplay state is what made the route look broken rather than
+  merely unseeded.
 
 
 ## Resolution
