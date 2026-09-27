@@ -330,6 +330,26 @@ So it is not a shifted address: the same parser reads real lighting in 15.7% of 
 and impossible distances in 1.2% of MM3D's. (The OoT3D 114/724 is its own note: most scene files
 carry no env region, consistent with the 114-of-724 that also carry no valid inline CMB.)
 
+**And it is not a compression artifact, which was the obvious next excuse.** The two containers'
+first bytes differ: OoT3D's ZSI opens `5a 53 49 01` ("ZSI\x01", content at 0) while MM3D's opens
+`4c 7a 53 01` ("LzS\x01", payload at 0x10) — and `parse_env` starts its command walk at byte 16,
+so on an MM3D file the first "command" it reads is type `0xff`. But **only 182 of MM3D's 424 scene
+files carry an LzS header at all**, and `cmb_corpus`'s scene iterator finds a plain `"cmb "` marker
+in them with `bytes.find`, which a compressed stream could not contain. So three readings were
+measured, each against the same OoT3D control:
+
+| reading | OoT3D (control) | MM3D |
+|---|---|---|
+| command walk from byte 16 of the file | **114 of 724**, real lighting | 5 of 424, `zFar=-2.49e+10` |
+| skip the 16-byte LzS header first | 35 of 724, garbage — the skip is *wrong* | 5 of 424, garbage |
+| the 242 files with **no** LzS header, no skip | — | **0 of 242** |
+
+The middle row is the useful one: applying the same skip to the game where the region is known
+*degrades* the control, which is what makes the third row decisive. MM3D's scene ZSI uses a different
+scene-header format, not OoT3D's env command at another offset. The question for `mm3d-decomp` is
+now sharp and answerable: **what replaces `SCENE_CMD 0x0F` in MM3D's scene header**, and where MM3D
+stores the per-slot `zFar`/`fogNear`/`fogFar`/`ambient`/`fogColor` record.
+
 **Majora's Mask is inside the same gate as Ocarina of Time — checked, because I assumed otherwise
 for a while.** The root `CMakeLists.txt` is the only supported configure root and it adds BOTH
 games into one tree (`add_subdirectory(${ZELDA3D_OOT_DIR} .../soh)` and
