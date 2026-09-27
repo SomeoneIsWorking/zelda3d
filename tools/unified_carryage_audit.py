@@ -79,11 +79,6 @@ SUBSTITUTIONS: dict[str, tuple[str, str]] = {
 # the packer that is false.
 PER_FRAME_UNREAD = ("uShadow", "uFog2")
 
-# The unified route's dead-field names, kept out of SUBSTITUTIONS on purpose: nothing reads them on
-# either route, so they are not carriage decisions.
-KNOWN_DEAD = frozenset()
-
-
 @dataclass
 class Audit:
     ubo_fields: list[str] = field(default_factory=list)
