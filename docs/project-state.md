@@ -311,6 +311,25 @@ fabricated numbers. MM's fog and ambient data live somewhere this parser has not
 recovering them is a named `mm3d-decomp` step, not a table to transcribe. Until then MM's fog is
 recorded as **missing**, not approximated from OoT3D's table.
 
+That negative is **controlled**, because the first version of it was not. A hand-rolled content
+predicate (a 28-byte stride where `zFar` and `fogFar` are positive finite floats in scene ranges and
+`fogNear`'s low 10 bits are plausible) was written to search for the region without assuming its
+address — and it produced 395 of 724 OoT3D "hits" whose records were plainly not env data
+(`zFar=64.3 fogFar=90.1 amb=[164,66,145]`), including a 119-record "run" in a Kakusiana file whose
+bytes ramp through 67/68/69. An instrument that shows the wrong answer on a corpus where the answer
+is known cannot support a negative, so it was discarded rather than reported. The sound version
+runs the **one parser already validated against OoT3D's live Azahar `EnvLightSettings` list** over
+both games in the same process, so control and measurement differ only in the ROM:
+
+| game | files with an env region through the validated parser | what the records read |
+|---|---|---|
+| OoT3D | **114 of 724** | `zFar=2000 fogFar=800 fogNear=40`, `zFar=8000 fogFar=3200`, `zFar=12800 fogFar=12800 fogNear=794` — real scene lighting |
+| MM3D | **5 of 424** | `zFar=-2.49e+10`, `fogFar=1.69e-19`, `zFar=3.83e+15` — impossible distances |
+
+So it is not a shifted address: the same parser reads real lighting in 15.7% of OoT3D's scene files
+and impossible distances in 1.2% of MM3D's. (The OoT3D 114/724 is its own note: most scene files
+carry no env region, consistent with the 114-of-724 that also carry no valid inline CMB.)
+
 **Majora's Mask is inside the same gate as Ocarina of Time — checked, because I assumed otherwise
 for a while.** The root `CMakeLists.txt` is the only supported configure root and it adds BOTH
 games into one tree (`add_subdirectory(${ZELDA3D_OOT_DIR} .../soh)` and
