@@ -52,9 +52,12 @@ and effect families whose parity is partial. Coordinator mapping methods are now
 entry point calls one of two mutually exclusive bodies, and only one of them contains the
 texture-coordinator mapping switch. A real oracle capture closed the obvious follow-up by refuting
 it — `ShaderMode.w` is not a synonym for "lit", so the host correctly needs no new transport and
-must not gain a lit-ness gate. ProjectionMap (method 4, 366 consumed OoT3D materials on coordinator
-1) remains unimplemented; its one remaining measurement is now a plain register read
-(`tools/pica_texturing_registers.py`), blocked only on reaching a gameplay draw.
+must not gain a lit-ness gate; Majora's Mask's asset corpus refutes it a second time, since its
+mapped materials are fragment-lit where OoT3D's are vertex-lit. ProjectionMap (method 4) is the one
+unimplemented mapping, and both games' corpora put it on coordinator 1 only — where the shader emits
+no `w`, so the question that seemed to need a PICA register measurement is not on the critical path
+at all. What remains is the value of `uInvView` and coordinator 1's per-vertex component step, both
+reachable only from a gameplay draw.
 
 ### S004 — OoT3D behavior coverage
 

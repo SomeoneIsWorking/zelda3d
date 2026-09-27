@@ -15,6 +15,11 @@ retail material, what is its coordinator mapping method, and is it lit?
 It also separates the units a combiner actually samples from units that merely
 declare a texture, because only a sampled unit can change a pixel. Never starts
 the oracle.
+
+Both games are measured with the same code: `--game oot` walks ZAR + scene CMBs,
+`--game mm` walks Majora's Mask's actor GAR archives (`tools/cmb_corpus.py` owns
+which container each game uses). The two populations are not the same set of
+models, so each game's reach has to be stated separately.
 """
 
 from __future__ import annotations
@@ -23,7 +28,7 @@ import argparse
 import sys
 from collections import Counter
 
-from cmb_corpus import iter_cmbs
+from cmb_corpus import iter_corpus
 from tev_corpus_survey import parse_material_records, slots_used
 
 TEXTURE_SOURCES = (0x84C0, 0x84C1, 0x84C2, 0x84C3)
@@ -61,10 +66,10 @@ def lighting_kind(record) -> str:
     return "-"
 
 
-def survey(label_filter: str | None = None) -> dict[str, Counter]:
+def survey(label_filter: str | None = None, game: str = "oot") -> dict[str, Counter]:
     table: dict[str, Counter] = {}
     files = materials = parse_failures = 0
-    for label, cmb in iter_cmbs():
+    for label, cmb in iter_corpus(game)():
         if label_filter and label_filter not in label:
             continue
         try:
@@ -92,19 +97,28 @@ def survey(label_filter: str | None = None) -> dict[str, Counter]:
                     print(f"    {label} mat{record.index} tex{unit} method={method} "
                           f"fragLit={int(record.fragment_lighting)} "
                           f"vertLit={int(record.vertex_lighting)} scope={scope}")
-    print(f"scanned {files} files / {materials} materials, {parse_failures} parse failures",
-          file=sys.stderr)
+    print(f"scanned {game}: {files} files / {materials} materials, "
+          f"{parse_failures} parse failures", file=sys.stderr)
+    if files == 0:
+        # An empty table reads like "this game uses no mapped coordinators", which is a
+        # claim. It is nearly always a broken container or layout read, so refuse it.
+        raise RuntimeError(
+            f"{game} corpus yielded no parseable CMB materials; the container or the "
+            "material layout is wrong, not the answer"
+        )
     return table
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--game", default="oot", choices=("oot", "mm"),
+                        help="which ROM's CMB corpus to walk")
     parser.add_argument("--file", help="only list materials whose label contains this")
     args = parser.parse_args()
-    table = survey(args.file)
+    table = survey(args.file, args.game)
     if args.file:
         return 0
-    print("\n== coordinator mapping methods 3 and 4, by lighting state ==")
+    print(f"\n== coordinator mapping methods 3 and 4, by lighting state ({args.game}) ==")
     for key in sorted(table):
         counts = table[key]
         total = counts["lit"] + counts["unlit"]
