@@ -489,6 +489,37 @@ Worth noting how this was found: it is the same shape as the LA4 defect — a va
 reachable, behind a name the host does not construct. Neither was visible from the code, only from
 enumerating the ROM and comparing it against the table the game indexes.
 
+**A generated table could be written to a path nothing builds — and had already drifted.** Applying the
+"enumerate the ROM against what the host constructs" method to Ocarina of Time turned up three things
+in the scene-name generator:
+
+* **All 324 `.zar` paths the OoT3D layer constructs exist in the ROM.** 325 paths are constructed and
+  324 of them are `.zar`, all present; the one non-`.zar` hit, `/scene/spot99_info.zsi`, is present too.
+  No missing archive.
+* **`tools/gen_scene_names.py` wrote to a path nothing includes.** It emitted
+  `Shipwright/soh/src/zelda3d/zelda3d_scene_names.inc`, while the build includes
+  `Shipwright/soh/src/zelda3d/tables/zelda3d_scene_names.inc` (via `scene_replacement.c`'s
+  `#include "../tables/zelda3d_scene_names.inc"`). So regenerating produced a second, **untracked** copy
+  of the same data and left the tracked table stale. The two had already drifted in their header count
+  (102/111 generated vs 101/110 written) while every *name* still matched — the worst kind of
+  divergence, because it looks correct until someone edits the copy that is not the one that compiles.
+  The generator now writes the compiled table, and the only hand-written comment inside it (why
+  sceneNum `0x6E` maps to `spot99` at all) is preserved by **sceneNum key**, not by position, so
+  inserting a row cannot shift it onto the wrong scene.
+* **My own survey had the same undercount it was measuring.** `mm_scene_coverage_survey.py` reported
+  "MM3D's own `SCENE_UNSET` scene ids: **0**" for a table that has 11. MM3D writes its empty slots as
+  `((unset))`, and a `[^)]*` capture group stops at the `(` of `(unset`, leaving a stray `)` that no
+  longer matches `\s*\*/` — so all 11 rows silently failed to parse. That is the bucket that has to
+  stay separate from the mapping-gap count, so the undercount was a *wrong verdict*, not a cosmetic
+  slip. The corrected survey reports **113 entries / 102 mapped / 11 UNSET**, matching the generator's
+  own header, and 102 of 102 still resolve with zero dead mappings.
+
+Both generators are now covered by `tools/test_gen_scene_names.py` (8 cases): each writes the table the
+build includes, no stray second copy exists, **regeneration is idempotent** (the only way a generated
+table's staleness is detectable without reading it), the header count equals the table contents, and
+the preserved comment stays on its own row. The MM survey's parser gained two cases, and restoring the
+`[^)]*` group fails both — mutation-verified.
+
 One documented multi-stage-TEV approximation is now **closed by measurement rather than by argument**:
 `PREVIOUS_BUFFER` was listed as reading zero because PICA's initial combiner-buffer color is an
 uncaptured runtime register, but `tev_corpus_survey.prevbuf_before_latch` walks each chain in stage

@@ -43,8 +43,14 @@ from ctr_romfs import CtrRom  # noqa: E402
 # path so the sceneNum->name table has ONE owner"). Parsed, never transcribed: a copy here would
 # drift from the table the game actually uses, which is the same failure mode as the LA4 format table.
 SCENE_NAMES_INC = REPO / "2ship" / "2s2h" / "zelda3d" / "mm3d_scene_names.inc"
+# The paren group must tolerate ONE nested paren. MM3D's own empty slots are written `((unset))`, and a
+# `[^)]*` group stops at the `(` of `(unset` — leaving a stray `)` that no longer matches `\s*\*/`, so
+# those rows silently fail to match. That undercount is not cosmetic: it made this survey report
+# "MM3D's own SCENE_UNSET scene ids: 0" for a table that has 11, which is exactly the bucket that must
+# stay separate from the mapping-gap count.
 ENTRY = re.compile(
-    r"/\* 0x([0-9A-F]{2}) SCENE_(\S+)\s+\(([^)]*)\)\s*\*/\s*(NULL|\"[a-z0-9_]+\")"
+    r"/\* 0x([0-9A-F]{2}) SCENE_(\S+)\s+\((?P<seg>[^()]*|\([^()]*\))\)"
+    r"\s*\*/\s*(?P<val>NULL|\"[a-z0-9_]+\")"
 )
 SCENES_PREFIX = "/scenes/"
 INFO_SUFFIX = "_info.zsi"

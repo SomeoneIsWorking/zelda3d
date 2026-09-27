@@ -652,6 +652,19 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - gap: **the mapping is complete; the pixels are not verified.** `mm3d_draw.h` carried a stale comment claiming `Zelda3D_TryDrawRoom` "currently returns 0 unconditionally (no MM3D scene coverage table yet)" — the table had landed and the comment outlived it; it is corrected in place. What is still missing is any MM *visual* evidence: there is no MM oracle capture, so none of this coverage is confirmed on screen.
 - notes: a mapping gap is invisible from the host's side — a missing entry just looks like content that was never ported — which is why this is measured from the ROM rather than inferred from the code. The table is PARSED, never transcribed, because a transcribed copy is exactly how the LA4 constant was "supported" while `PicaDecode` returned empty. My first test suite for this survey exercised only the ROM-gated `survey()` entry point, so two real mutations (transcribe-instead-of-parse, and treat no-suffix files as reachable) both left all 14 tests **green**; the classification now lives in a pure `classify_scene_files()` the tests call directly, and both mutations fail. A rule tested only through an entry point that needs external state is not tested.
 
+**The table was being parsed with a group that skipped MM's own empty slots.** MM3D writes those
+as `((unset))`; a `[^)]*` capture stops at the `(` of `(unset`, so all 11 UNSET rows failed to match and
+the survey reported "MM3D's own SCENE_UNSET scene ids: 0". Corrected: **113 table entries, 102 mapped,
+11 UNSET**, matching the generator's own `102/113` header, with 102 of 102 still resolving and zero dead
+mappings. The verdict was not wrong, but the bucket that exists precisely to keep MM3D's own empty slots
+out of the mapping-gap count was empty for the wrong reason — a silent undercount in the thing doing the
+counting. `tools/test_gen_scene_names.py` (8 cases) now covers both generators: each writes the table
+the build includes, no stray second copy exists, regeneration is idempotent, the header count equals the
+table contents, and the one hand-written comment inside the generated table is preserved by sceneNum
+key rather than position. `gen_scene_names.py` itself was writing to
+`Shipwright/soh/src/zelda3d/zelda3d_scene_names.inc` while the build includes
+`.../zelda3d/tables/zelda3d_scene_names.inc`, so regenerating produced an untracked second copy and left
+the tracked table stale (header 101/110 vs 102/111, every name identical); both are fixed.
 ### render.cmb-fragment-lighting — PICA fixed-function fragment primary / secondary
 - status: re-partial
 - deps: render.multi-stage-tev
