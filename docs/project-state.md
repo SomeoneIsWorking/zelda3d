@@ -63,14 +63,16 @@ the same feature table the GLSL comes from and locked against the generated sour
 
 What that first comparison establishes and does not: the wordmark composition — lockup, sub-lockup,
 shield, sword, credit line — is present at the oracle's scale and placement, so the 3DS-authored
-content is composed correctly (lockup width ~445px host vs ~415px oracle of 800). The glow hue is white where the oracle's
-is orange, and it is **unattributed**: it was first blamed on the unified path's placeholder combiner,
+content is composed correctly (lockup width ~445px host vs ~415px oracle of 800). The glow hue was
+white where the oracle's is orange. It was first blamed on the unified path's placeholder combiner,
 but a generated-source test refutes that — `kDualTex`/`kDualTexFog` never call `evalCycle`, they take
 a branch implementing the three byte-classified PICA dual-texture shapes on `uSheen.y`, so the
-wordmark is on the same proven shape mechanism as the native path. Every 3DS draw on this frame is
-therefore accounted for on a proven mechanism, which puts the delta in a stage shared by all of them;
-the PICA distance fog the unified path documents as not applied, and the dawn-layer stack, are the
-candidates and neither is claimed. The tool's `content` metric moved
+wordmark is on the same proven shape mechanism as the native path. It is now **attributed and fixed**:
+the unified path gated the per-draw RGB modulation on `lit`, which `ZELDA3D_HANDLE_FORCE_UNLIT` clears
+without touching the modulation, so the force-unlit fire-glow drew untinted and additively saturated
+to white — and scene geometry lost its scene tint the same way. The PICA distance fog the unified
+path documents as not applied, and the dawn-layer stack, remain candidates for the *residual* and
+neither is claimed. The tool's `content` metric moved
 0.4784 → 0.4846 between two invocations that looked identical; that was **not** run-to-run noise but a
 one-frame shift, since `--draw-list` armed and stepped before capturing. Measured, with the host
 state read at cs=1093 in two separate processes:
