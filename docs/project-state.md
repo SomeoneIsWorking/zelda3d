@@ -357,6 +357,64 @@ reports that field. `tools/test_unified_carryage_audit.py` (13 cases) plus the g
 from the previous turn are now in the hosted CI list, since they are ROM-free structural gates for
 the shipped renderer.
 
+**The fragment-lighting transport is closed, and one of its load-bearing readings was wrong.**
+`oot3d-decomp`'s `fragment_lighting.md` had recorded, as a blocker, that the per-draw lighting object
+is "a **separate 0x4C8-byte object**, authored per material by the 3DS toolchain and held in game
+data" — so the only remaining route was to find that blob in the data archives. There is no such blob.
+
+`FUN_004c34ac` (408 B, the single caller of the object's constructor `FUN_004c6264` at `0x004c3528`)
+builds the per-material state: zero four words, construct the object at **record + 0x10**, advance by
+`0x73` words — so the record is **0x1CC bytes at stride 0x1CC**, and the object is constructed and fed
+at build time, not copied. Its last statement is `FUN_004c6364(piVar8 + 3, *piVar8 + 0xcc)`: the
+descriptor feed, whose input is **material + 0xCC**. `FUN_004c6364` then reads offsets
+`{0x10,0x12,0x14,0x18,0x1C,0x1E,0x1F,0x20,0x23,0x24,0x26,0x28}` through the pointer it just stored, and
+those twelve are exactly `CmbMaterial::fragment_lighting_descriptor`'s twelve field names in the
+shipping parser. **So the mode bytes need no new asset data — the host already retains every field the
+feed reads**, and the gate is `material + 0x00`, which it already parses as
+`CmbMaterial::fragment_lighting`. The note's own arithmetic ("a 0x4C8-byte source cannot live inside a
+material entry") was correct and was the tell: the source was never 0x4C8 bytes.
+
+**The reading that would have produced a plausible bad port.** That same function's `+0x138` /
+`+0x13C..+0x158` block was recorded as the fragment-lighting mode bytes. It is **alpha-blend state**.
+Measured over both corpora at the same base the host uses (`mats + 0x0C`, stride 0x15C/0x16C):
+
+| field | OoT3D | MM3D | reading |
+|---|---|---|---|
+| `+0x138` | 2 values (0: 9661, 1: 1511) | 3 values (0: 5697, 1: 1093, 2: 1) | blend enable |
+| `+0x13C` | 4 values, 100% GL blend enums | 4, 100% | `blendSrcRGB` = 0x0302 x10781 |
+| `+0x13E` | 6 values, 90.3% GL enums | 3, 89.3% | `blendDstRGB` = 0x0303 x9970 |
+| `+0x140` | 2 values, 100% (0x8006 x11166) | 2, 100% | `blendEqRGB` = FUNC_ADD |
+| `+0x00` | **205 of 11172** | **6428 of 6791** | **fragment-lighting gate** |
+
+Bounded enum indices cannot be GL enums, and the `+0x00` counts reproduce the two figures this project
+already had from the *combiner* side (`cmb_fragment_lighting_survey.py`: 205 OoT3D, 6,428 MM3D) — an
+independent direction, so `+0x00` is the gate and the host's blend names at `cmb.cpp:276-284` are
+right. Had that block been ported as fragment-lighting input it would have produced plausible,
+corpus-wide, entirely wrong lighting for every material.
+
+**The Thumb caller is now excluded by a decoder that works.** The note said the only unexcluded case
+was a Thumb `BL`/`BLX`, because the previous decoder matched 100% of halfword positions with a 1:1
+target ratio and put 2.2% of targets back in the image — reading data, not instructions, and correctly
+refused as non-evidence. `oot3d-decomp/tools/callers_thumb.py` (15 cases validated against
+hand-computed encodings rather than against the corpus, since a corpus ratio cannot tell a wrong
+decoder from a false positive) gets two details right that decide the whole thing: the PC is
+`(address & ~3) + 4` with the low two bits cleared, and `BLX`'s second halfword is
+`11 J1 0 J2 H imm10H`, so the offset field is **10** bits and bit 0 is the H flag. Reading 11 bits folds
+H into the offset and is wrong for every BLX — that one bit alone dragged the measured in-image
+fraction from 70% to 21%. Over 22,223 matches it finds **zero** whose target is a known function entry,
+so `code.bin` has no Thumb branch reaching code at all. The control is therefore the function-start
+fraction, not the in-image fraction: this image is mostly ARM, and a Thumb match inside ARM data still
+lands in the image, which is why a correct decoder cannot post the ARM scanner's 70% here.
+
+**What is left for fragment lighting is now short and none of it is the transport:** the eight
+slot-enable bytes, set by `FUN_003fa5d0` (1608 B) and `FUN_003fa34c` (672 B) in the CMB *renderer* rather
+than by the construction chain, so PICA's `lights_num` must be read out of those two functions and
+matched against the host's two-enabled-slot model instead of assumed equal; and a measurement conflict
+— the construction chain's stride is 0x1CC while the live dump measured 0x4C8 at
+`CmbRenderer + 0x400`, so those are two different arrays and the live dump must not be read as this
+one. The configuration counterfactual still needs one lit material, and the title demo never enables
+fragment lighting (0 of 207 draws, `picaLit` register), so that half remains behind issue #23.
+
 **Majora's Mask has no PICA distance fog at all, and the natural fix is refuted.** `Zelda3D_Fog3dSet` is
 called only from the SoH layer (`title_lighting.cpp`, `lighting/zelda3d_lighting.c`) and never from
 `2ship/`, so `gZelda3dFog3dOn` stays 0 for the whole game and every MM draw is unfogged on both
