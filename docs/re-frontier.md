@@ -422,6 +422,15 @@ This doc **organizes and links to** the existing RE corpus rather than duplicati
 - gap: none NOW, after three corrections: (1) the region is `[16-byte header][count x 28-byte records]`, not a 28-byte "metadata entry 0" — the old "+1 slot bias" masked a 12-byte phase shift; (2) `amb` is at `+0x0a`, so the "constant (160,72,72) ambient" seen in every scene was direction bytes; (3) the block at `+0x0a` is N64 `EnvLightSettings` byte-for-byte with **DIR BEFORE COLOUR**, so what was labelled `l1dir` was really `fogColor`. The `light2Dir = -light1Dir` invariant made `light1Dir` come out right BY ACCIDENT, hiding (3).
 - notes: if a future divergence smells like env data, suspect this record's field map before suspecting the renderer.
 
+### render.per-draw-uniform-carriage — what the unified route copies from the native per-draw packer
+
+- status: re-verified
+- deps: lighting.pica-fog
+- evidence: two of the native packer's PER-DRAW inputs were not carried by the unified route, and both were live on the title. (1) The fog mode gate — 9.91 mean-abs at cs=1093 (48.14 -> 38.23), see `lighting.pica-fog`. (2) The per-draw texcoord scroll — **2 of 101 title draws at cs=1093 carry a non-zero value, both (0.57222, 0), on models 2002/2004**, the OoT3D sky cloud band's `.cmab` rate. The scroll measurement comes from `uvScroll` on the per-draw `[Zelda3D_SG] draw N` list, added because the per-group `uv=` in an `sgdump` row is the group's own UV and a capture without the draw's scroll cannot tell "the band does not scroll" from "no draw asked it to".
+- where: `Shipwright/libultraship/include/fast/unified_ubo.h` (`uFogCtl`, and `uUvScroll` which replaced the dead `uEnvColor` — written 0 and read by nothing, a size-parity filler in the slot a real input wanted), `Shipwright/libultraship/src/fast/backends/unified_shader.cpp`, `Shipwright/libultraship/src/fast/zelda3d_sdl3gpu_pass.cpp`
+- gap: none for the two found. **The audit that found them was by hand, over the native per-group writes against the unified packer's copies, and is not a mechanical check** — so this row is the finding, not a guarantee that a third is absent. `SgUbo` fields the native writes that neither route's shader reads (`uShadow`, `uFog2`, `uParams[0..1]`, `uTintSkin[3]` on the CMB path) were checked one by one and are dead by construction rather than by omission.
+- notes: **no pixel win is claimed for the scroll.** `union_rgb_mae` moves 38.23 -> 38.09 and `content` 0.4807 -> 0.4760, and this instrument's measured noise floor is 0.73 mean-abs with one frame worth ~5.9 — so 0.14 is five times below the floor and the `content` sign is opposite. The evidence for the fix is the measured live INPUT and the mechanism being the native one, not the image. A mechanical counterpart of the audit (assert every field the native per-group packer writes is either read by a route's shader or listed as dead) is the named follow-up.
+
 ### lighting.pica-fog — 3DS PICA distance fog (window + colour)
 - status: re-verified
 - deps: lighting.zsi-record-layout

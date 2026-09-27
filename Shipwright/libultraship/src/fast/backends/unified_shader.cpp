@@ -125,7 +125,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     vec4 uLightDir; \
     ivec4 uCombA[4]; \
     vec4 uPrimColor; \
-    vec4 uEnvColor; \
+    vec4 uUvScroll; \
     vec4 uFogColor; \
     vec4 uParams0; \
     vec4 uParams1; \
@@ -222,7 +222,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
                                  (nv0.y * 0.5 + 0.5 - ubo.uTex0Xf.w) * ubo.uTex0Xf.y);
                 vUv0 = vec2(suv0.x, 1.0 - suv0.y);
             } else {
-                vUv0 = vec2(aUv0.x, 1.0 - aUv0.y);
+                vUv0 = vec2(aUv0.x + ubo.uUvScroll.x, 1.0 - aUv0.y + ubo.uUvScroll.y);
             }
             if (ubo.uTevCtl.y > 2.5 && ubo.uTevCtl.y < 3.5) {
                 vec3 nv = normalize(ns);
@@ -249,7 +249,10 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
                 vUv2 = vec2(0.0);
             @end
         @else
-            vUv0 = aUv0;
+            // The N64 route submits a zero scroll, so this term is a no-op there; it is here so a CMB
+            // draw that lands on this variant still gets its per-draw scroll rather than losing it
+            // because of which variant it was classified into.
+            vUv0 = vec2(aUv0.x + ubo.uUvScroll.x, aUv0.y + ubo.uUvScroll.y);
             vUv1 = aUv1;
             vUv2 = vec2(0.0);
         @end

@@ -957,7 +957,15 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             };
             memcpy(uu.common.uCombA, kCombA, sizeof(uu.common.uCombA));
             Zelda3DUnified::PackCmbDrawModulation(uu.common, r8, g8, b8, a8);
-            uu.common.uEnvColor[0] = uu.common.uEnvColor[1] = uu.common.uEnvColor[2] = uu.common.uEnvColor[3] = 0.0f;
+            // The per-draw texcoord SCROLL (the native's uExtra.yz). This is a per-DRAW input and the
+            // unified route dropped it: only the per-group coordinator transform in uTex0Xf was
+            // carried, so every scrolling draw sat still. Measured live at title cs=1093, 2 of 101
+            // draws carry a non-zero scroll -- both (0.57222, 0), the OoT3D sky cloud band's .cmab
+            // rate -- so the omission was visible content, not a dead field.
+            uu.common.uUvScroll[0] = uvOffU;
+            uu.common.uUvScroll[1] = uvOffV;
+            uu.common.uUvScroll[2] = 0.0f;
+            uu.common.uUvScroll[3] = 0.0f;
             uu.common.uFogColor[0] = base.uFog[0];
             uu.common.uFogColor[1] = base.uFog[1];
             uu.common.uFogColor[2] = base.uFog[2];
@@ -1029,11 +1037,16 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
     for (const DrawGroup& g : dgs) {
         const int drawIdx = g_sgDrawIdx++;
         if (gZelda3dSgDrawList) {
+            // uvScroll is a shader INPUT like the fog window, and it is invisible in the per-group
+            // `uv=` of an sgdump row (that is the group's own UV, not this draw's scroll). It drives
+            // the OoT3D sky cloud band's .cmab rate (#28b) and is 0 for every other draw, so a
+            // capture without it cannot distinguish "the band does not scroll" from "no draw asked
+            // it to scroll" -- which is exactly the two cases a shader divergence looks alike.
             fprintf(stderr,
                     "[Zelda3D_SG] draw %d model=%d group=%d material=%d first=%u count=%u dual=%d tev=%d "
-                    "tex1idx=%d coord0=%d coord1=%d tex=%p tex1=%p tex2=%p\n",
+                    "tex1idx=%d coord0=%d coord1=%d uvScroll=(%.5f,%.5f) tex=%p tex1=%p tex2=%p\n",
                     drawIdx, modelId, g.model_group_index, g.material_index, g.first, g.count, g.dual_tex_mode,
-                    g.tev_generic, g.tex1_index, g.coord0_mapping, g.coord1_mapping, (const void*)g.tex,
+                    g.tev_generic, g.tex1_index, g.coord0_mapping, g.coord1_mapping, uvOffU, uvOffV, (const void*)g.tex,
                     (const void*)g.tex1, (const void*)g.tex2);
         }
         if (!Zelda3D_SgDrawIsolationIncludes(modelId, drawIdx)) {
