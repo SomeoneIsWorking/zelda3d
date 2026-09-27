@@ -107,6 +107,26 @@ def _model_view_rows_are_identity(uniforms) -> bool:
     return True
 
 
+# What a capture has to provide before UNIFORM_BLOCKS may be read through it. Each clause below is a
+# measured or source-read fact, not a precaution.
+#
+# 1. MATERIAL IDENTITY. Azahar's per-draw vsuni log (Azahar/src/video_core/pica/pica_core.cpp, the
+#    `draw n=%d idx=%d ...` fprintf) prints `idx` as `(int)is_indexed` -- the PICA indexed-draw flag,
+#    NOT a material. Nothing in that log names the bound C material, and the C program is what
+#    decides what each float-uniform index means. So this is a requirement on the INSTRUMENTATION, not
+#    just on the probe record: a capture cannot be read through the block table until the logger
+#    carries the material.
+# 2. SPAN. The named blocks must actually be written; `MappingConstants` (c93..c95) is written by no
+#    capture in the current corpus, so the method-4 question cannot be reached at all today.
+# 3. A USEFUL VALUE. A capture can span a block and still be degenerate for the question, which is
+#    why UNIFORM_QUESTIONS carries value checks.
+CAPTURE_REQUIREMENTS: tuple[str, ...] = (
+    "material identity in the per-draw log (today `idx` is is_indexed, the PICA indexed-draw flag)",
+    "the named blocks actually written (MappingConstants c93..c95: written by no cached capture)",
+    "values non-degenerate for the question (an identity model-view answers nothing about a "
+    "non-identity model-view)",
+)
+
 # An open question, the blocks a capture must span, where it is tracked, and an optional VALUE check.
 # The value check is what stops "the index is present" from being reported as "the question is
 # answerable": question (1) needs a non-identity model-view, and the only layout-identified capture
@@ -309,6 +329,10 @@ def format_report(report: CoverageReport, cache_root: Path) -> str:
     lines.append("block order: " + " ".join(block_names))
     lines.append("")
     lines.append("NOTE " + INDEX_SCOPE_NOTE)
+    lines.append("")
+    lines.append("what a capture must provide before it may be read through the block table:")
+    for requirement in CAPTURE_REQUIREMENTS:
+        lines.append(f"  - {requirement}")
     lines.append("")
     lines.append("questions a cached capture can ANSWER (spans the blocks AND names a material):")
     answered = report.answered()
