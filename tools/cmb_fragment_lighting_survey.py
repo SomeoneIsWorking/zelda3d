@@ -303,10 +303,17 @@ def main(arguments: list[str] | None = None) -> int:
     failures = 0
     records: list[MaterialLighting] = []
     corpus: list[tuple[str, bytes]] = []
+    # What the population actually IS, so a percentage is never read without its denominator. The two
+    # games are NOT the same shape: OoT3D reaches 610 inline scene CMBs from .zsi files, while MM3D
+    # ships no scene container under /actors/ and its iterator reaches actor archives only. Every
+    # percentage this tool prints is therefore an ACTOR-MATERIAL figure for mm and an
+    # actor+scene figure for oot.
+    corpus_kinds: Counter = Counter()
     try:
         for label, data in iter_corpus(args.game)():
             files += 1
             corpus.append((label, data))
+            corpus_kinds["zsi-scene" if label.endswith(".zsi") else "archive-member"] += 1
             try:
                 parsed = scan_materials(label, data)
                 records.extend(parsed)
@@ -396,6 +403,14 @@ def main(arguments: list[str] | None = None) -> int:
             "  verdict: NOT distinctive -- the word is common at several offsets, so this proves"
             " nothing"
         )
+    print(
+        f"corpus: {dict(corpus_kinds)}"
+        + (
+            "  <- ACTOR MATERIALS ONLY; MM3D scene/environment materials are NOT in this population"
+            if args.game == "mm"
+            else "  (actors + inline scene CMBs)"
+        )
+    )
     print(
         f"files={files} materials={materials} fragment_enabled={len(enabled)} "
         f"fragment_primary_consumers={len(primary)} "

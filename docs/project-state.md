@@ -113,7 +113,12 @@ definitions: **OoT3D has 197 of 11,172 materials (1.8%) consuming an enabled PIC
 MM3D has 2,283 of 2,968 (76.9%)**, plus 503 vs 69 for `FRAGMENT_SECONDARY`. The host maps those to the
 vertex-lit primary and to black, so this is a rounding error on OoT3D and the **dominant lighting
 mechanism of MM3D being essentially unimplemented** — which contradicts any reading of S003/S005 as
-symmetric. It is also cheap to fix and rankable: **1,069 MM3D materials (36% of the corpus) use only
+symmetric. **But the two populations are not the same shape, and the tool prints that on every run:**
+OoT3D reaches 1,387 archive members plus 610 inline `.zsi` scene CMBs, while MM3D's iterator reaches
+1,448 actor members and **zero scene files** (MM3D ships no `.zsi` equivalent under `/actors/`). So
+76.9% is an **actor-material** figure and MM3D's scene/environment materials are unmeasured — extending
+`iter_mm3d_cmbs` to MM3D's scene container is a named gap, and the same limit applies to the other
+"MM3D's corpus" figures in the frontier. It is also cheap to fix and rankable: **1,069 MM3D materials (36% of the corpus) use only
 `MODULATE[C(FRAG_PRIMARY),C(TEX0)]`-family chains**, so one correct `FRAG_PRIMARY` is worth more on the
 MM side than every other open graphics row combined. The OoT3D figures reconcile exactly with the
 existing row (202 consumers, `source_without_flag=5`, 202−5=197). Whether the OoT3D-recovered `+0` flag and `+0xA0..+0xB3`
