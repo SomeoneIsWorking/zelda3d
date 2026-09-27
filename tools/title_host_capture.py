@@ -151,6 +151,31 @@ def wordmark_metrics(oracle_path: Path, host_path: Path) -> dict[str, float | in
     }
 
 
+def glow_metrics(oracle_path: Path, host_path: Path) -> dict[str, float]:
+    """Measure the fire-glow's channel RATIOS over the brightest tenth of the halo.
+
+    The glow is additively blended, so a lost per-draw RGB tint does not merely shift brightness --
+    it drives every channel to saturation and the glow turns white. An absolute-brightness metric
+    cannot see that (a saturated white and a saturated orange have the same luminance), but the
+    channel RATIOS can: the oracle keeps blue at ~0.58 of red, and an untinted white texture puts it
+    at ~0.99. The ratios are also independent of how much of the halo each side covers, which the
+    gold-pixel count above is not.
+    """
+    box = (250, 60, 430, 200)
+    out: dict[str, float] = {}
+    for name, path in (("oracle", oracle_path), ("host", host_path)):
+        image = np.asarray(Image.open(path).convert("RGB"), dtype=np.float64)
+        halo = image[box[1] : box[3], box[0] : box[2]].reshape(-1, 3)
+        core = halo[np.argsort(halo.sum(axis=1))[- max(1, len(halo) // 10) :]]
+        red = float(core[:, 0].mean())
+        out[f"{name}_glow_r"] = red
+        out[f"{name}_glow_g_over_r"] = float(core[:, 1].mean()) / max(red, 1e-9)
+        out[f"{name}_glow_b_over_r"] = float(core[:, 2].mean()) / max(red, 1e-9)
+        out[f"{name}_glow_saturated_px"] = float(np.count_nonzero(halo.max(axis=1) >= 255))
+    out["glow_b_over_r_delta"] = out["host_glow_b_over_r"] - out["oracle_glow_b_over_r"]
+    return out
+
+
 def require_cached_oracle_frames(
     cache: OracleCache, title_frames: list[int]
 ) -> dict[int, tuple[int, Path]]:
@@ -232,6 +257,7 @@ def run(title_frames: list[int], name: str, unified_renderer: int, draw_list: bo
             Image.open(oracle_path).convert("RGB").save(oracle_output)
             score = content_score(oracle_output, host_path)
             metrics = wordmark_metrics(oracle_output, host_path)
+            glow = glow_metrics(oracle_output, host_path)
             comparison = compose_sxs(
                 oracle_output,
                 host_path,
@@ -244,7 +270,10 @@ def run(title_frames: list[int], name: str, unified_renderer: int, draw_list: bo
                 f"content={score:.4f} gold_px={metrics['oracle_gold_px']}/"
                 f"{metrics['host_gold_px']} gold_mean_r="
                 f"{metrics['oracle_gold_mean_r']:.1f}/{metrics['host_gold_mean_r']:.1f} "
-                f"union_rgb_mae={metrics['union_rgb_mae']:.2f} sxs={comparison}"
+                f"union_rgb_mae={metrics['union_rgb_mae']:.2f} "
+                f"glow_b/r={glow['oracle_glow_b_over_r']:.2f}/{glow['host_glow_b_over_r']:.2f} "
+                f"glow_sat_px={glow['oracle_glow_saturated_px']:.0f}/"
+                f"{glow['host_glow_saturated_px']:.0f} sxs={comparison}"
             )
     finally:
         harness.close()

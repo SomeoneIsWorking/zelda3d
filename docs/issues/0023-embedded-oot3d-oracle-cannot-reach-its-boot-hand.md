@@ -59,6 +59,61 @@ need, and any gameplay-scoped host-vs-oracle image — is waiting on that one ar
 
 The pre-handshake Vulkan work recorded below stays valid and stays fixed; it was never this blocker.
 
+## The cold route, measured frame by frame (2026-09-27): the blocker is external state, and it is exact
+
+The record above said the cold title route "fails". It did not say *where*, so it was re-driven with
+a frame captured at every step (`tools/title_flow_watch.py`, `tools/title_load_watch.py`). The flow is
+**order-sensitive in a way that made earlier recipes look broken**:
+
+* **A alone does nothing at all.** `scene` stays `0x006b`, `playstate` stays `mode=title`.
+* **Start is the button that transitions**, and only once the title card is up. The correct user path
+  is: run to the logo (~1093 frames), press **Start once**.
+* The transition is not instant. Roughly 200 frames of pure black (`min=max=0`), and then the screen
+  resolves to a **sky-only frame** — clouds, no geometry, no UI — at `scene 0x0000`.
+
+### Refuted on the way, so nobody repeats them
+
+* **"The menu only accepts input after the logo appears."** Refuted: the flow is byte-identical when
+  the first tap is at frame 300 and at frame 1093 (`0x006b` -> `0x0000` on `start,start,a` either way).
+* **"The black screen is still loading."** Refuted: 2400 frames at `scene 0x0000` leaves
+  `playstate=ok 0x0871e840 mode=title` and `gameplay=ok no` at every 200-frame sample. It is stuck, not
+  slow. (This one nearly reproduced a false negative: an intermediate probe read a frame only ~40
+  frames into the transition as "black and stuck", when the screen in fact resolves at ~200.)
+
+### What the emulator actually reports
+
+```
+core/file_sys/savedata_archive.cpp:OpenFile: Non-existing file .../title/00040000/00033500/
+  data/00000001/save00.bin can't be open without mode create        (and save01.bin, save02.bin)
+```
+
+The game's save index is `.../data/00000001/system.dat`, and **it is not a 3DS file at all** — 34
+bytes, no `SAVE` magic (`00 3D 55 24 43 75 54 65 ...`). Deleting it changes the reported error but
+**Azahar does not regenerate it**, so the file-select has no slots to enumerate either way. A valid
+save-data index is what would let the game create slot 0, and hand-authoring one would be exactly the
+kind of guessed binary layout this project refuses to ship.
+
+### The missing system title is genuinely absent, not mis-pathed
+
+The NAND image carries system *data* (`sysdata/00010017` config, `00010026` eventlog, `00010035`
+news.db, `extdata/00048000` gamecoin) but **has no `title/` directory at all**, and `0004000e` appears
+nowhere in the whole save tree. The SD card holds only the game itself (`title/00040000`).
+
+So the residual blocker is external state that must be **provided, not derived**: either an Azahar
+image carrying `title/0004000e/00033500`, or a valid 3DS save-data `system.dat` so the game creates
+its own slot. Neither is something to fabricate — the first is Nintendo system-title content, the
+second is a hand-built binary filesystem.
+
+### Consequence for the renderer campaign
+
+The title screen remains available as an oracle, and the corpus surveys do not need one at all, so
+this blocks *gameplay-scoped* parity specifically. It also explains why the title host-vs-oracle image
+is a weak discriminator for renderer semantics: the host runs the **N64** title demo and the oracle
+runs the **3DS** title demo, so the authored camera scripts differ and most of the measured delta
+(`union_rgb_mae=47.80`) is that difference rather than raster semantics. A forced pose or a
+per-material isolation is the honest way to compare raster semantics on the title content, and it
+cannot stand in for a gameplay interaction.
+
 ## What was tried / dead ends
 
 * Loading `raw/fd2-oracle-fixed.state` directly as `boot_to_gameplay`'s state: the harness closes

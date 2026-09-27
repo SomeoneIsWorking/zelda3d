@@ -185,11 +185,21 @@ TEST(Zelda3DUnifiedShader, SelectedFragmentProbesConsumeTheUnifiedDebugGate) {
     EXPECT_EQ(Fast::Unified::BuildFragmentSource(Variant::kGenericTev).find("ubo.uDebug.x > 0.5"), std::string::npos);
 }
 
-TEST(Zelda3DUnifiedShader, CmbDrawModulationPreservesTintGateAndPostTevAlpha) {
+TEST(Zelda3DUnifiedShader, CmbDrawModulationAppliesToEveryCmbDrawExceptVertexLitAndN64) {
     const std::string vertex = Fast::Unified::BuildVertexSource(Fast::Unified::Variant::kGenericTev);
     const std::string fragment = Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kGenericTev);
-    EXPECT_NE(vertex.find("ubo.uParams1.w < 0.5 && ubo.uParams1.x > 0.5"), std::string::npos);
+    // Exactly two exclusions: an N64 already-transformed draw (uPrimColor is a combiner SOURCE
+    // there, so multiplying would double-apply) and the vertex-lit mode (PRIMARY comes from the
+    // PICA light bank).
+    EXPECT_NE(vertex.find("if (ubo.uParams1.w < 0.5 && ubo.uParams0.y < 1.5)"), std::string::npos);
     EXPECT_NE(vertex.find("vColor0.rgb *= ubo.uPrimColor.rgb"), std::string::npos);
+    // `lit` must not gate the modulation. `lit` is "apply the character/prop lighting term";
+    // ZELDA3D_HANDLE_FORCE_UNLIT clears it while leaving the modulation intact, so requiring it
+    // drops the modulation for every force-unlit and every scene-geometry draw. This assertion is
+    // the regression lock: it fails on the gate that rendered the title fire-glow white instead
+    // of the oracle's amber.
+    EXPECT_EQ(vertex.find("ubo.uParams1.x"), std::string::npos)
+        << "uParams1.x (the N64 noise scale) must not gate the CMB draw modulation";
     const auto alphaTest = fragment.find("if (afn > 0 && !alphaPass");
     const auto drawAlpha = fragment.find("texel.a *= ubo.uPrimColor.a");
     ASSERT_NE(alphaTest, std::string::npos);
@@ -197,14 +207,33 @@ TEST(Zelda3DUnifiedShader, CmbDrawModulationPreservesTintGateAndPostTevAlpha) {
     EXPECT_LT(alphaTest, drawAlpha);
 }
 
-TEST(Zelda3DUnifiedUbo, CmbDrawModulationUsesCallerRgbaAndLitGate) {
+TEST(Zelda3DUnifiedUbo, CmbDrawModulationCarriesCallerRgbaWithNoEnableSwitch) {
     Zelda3DUnified::CommonUbo unified{};
-    Zelda3DUnified::PackCmbDrawModulation(unified, 64, 128, 192, 32, true);
+    Zelda3DUnified::PackCmbDrawModulation(unified, 64, 128, 192, 32);
     EXPECT_FLOAT_EQ(unified.uPrimColor[0], 64.0f / 255.0f);
     EXPECT_FLOAT_EQ(unified.uPrimColor[1], 128.0f / 255.0f);
     EXPECT_FLOAT_EQ(unified.uPrimColor[2], 192.0f / 255.0f);
     EXPECT_FLOAT_EQ(unified.uPrimColor[3], 32.0f / 255.0f);
-    EXPECT_FLOAT_EQ(unified.uParams1[0], 1.0f);
+    // Written deterministically, not left to carry a stale N64-noise-scale meaning.
+    EXPECT_FLOAT_EQ(unified.uParams1[0], 0.0f);
+}
+
+TEST(Zelda3DUnifiedUbo, ForceUnlitDrawKeepsItsRgbModulation) {
+    // The title fire-glow's own numbers, sampled live at cs=1093 from g_title_fire.cmab's
+    // ConstColor channel 0 via the `log fireglow` channel: rgb=(0.8000,0.4300,0.0000). A
+    // force-unlit draw (lit == 0) must still carry them; the measured symptom of losing them was
+    // an all-three-channel-saturated white glow (1 : 1.00 : 0.99) against the oracle's amber
+    // (1 : 0.93 : 0.58) over the same pixels.
+    const auto byte = [](float v) { return static_cast<uint8_t>(v * 255.0f + 0.5f); };
+    Zelda3DUnified::CommonUbo unified{};
+    Zelda3DUnified::PackCmbDrawModulation(unified, byte(0.80f), byte(0.43f), byte(0.00f), 255);
+    EXPECT_FLOAT_EQ(unified.uPrimColor[0], byte(0.80f) / 255.0f);
+    EXPECT_FLOAT_EQ(unified.uPrimColor[1], byte(0.43f) / 255.0f);
+    EXPECT_FLOAT_EQ(unified.uPrimColor[2], 0.0f);
+    EXPECT_FLOAT_EQ(unified.uPrimColor[3], 1.0f);
+    // The blue channel is the discriminator: the oracle's glow keeps blue at 0.58 of red, so a
+    // dropped tint (which would leave blue at full) is a visible error, not a rounding difference.
+    EXPECT_LT(unified.uPrimColor[2], unified.uPrimColor[0] * 0.6f);
 }
 
 TEST(Zelda3DUnifiedUbo, CmbLightBankPreservesAmbientMultiplicityAndBothSlots) {

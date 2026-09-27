@@ -82,16 +82,22 @@ inline void CopyCmbVertexLightBank(CommonUbo& target, const Zelda3DSg::SgUbo& so
 
 // Preserve the native CMB path's per-draw modulation without introducing a second UBO field set.
 // uPrimColor is the N64 primitive color when alreadyTransformed is true; for model-space CMB draws
-// it carries the caller's RGBA modulation. uParams1.x is otherwise the N64 noise scale, so it can
-// carry the native `lit` tint gate on the mutually exclusive CMB route.
-inline void PackCmbDrawModulation(CommonUbo& target, uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha,
-                                  bool tintEnabled) {
+// it carries the caller's RGBA modulation, which the vertex stage applies on every CMB draw except
+// the vertex-lit one (see the gate in BuildVertexSource).
+//
+// There is deliberately no "is the modulation enabled" parameter. The native authority applies the
+// same modulation unconditionally (`shade = ubo.uTintSkin.xyz`), so any such switch here would be a
+// second, divergent policy — and the one that was here keyed on `lit`, which silently dropped the
+// modulation for every force-unlit and every scene-geometry draw. uParams1[0] is the N64 noise scale
+// on the N64 route and is unused by CMB draws (their frame_count is 0, so SHADER_NOISE never reads
+// it), so it is written explicitly rather than left to carry a stale meaning.
+inline void PackCmbDrawModulation(CommonUbo& target, uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) {
     constexpr float kByteToFloat = 1.0f / 255.0f;
     target.uPrimColor[0] = static_cast<float>(red) * kByteToFloat;
     target.uPrimColor[1] = static_cast<float>(green) * kByteToFloat;
     target.uPrimColor[2] = static_cast<float>(blue) * kByteToFloat;
     target.uPrimColor[3] = static_cast<float>(alpha) * kByteToFloat;
-    target.uParams1[0] = tintEnabled ? 1.0f : 0.0f;
+    target.uParams1[0] = 0.0f;
 }
 
 static_assert(sizeof(CommonUbo) == Zelda3DSg::kCommonBytes,
