@@ -73,25 +73,32 @@ bool CompileGlslToSpirv(EShLanguage stage, const std::string& src, std::vector<u
 }
 
 struct VariantFeatures {
-    bool hasTex0, hasTex1, hasTex2, alphaTest, fog, grayscale, genericTev;
+    bool hasTex0, hasTex1, hasTex2, alphaTest, fog, grayscale, genericTev, fog3d;
 };
+
+// Every variant carries the PICA fog block, not a subset. The gate is RUNTIME (uFogCtl.x), so
+// compiling it everywhere costs one vec3 varying and a few instructions, while compiling it
+// selectively would make the compiled set a SECOND fog policy that silently drops the fog for
+// whichever material happens to land on a variant someone forgot — the exact class of bug the
+// uFogColor gate already had. The N64 route is unaffected: its draws submit uFogCtl.x == 0.
+constexpr bool kAllVariantsFog3d = true;
 
 VariantFeatures FeaturesFor(Variant v) {
     switch (v) {
         case Variant::kUntextured:
-            return { false, false, false, false, false, false, false };
+            return { false, false, false, false, false, false, false, kAllVariantsFog3d };
         case Variant::kSingleTex:
-            return { true, false, false, false, false, false, false };
+            return { true, false, false, false, false, false, false, kAllVariantsFog3d };
         case Variant::kSingleTexAlphaTest:
-            return { true, false, false, true, false, false, false };
+            return { true, false, false, true, false, false, false, kAllVariantsFog3d };
         case Variant::kDualTex:
-            return { true, true, false, false, false, false, false };
+            return { true, true, false, false, false, false, false, kAllVariantsFog3d };
         case Variant::kDualTexFog:
-            return { true, true, false, false, true, false, false };
+            return { true, true, false, false, true, false, false, kAllVariantsFog3d };
         case Variant::kGrayscale:
-            return { true, false, false, false, false, true, false };
+            return { true, false, false, false, false, true, false, kAllVariantsFog3d };
         case Variant::kGenericTev:
-            return { true, true, true, false, false, false, true };
+            return { true, true, true, false, false, false, true, kAllVariantsFog3d };
         default:
             return {};
     }
@@ -141,7 +148,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     uvec4 uTevConst[2]; \
     vec4 uTex2Xf; \
     vec4 uTevCtl; \
-    vec4 uNativeLayoutPad; \
+    vec4 uFogCtl; \
     vec4 uDebug;
 
 @if(VERTEX_SHADER)
@@ -169,6 +176,12 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     layout(location=7) out vec2 vFog;
     layout(location=8) out vec3 vNrmView;
     layout(location=9) out vec2 vUv2;
+    // PICA distance-fog depth input. The fog factor is per FRAGMENT because the 3DS indexes its
+    // 128-entry LUT by the z-buffer DEPTH of the fragment, not by a per-vertex distance; two
+    // vertex-level variants of this were measured and falsified on the native path, so this
+    // varying carries the world POSITION (affine in the interpolation, hence exact) and the dot
+    // product is taken per fragment. Only the fogged variants pay for it.
+    @if(o_fog3d) layout(location=10) out vec3 vWorld;
 
     layout(set=1, binding=0, std140) uniform UnifiedCommon { UNIFIED_COMMON_UBO_BODY } ubo;
     layout(set=1, binding=1, std140) uniform UnifiedBones { mat4 uBones[@{ZELDA3D_GL_MAX_BONES}]; } bones;
@@ -193,6 +206,12 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         // clobber w=1). Otherwise (3DS): GPU-transform model-space pos via uMvp as before.
         gl_Position = (ubo.uParams1.w > 0.5) ? aPos : (ubo.uMvp * vec4(sp, 1.0));
         vNrmView = mat3(ubo.uMv) * nM;
+        // World position for the PICA distance fog, mirroring the native path's vWorld exactly:
+        // the model transform only, because for scene draws the camera is folded into uMvp and the
+        // fog's eye depth is recovered by dotting this against uFog3d1 (camera forward + its offset).
+        @if(o_fog3d)
+            vWorld = (ubo.uMv * vec4(sp, 1.0)).xyz;
+        @end
         @if(o_cmbExtraTex)
             vec3 ns = (ubo.uSphNrm0.w > 0.5)
                 ? vec3(dot(ubo.uSphNrm0.xyz, nM), dot(ubo.uSphNrm1.xyz, nM), dot(ubo.uSphNrm2.xyz, nM))
@@ -306,6 +325,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     layout(location=7) in vec2 vFog;
     layout(location=8) in vec3 vNrmView;
     layout(location=9) in vec2 vUv2;
+    @if(o_fog3d) layout(location=10) in vec3 vWorld;
     layout(location=0) out vec4 fragColor;
 
     @if(o_tex0) layout(set=2, binding=0) uniform sampler2D uTex0;
@@ -337,6 +357,21 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         float r = dot(sin(value), vec3(12.9898, 78.233, 37.719));
         return fract(sin(r) * 143758.5453);
     }
+
+    // RE'd 3DS fog LUT node value at t = i/128 (FogResUpdater, linear mode 0 —
+    // oot3d-decomp title_env_lighting.md §13): eyeDist = b/(a - t) (inverse projection), then the
+    // linear fogNear..fogFar window. uFog3d0 = (a, b, fogNear, fogFar). Byte-for-byte the native
+    // path's fog3dNode(); keeping one copy of the formula per route rather than one per pipeline
+    // would be the second, divergent implementation this codebase keeps refusing to add, so if the
+    // recovered formula changes, change it in both (zelda3d_sdl3gpu_shaders.cpp) and re-measure.
+    @if(o_fog3d)
+        float fog3dNode(float t) {
+            float d = ubo.uFog3d0.y / max(ubo.uFog3d0.x - t, 1e-6);
+            if (d < ubo.uFog3d0.z) return 1.0;
+            if (d > ubo.uFog3d0.w) return 0.0;
+            return (ubo.uFog3d0.w - d) / (ubo.uFog3d0.w - ubo.uFog3d0.z);
+        }
+    @end
 
     vec4 texel0() {
         @if(o_tex0)
@@ -458,6 +493,32 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         @if(o_fog)
             texel.rgb = mix(texel.rgb, ubo.uFogColor.rgb, clamp(vFog.x, 0.0, 1.0));
         @end
+        // OoT3D PICA distance fog (uFogCtl.x == 2.0 — zelda3d_sg_ubo.h, the same per-draw gate the
+        // native path reads as uFog.w, carried verbatim rather than re-derived). This is a SEPARATE
+        // mode from the N64 ramp above, not a replacement: the native path tests uFog.w > 1.5 first
+        // and falls through to the F3DEX ramp only when the PICA gate is off, and the two routes
+        // share one mode enum, so a draw can be moved between them by one number.
+        //
+        // The 3DS indexes a 128-entry fog LUT by the z-buffer DEPTH of this fragment. The depth is
+        // recovered from the interpolated world position: d = eye depth along the view axis, then
+        // depth = a - b/d is the fragment's z/w under the 3DS projection — exactly the value PICA
+        // indexes with. PICA then samples the entry and LERPs toward the next INSIDE the entry; with
+        // the scene's compressed depth range entry 127 spans eye ~873..zFar, so this
+        // piecewise-linear-in-DEPTH interpolation, not the underlying distance curve, is the visible
+        // haze. (The 3DS's 11/13-bit LUT quantization is omitted: <=1/2048 in the factor, sub-LSB of
+        // the 8-bit output.) Never applied to sky (uLightDir[3]), on this route or the native one.
+        @if(o_fog3d)
+            if (ubo.uFogCtl.x > 1.5 && ubo.uLightDir[3] < 0.5) {
+                float d3 = dot(vWorld, ubo.uFog3d1.xyz) - ubo.uFog3d1.w;
+                float depth3ds = ubo.uFog3d0.x - ubo.uFog3d0.y / max(d3, 1e-3);
+                float x = clamp(depth3ds, 0.0, 1.0) * 128.0;
+                float i0 = min(floor(x), 127.0);
+                float f0 = fog3dNode(i0 * (1.0 / 128.0));
+                float f1 = fog3dNode((i0 + 1.0) * (1.0 / 128.0));
+                float factor = clamp(f0 + (f1 - f0) * (x - i0), 0.0, 1.0);
+                texel.rgb = mix(ubo.uFogColor.rgb, texel.rgb, factor);
+            }
+        @end
 
         // Native CMB applies the caller's draw alpha after TEV and alpha-test. Applying it to
         // PRIMARY earlier would incorrectly change the alpha-test decision during title fades.
@@ -478,6 +539,7 @@ std::string BuildSource(Variant v, bool vertex, int fragmentProbeMode = 0) {
         { "o_tex2", f.hasTex2 },
         { "o_alphaTest", f.alphaTest },
         { "o_fog", f.fog },
+        { "o_fog3d", f.fog3d },
         { "o_grayscale", f.grayscale },
         { "o_genericTev", f.genericTev },
         { "o_cmbExtraTex", f.genericTev || v == Variant::kDualTex || v == Variant::kDualTexFog },

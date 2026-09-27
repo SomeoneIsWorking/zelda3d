@@ -267,6 +267,35 @@ TEST(Zelda3DUnifiedUbo, CmbLightBankPreservesAmbientMultiplicityAndBothSlots) {
     }
 }
 
+// The unified draw packer used to copy the fog PARAMETERS (uFog3d0/uFog3d1) and no gate, so the
+// shader's fog block — which is gated on the mode — evaluated to nothing for every unified draw.
+// The gate copy is the one line that decides it, so it gets a seam and a test of its own rather
+// than living unexercised inside the draw loop.
+TEST(Zelda3DUnifiedUbo, FogGateCarriesTheNativeMode) {
+    Zelda3DSg::SgUbo native{};
+    native.uFog[0] = 0.9f;
+    native.uFog[1] = 0.8f;
+    native.uFog[2] = 0.7f;
+    // 2.0 = the PICA distance-fog LUT, set by zelda3d_sdl3gpu_pass.cpp when
+    // (gZelda3dFog3dOn && grp.fogEnabled).
+    native.uFog[3] = 2.0f;
+
+    Zelda3DUnified::CommonUbo unified{};
+    // Pre-poison every lane: a packer that copied the mode nowhere would leave the sentinel.
+    for (int component = 0; component < 4; ++component) {
+        unified.uFogCtl[component] = -1.0f;
+    }
+
+    Zelda3DUnified::PackCmbFogGate(unified, native);
+
+    EXPECT_FLOAT_EQ(unified.uFogCtl[0], 2.0f);
+    // The remaining lanes are not part of the enum; they must be zeroed, not left as whatever the
+    // draw loop's reused UBO last held, because a stale lane here is a future field nobody set.
+    EXPECT_FLOAT_EQ(unified.uFogCtl[1], 0.0f);
+    EXPECT_FLOAT_EQ(unified.uFogCtl[2], 0.0f);
+    EXPECT_FLOAT_EQ(unified.uFogCtl[3], 0.0f);
+}
+
 // BUG 3: neither pushed uniform block may exceed SDL3 GPU's MAX_UBO_SECTION_SIZE. If this fails, the
 // renderer silently reads 0 for everything past the cap -> black world, T-posed actors.
 TEST(Zelda3DUboLayout, PushBlocksFitSdl3GpuSectionCap) {
@@ -362,6 +391,79 @@ TEST(UnifiedShader, DeclaredSamplerCountMatchesGeneratedBindings) {
             << Fast::Unified::VariantSamplerCount(variant) << " samplers but the "
             << "generated fragment stage binds " << declared;
     }
+}
+
+// The OoT3D PICA distance fog (uFogCtl.x == 2) is a SEPARATE mode from the N64 ramp above, and it
+// lives in the stage after the combiner, so every variant a CMB draw can land on must carry it.
+// The unified route compiled no fog at all until now: the packer copied uFog3d0/uFog3d1 (frame-level
+// parameters) but no per-draw GATE, so every draw evaluated the block to nothing. Measured at title
+// cs=1093 on the route that does have it, the fog is worth 9.63 mean-abs against the oracle
+// (43.56 with, 53.19 without), so this was not a cosmetic omission.
+TEST(UnifiedShader, PicaDistanceFogIsInEveryVariant) {
+    for (int index = 0; index < static_cast<int>(Fast::Unified::Variant::kCount); ++index) {
+        const auto variant = static_cast<Fast::Unified::Variant>(index);
+        const std::string fragment = Fast::Unified::BuildFragmentSource(variant, 0);
+        const std::string label = Fast::Unified::VariantName(variant);
+        EXPECT_NE(fragment.find("float fog3dNode(float t)"), std::string::npos) << label;
+        EXPECT_NE(fragment.find("if (ubo.uFogCtl.x > 1.5 && ubo.uLightDir[3] < 0.5)"), std::string::npos) << label;
+    }
+}
+
+// The mix argument order is the whole fog. mix(texel, fogColor, factor) is "fog the surface"; the
+// native path's mix(uFog.xyz, rgb, factor) is "fog toward the colour by the surviving factor".
+// Swapping them is a one-token change that compiles, passes every structural test, and inverts the
+// haze — the draw gets MORE distant-looking as it approaches, which reads as a subtler colour bug.
+TEST(UnifiedShader, PicaFogMixesTowardTheFogColourByTheSurvivingFactor) {
+    const std::string fragment = Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kGenericTev, 0);
+    EXPECT_NE(fragment.find("texel.rgb = mix(ubo.uFogColor.rgb, texel.rgb, factor);"), std::string::npos);
+    EXPECT_EQ(fragment.find("mix(texel.rgb, ubo.uFogColor.rgb, factor)"), std::string::npos);
+    // ...and factor == 1 must mean "unfogged", which is what puts the SURFACE in the second slot.
+    EXPECT_NE(fragment.find("return 1.0;"), std::string::npos); // nearer than fogNear
+    EXPECT_NE(fragment.find("return 0.0;"), std::string::npos); // beyond fogFar
+}
+
+// The 3DS indexes its 128-entry fog LUT by the fragment's z-buffer DEPTH, recovered from the
+// interpolated world position as a - b/d. A per-vertex fog factor is NOT equivalent: two variants of
+// that were measured and falsified on the native path, so this locks the depth form and the
+// in-entry interpolation (which is the visible haze under a compressed depth range).
+TEST(UnifiedShader, PicaFogUsesPerFragmentDepthAndThe128EntryLutInterpolation) {
+    const std::string fragment = Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kGenericTev, 0);
+    EXPECT_NE(fragment.find("float d3 = dot(vWorld, ubo.uFog3d1.xyz) - ubo.uFog3d1.w;"), std::string::npos);
+    EXPECT_NE(fragment.find("float depth3ds = ubo.uFog3d0.x - ubo.uFog3d0.y / max(d3, 1e-3);"), std::string::npos);
+    EXPECT_NE(fragment.find("float x = clamp(depth3ds, 0.0, 1.0) * 128.0;"), std::string::npos);
+    EXPECT_NE(fragment.find("float i0 = min(floor(x), 127.0);"), std::string::npos);
+    EXPECT_NE(fragment.find("float factor = clamp(f0 + (f1 - f0) * (x - i0), 0.0, 1.0);"), std::string::npos);
+}
+
+// A varying that is declared in the fragment stage but never written in the vertex stage is not a
+// compile error in every toolchain and is a silently always-zero fog where it is. Both halves, on
+// every variant, matched by location so a renumbering cannot hide a mismatch.
+TEST(UnifiedShader, TheFogWorldVaryingIsDeclaredOnBothStagesAtTheSameLocation) {
+    for (int index = 0; index < static_cast<int>(Fast::Unified::Variant::kCount); ++index) {
+        const auto variant = static_cast<Fast::Unified::Variant>(index);
+        const std::string label = Fast::Unified::VariantName(variant);
+        const std::string vertex = Fast::Unified::BuildVertexSource(variant);
+        const std::string fragment = Fast::Unified::BuildFragmentSource(variant, 0);
+        EXPECT_NE(vertex.find("layout(location=10) out vec3 vWorld;"), std::string::npos) << label;
+        EXPECT_NE(fragment.find("layout(location=10) in vec3 vWorld;"), std::string::npos) << label;
+        EXPECT_NE(vertex.find("vWorld = (ubo.uMv * vec4(sp, 1.0)).xyz;"), std::string::npos) << label;
+    }
+}
+
+// The mode enum is shared with the native route, not re-derived here: one number moves a draw
+// between the PICA LUT and the F3DEX ramp on either route. This is the property that stopped the
+// unified route silently dropping the fog (it copied the parameters, never the gate).
+TEST(UnifiedShader, TheFogModeEnumIsTheNativeOne) {
+    const std::string fragment = Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kGenericTev, 0);
+    // The N64 ramp is selected by its own compiled feature (@if(o_fog)), not by the mode enum, so a
+    // 0/1 test on uFogCtl.x would be a SECOND policy rather than a read of the native one. Only the
+    // 2.0 test is allowed to exist.
+    EXPECT_EQ(fragment.find("ubo.uFogCtl.x > 0.5"), std::string::npos);
+    // The N64 ramp block itself is only compiled into the variant that selects it (@if(o_fog), set
+    // for kDualTexFog), so read it there — checking a variant without it would be vacuous.
+    const std::string n64Ramp = Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kDualTexFog, 0);
+    EXPECT_NE(n64Ramp.find("texel.rgb = mix(texel.rgb, ubo.uFogColor.rgb, clamp(vFog.x, 0.0, 1.0));"),
+              std::string::npos);
 }
 
 // The two-sampler variants are the ones that were under-declared (they were told 1). Pin them

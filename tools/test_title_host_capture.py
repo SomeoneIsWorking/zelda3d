@@ -42,12 +42,21 @@ class TitleHostCaptureTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 title_host_capture.oracle_frame_for_title_cs(87)
 
+    # The reply shape the real harness prints (environment_probe_commands.cpp HandleZelda3dFog).
+    # `on=` is the RESULTING state, which is only meaningful after a frame has run — the latch is
+    # read by Zelda3D_Fog3dSet once per rendered frame, so the reply before soh_step still says
+    # on=0 for a request to turn it on.
+    FOG_ON = "ok soh_fog3d forceOff=0 on=1 a=1.000584 b=7.0041 near=800.0 far=2400.0"
+    FOG_OFF = "ok soh_fog3d forceOff=1 on=0 a=0.000000 b=0.0000 near=0.0 far=0.0"
+
     def test_boot_selects_renderer_before_title_frames(self) -> None:
         harness = FakeHarness(
             {
                 "soh_boot": "ok soh_boot",
                 "soh_unified 1": "ok soh_unified 1",
+                "soh_fog3d 1": "ok soh_fog3d forceOff=0 on=0 a=0.0 b=0.0 near=0.0 far=0.0",
                 "soh_step 240": "ok soh_step 240",
+                "soh_fog3d": self.FOG_ON,
                 "soh_camera": "ok soh_camera live=1 eye=(0,0,0)",
                 "soh_titlecs": "ok soh_titlecs frame=4 end=2400",
             }
@@ -55,7 +64,57 @@ class TitleHostCaptureTests(unittest.TestCase):
         self.assertEqual(title_host_capture.boot_host_title(harness, 1), 4)
         self.assertEqual(
             harness.commands,
-            ["soh_boot", "soh_unified 1", "soh_step 240", "soh_camera", "soh_titlecs"],
+            [
+                "soh_boot",
+                "soh_unified 1",
+                "soh_fog3d 1",
+                "soh_step 240",
+                "soh_fog3d",
+                "soh_camera",
+                "soh_titlecs",
+            ],
+        )
+
+    def test_a_fog_a_b_that_claims_off_but_reports_on_is_refused(self) -> None:
+        """A capture labelled "fog off" is worthless if the fog was on for another reason.
+
+        The fog can be off because it was latched off, or because nothing was fogged (no fogged
+        material, a degenerate window, the sky exclusion) — and only the first isolates anything. So
+        the resulting state is read back after a frame and a disagreement is an error, not a run.
+        This is the check that stops a fog A/B from silently measuring nothing.
+        """
+        harness = FakeHarness(
+            {
+                "soh_boot": "ok soh_boot",
+                "soh_unified 0": "ok soh_unified 0",
+                "soh_fog3d 0": "ok soh_fog3d forceOff=1 on=1 a=1.0 b=7.0 near=800.0 far=2400.0",
+                "soh_step 240": "ok soh_step 240",
+                "soh_fog3d": self.FOG_ON,  # the latch did not take
+                "soh_camera": "ok soh_camera live=1 eye=(0,0,0)",
+                "soh_titlecs": "ok soh_titlecs frame=4 end=2400",
+            }
+        )
+        with self.assertRaisesRegex(RuntimeError, "fog latch did not take effect"):
+            title_host_capture.boot_host_title(harness, 0, 0)
+
+    def test_fog_off_is_verified_after_the_frame_not_before(self) -> None:
+        """Reading the latch reply BEFORE the step would always report on=0 and reject fog=on."""
+        harness = FakeHarness(
+            {
+                "soh_boot": "ok soh_boot",
+                "soh_unified 0": "ok soh_unified 0",
+                "soh_fog3d 0": "ok soh_fog3d forceOff=1 on=1 a=1.0 b=7.0 near=800.0 far=2400.0",
+                "soh_step 240": "ok soh_step 240",
+                "soh_fog3d": self.FOG_OFF,
+                "soh_camera": "ok soh_camera live=1 eye=(0,0,0)",
+                "soh_titlecs": "ok soh_titlecs frame=4 end=2400",
+            }
+        )
+        self.assertEqual(title_host_capture.boot_host_title(harness, 0, 0), 4)
+        self.assertLess(
+            harness.commands.index("soh_step 240"),
+            harness.commands.index("soh_fog3d"),
+            "the resulting fog state was read before any frame ran",
         )
 
     def test_advances_naturally_and_reads_half_rate_cursor(self) -> None:

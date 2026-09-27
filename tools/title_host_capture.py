@@ -80,16 +80,34 @@ def advance_host_title(harness, current_cs: int, target_cs: int) -> int:
     )
 
 
-def boot_host_title(harness, unified_renderer: int) -> int:
+def boot_host_title(harness, unified_renderer: int, host_fog3d: int = 1) -> int:
     response = harness.send("soh_boot")
     if response != "ok soh_boot":
         raise RuntimeError(f"host boot failed: {response}")
     response = harness.send(f"soh_unified {unified_renderer}")
     if response != f"ok soh_unified {unified_renderer}":
         raise RuntimeError(f"host unified-renderer selection failed: {response}")
+    # Latch the OoT3D PICA distance fog at its single owner (gZelda3dFog3dForceOff inside
+    # Zelda3D_Fog3dSet) rather than in a shader, so one A/B moves the fog and nothing else. This
+    # is the discriminator for "how much of the host-vs-oracle delta is the fog": the native and
+    # unified routes are different code, so comparing them against each other confounds the fog
+    # with every other difference between them. Valid on either route, because both read the same
+    # per-draw gate (SgUbo::uFog[3]) this latch feeds.
+    response = harness.send(f"soh_fog3d {host_fog3d}")
+    if not response.startswith(f"ok soh_fog3d forceOff={0 if host_fog3d else 1} "):
+        raise RuntimeError(f"host fog latch failed: {response}")
     response = harness.send(f"soh_step {SOH_TITLE_BOOT_STEPS}")
     if response != f"ok soh_step {SOH_TITLE_BOOT_STEPS}":
         raise RuntimeError(f"host title boot step failed: {response}")
+    # The latch is read by Zelda3D_Fog3dSet once per rendered frame, so the reply can only report
+    # the resulting state AFTER a frame has run. Require it here, or a capture claiming "fog off"
+    # could be one where the fog was already off for an unrelated reason (no fogged material, a
+    # degenerate window, the sky exclusion) and the A/B would silently measure nothing.
+    response = harness.send("soh_fog3d")
+    if (f"on=1 " in response) != bool(host_fog3d):
+        raise RuntimeError(
+            f"host fog latch did not take effect as requested (host_fog3d={host_fog3d}): {response}"
+        )
     response = harness.send("soh_camera")
     if not response.startswith("ok soh_camera live=1"):
         raise RuntimeError(f"host title did not become active: {response}")
@@ -217,7 +235,9 @@ def capture_cursor_image(harness, title_cs: int, base: Path, draw_list: bool) ->
     return host_path
 
 
-def run(title_frames: list[int], name: str, unified_renderer: int, draw_list: bool) -> None:
+def run(
+    title_frames: list[int], name: str, unified_renderer: int, draw_list: bool, host_fog3d: int = 1
+) -> None:
     apply_repo_environment(REPO, os.environ)
     # The historical title anchors being consumed here are vanilla ROM frames.
     # Set this before OracleCache construction so both cache identity and host
@@ -247,7 +267,7 @@ def run(title_frames: list[int], name: str, unified_renderer: int, draw_list: bo
     print(f"[title_host_capture] oracle cache hit key={cache.key}")
     harness = spawn()
     try:
-        current_cs = boot_host_title(harness, unified_renderer)
+        current_cs = boot_host_title(harness, unified_renderer, host_fog3d)
         for title_cs in ordered_frames:
             oracle_frame, oracle_path = cached[title_cs]
             current_cs = advance_host_title(harness, current_cs, title_cs)
@@ -273,7 +293,8 @@ def run(title_frames: list[int], name: str, unified_renderer: int, draw_list: bo
                 f"union_rgb_mae={metrics['union_rgb_mae']:.2f} "
                 f"glow_b/r={glow['oracle_glow_b_over_r']:.2f}/{glow['host_glow_b_over_r']:.2f} "
                 f"glow_sat_px={glow['oracle_glow_saturated_px']:.0f}/"
-                f"{glow['host_glow_saturated_px']:.0f} sxs={comparison}"
+                f"{glow['host_glow_saturated_px']:.0f} unified={unified_renderer} "
+                f"fog3d={host_fog3d} sxs={comparison}"
             )
     finally:
         harness.close()
@@ -291,13 +312,20 @@ def main(argv: list[str]) -> int:
         help="host unified-renderer bitmask (default: 1, CMB unified)",
     )
     parser.add_argument(
+        "--host-fog3d",
+        type=int,
+        choices=(0, 1),
+        default=1,
+        help="latch the OoT3D PICA distance fog off/on at its owner (default: 1, on)",
+    )
+    parser.add_argument(
         "--draw-list",
         action="store_true",
         help="publish the exact-cursor host group/material identity list",
     )
     args = parser.parse_args(argv)
     try:
-        run(args.title_cs, args.name, args.unified_renderer, args.draw_list)
+        run(args.title_cs, args.name, args.unified_renderer, args.draw_list, args.host_fog3d)
     except (RuntimeError, ValueError) as error:
         print(f"title_host_capture: {error}", file=sys.stderr)
         return 1

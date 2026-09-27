@@ -17,9 +17,9 @@ S003 is the current focus.
 | --- | --- | --- | --- | --- |
 | S001 | One launcher provisions, validates, builds, and chooses between the OoT and MM game cores | verified | — | G003 |
 | S002 | 3DS containers, models, animations, scenes, collision, cameras, lighting, and face data are available to both engines | partial | S001 | G001, G002 |
-| S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; material/lighting/fog still partial) | S002 | G001, G002 |
+| S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; **OoT's PICA distance fog: measured and applied on both host routes**, MM's is missing per S005; material/fragment lighting still partial) | S002 | G001, G002 |
 | S004 | OoT3D actor animation, facial, camera, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G001 |
-| S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G002 |
+| S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial (**scene-authored fog: missing** — `Zelda3D_Fog3dSet` is never called from `2ship/`, and MM3D's ZSI does not carry OoT3D's env region, so the data is still to be recovered) | S002, S003 | G002 |
 | S006 | An embedded Azahar oracle and parity tooling can compare the port with independent 3DS execution | partial | S001 | G001, G002 |
 | S007 | The AppImage accepts four direct ROMs or bounded ZIPs and persists validated choices without shipping game content | partial | S001 | G003 |
 | S008 | Linux CI builds the complete app and both cores and executes asset-free native contracts | partial | — | G003 |
@@ -45,6 +45,17 @@ Gap: format and content coverage remains incomplete across both retail games.
 
 Reached materials preserve multi-stage combiners, multiple texture coordinates and samplers, vertex and
 fragment lighting, alpha behavior, and scene-authored fog through the native renderer.
+
+**Scene-authored fog is now measured and applied on both host routes**, so it is no longer part of
+this item's gap. The PICA distance-fog mechanism (window, colour, 128-entry LUT, per-fragment depth)
+was recovered and correct on the native route, and the **unified route — the one the title comparison
+runs on — applied none of it**: its UBO declared the fog parameters as "size-parity padding", and the
+packer copied them without the per-draw gate, so every unified draw was unfogged. Closing it moved
+the title host-vs-oracle `union_rgb_mae` from **48.14 to 38.23** at the same cursor and raster, which
+is the same -9.9 the native route shows for the same fog (-9.63) — two independent code paths
+measuring the same quantity. The N64 F3DEX ramp is a *different* mode of the same enum, not a
+replacement: mode `1` still reads the `aFog` varying, mode `2` reads the PICA LUT, and one number
+chooses between them on either route.
 
 Gap: the renderer campaign and current codemap still identify wider material, fragment-lighting, actor,
 and effect families whose parity is partial. **Both halves of the title-scoped host-vs-oracle
@@ -217,6 +228,66 @@ reports the sampled `g_title_fire.cmab` ConstColor at the exact cursor, and at c
 draw call. The whole-image `union_rgb_mae` moved 47.80 → 48.14 and is **not** evidence either way:
 that frame's dominant delta is the title-demo camera, since the host runs the N64 demo and the
 oracle the 3DS demo.
+
+**The unified route applied no PICA distance fog at all, and the title comparison runs on the unified
+route.** Its own UBO said so: `uFog3d0`/`uFog3d1` were declared as "size-parity padding" for a
+renderer that "doesn't apply the 3DS fog yet". The packer already copied **both** of them, so the
+frame-level parameters were arriving and nothing consumed them — the omission was the **per-draw
+GATE**, not the data. `SgUbo::uFog[3]` is set to 2.0 only when `gZelda3dFog3dOn && grp.fogEnabled`,
+i.e. the frame's 3DS fog is on *and* this material's CMB sets `isFogEnabled`; the additive/effect
+materials opt out, so a copy-the-parameters-only route is unfogged everywhere without a single
+diagnostic.
+
+The fog was worth naming as a number before it was worth porting. The native and unified routes are
+different code, so comparing them against each other confounds the fog with every other difference;
+instead the latch moved at its single owner, `gZelda3dFog3dForceOff` inside `Zelda3D_Fog3dSet`, which
+feeds the same per-draw gate on both routes. Measured at title cs=1093, one oracle frame, one raster:
+
+| route | fog | `union_rgb_mae` | `content` | host gold px | host glow sat px |
+|---|---|---|---|---|---|
+| unified | off | 48.14 | 0.4596 | 7122 | 1837 |
+| **unified** | **on** | **38.23** | **0.4811** | 13375 | 1923 |
+| native | off | 53.19 | 0.5627 | 3904 | 7756 |
+| native | on | 43.56 | 0.5735 | 11201 | 7799 |
+
+The unified route's **-9.91** and the native route's **-9.63** are the same quantity measured on two
+independent code paths, which is the cross-check that this is the fog and not a coincidence. Latching
+the unified route's fog back off reproduces the pre-change 48.14 / 7122 / 1837 **exactly**, so the
+entire diff is the fog. It also retires the frontier's "the PICA distance fog ... is the named
+candidate, with the dawn-layer stack second. Neither claimed" — the fog is now measured, the dawn
+layers are what's left.
+
+The port carries the **native mechanism**, not a second implementation of it: the same `fog3dNode()`
+LUT node (`eyeDist = b/(a-t)` then the linear `fogNear`..`fogFar` window), the same 128-entry
+in-entry interpolation, the same per-fragment depth from the interpolated world position (`a - b/d`),
+the same sky exclusion, and the **same mode enum** — `0` none, `1` the F3DEX ramp, `2` the PICA LUT —
+so one number moves a draw between fog modes on either route. The gate moved into
+`Zelda3DUnified::PackCmbFogGate` next to the other packers, and the UBO slot it occupies was
+`uNativeLayoutPad`, a size-parity filler in exactly the place the same fog needed. The block is
+compiled into **every** variant rather than a subset, because the gate is runtime: a per-variant
+subset would be a second fog policy that silently drops the fog for whichever material lands on a
+variant someone forgot. Six C++ tests, all mutation-verified (fog3d off for one variant, swapped mix
+arguments, a zero `vWorld`, a 0/1 gate instead of mode 2, and a dropped packer copy each fail
+something), plus three new Python cases on the fog latch — including the one that matters, which
+refuses a capture labelled "fog off" when the host reports the fog still on, because a fog can be off
+for an unrelated reason and then the A/B has silently measured nothing.
+
+**Majora's Mask has no PICA distance fog at all, and the natural fix is refuted.** `Zelda3D_Fog3dSet` is
+called only from the SoH layer (`title_lighting.cpp`, `lighting/zelda3d_lighting.c`) and never from
+`2ship/`, so `gZelda3dFog3dOn` stays 0 for the whole game and every MM draw is unfogged on both
+routes. The per-material half already works for both games — `CmbVShaderGroup::fogEnabled` comes from
+the CMB `is_fog` byte, and `cmb_glgroups.cpp` parses it for whichever game the archive came from — so
+what MM lacks is only the frame-level submission.
+
+The tempting move was to reuse OoT3D's generator for MM3D's scenes, and it does not work. Walking
+MM3D's **424** `/scenes/*_info.zsi` files with OoT3D's own `parse_env` (the 8-byte big-endian scene
+command stream, `ctype 0x0F`, `[16-byte header][count x 28-byte records]`), **only 5 files have a
+`0x0F` command at all**, and the records they do have read as noise — `zFar` values of `-2.49e10`,
+`+1.69e19` and `123150` in the same table, `fogFar` of `1.69e-19`. So MM3D's ZSI does not carry
+OoT3D's `EnvLightSettings` region at that layout, and a generated MM table from this parse would be
+fabricated numbers. MM's fog and ambient data live somewhere this parser has not found, and
+recovering them is a named `mm3d-decomp` step, not a table to transcribe. Until then MM's fog is
+recorded as **missing**, not approximated from OoT3D's table.
 
 **Majora's Mask is inside the same gate as Ocarina of Time — checked, because I assumed otherwise
 for a while.** The root `CMakeLists.txt` is the only supported configure root and it adds BOTH
