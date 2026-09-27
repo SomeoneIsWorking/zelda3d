@@ -28,9 +28,13 @@ from tev_corpus_survey import (
 FRAGMENT_PRIMARY = 0x6210
 FRAGMENT_SECONDARY = 0x6211
 
-# The descriptor word OoT3D's recovery pins at material+0xDC (oot3d-decomp/docs/fragment_lighting.md).
-# Used as a probe value: if it is the dominant word at exactly one offset, that offset is the table.
-FRAGMENT_LIGHT_AMB_COLOR = 0x62C884C0
+# A probe value, named for what it IS rather than for what it might mean. 0x62C884C0 is the u32 at
+# material+0xDC in 99% of BOTH games' materials, and it is a COMPOSITE of two descriptor fields the
+# parser already separates: its low half 0x84C0 is the TEV texture-source code TEX0 and its high half
+# 0x62C8 is the neighbouring u16. Nothing recovered here establishes what 0x62C8 selects, so it is not
+# named as a colour or a light enum. It is used purely as a fingerprint: if this word is the most common
+# one at exactly a single offset, that offset is a real table rather than a coincidence.
+DESCRIPTOR_PROBE_WORD = 0x62C884C0
 
 
 @dataclass(frozen=True)
@@ -196,13 +200,14 @@ def offset_control_sweep(label_data: list[tuple[str, bytes]], stride: int = 0x08
 
 
 def descriptor_enum_sweep(label_data: list[tuple[str, bytes]], stride: int = 0x04) -> list[tuple[int, int]]:
-    """For each word offset in the material record, how many materials hold FRAGMENT_LIGHT_AMB_COLOR.
+    """For each word offset in the material record, how many materials hold DESCRIPTOR_PROBE_WORD.
 
-    The palette argument failed its own control, so this tests the stronger and different claim: the
-    nested descriptor at +0xCC holds PICA *enum constants*, not colours, and the same constants appear
-    at the same offsets in the other game. That is only evidence if the constant is distinctive to its
-    offset -- a value that shows up at every offset would be noise. So sweep every word offset and
-    count how often 0x62C884C0 is the most common value; a sharp peak at +0xDC is the signature.
+    The palette argument failed its own control, so this tests a stronger and DIFFERENT claim: the
+    nested descriptor at +0xCC holds typed fields, and the same field values appear at the same offsets
+    in the other game. That is only evidence if the value is distinctive to its offset -- a value that
+    dominated at every offset would be noise. So sweep every word offset and count how often the probe
+    word is the most common value; a sharp peak at one offset is the signature, and a plateau is the
+    refutation.
     """
     results = []
     for offset in range(0x00, 0x150, stride):
@@ -222,7 +227,7 @@ def descriptor_enum_sweep(label_data: list[tuple[str, bytes]], stride: int = 0x0
         if not counter:
             continue
         top_value, top_count = counter.most_common(1)[0]
-        results.append((offset, top_count if top_value == FRAGMENT_LIGHT_AMB_COLOR else 0))
+        results.append((offset, top_count if top_value == DESCRIPTOR_PROBE_WORD else 0))
     return results
 
 
@@ -268,27 +273,30 @@ def main(arguments: list[str] | None = None) -> int:
 
     # WHAT IS CERTAIN, for a game other than oot. The CONSUMER counts are certain for any game: they
     # come from each material's own combiner stage records through the shared parser, with no layout
-    # assumption. The `+0` fragment-lighting flag and the +0xA0..+0xB3 colour block are
-    # OoT3D-RECOVERED (OoT3D FUN_003fa5d0 consuming five RGBA8 material colours) and have NOT been
-    # confirmed for another game by a binary read, so read the flag, the colours and the descriptor
-    # words as OoT3D-derived.
+    # assumption. The `+0` fragment-lighting flag and the +0xA0..+0xB3 colour block are OoT3D-RECOVERED
+    # (OoT3D FUN_003fa5d0 consuming five RGBA8 material colours) and have NOT been confirmed for
+    # another game by a binary read, so read the flag, the colours and the descriptor words as
+    # OoT3D-derived.
     #
     # Two independent lines of evidence, of very different strength, and the report below prints both
-    # with their controls so neither has to be taken on trust:
+    # with a control against each so neither has to be taken on trust:
     #
-    #   * PALETTE -- REFUTED by its own control. "Authored colours are spiky, wrong offsets are flat"
-    #     fails here: the material record is mostly constant, so the median control offset holds only
-    #     4-8 distinct values, and MM3D's specular0 is MORE varied (219) than that. Do not use this
+    #   * PALETTE -- REFUTED by its own control. "Authored colours are spiky, a wrong offset is flat"
+    #     does not hold here: the material record is mostly constant, so the median control offset holds
+    #     only 4-8 distinct values, and MM3D's specular0 is MORE varied (219) than that. Do not use this
     #     argument. The report says so out loud rather than quietly dropping it.
-    #   * DESCRIPTOR ENUM -- validated by its own control. 0x62C884C0 is the most common word at
-    #     exactly ONE of 84 sampled offsets, +0xDC, in BOTH games, covering 11,136 OoT3D and 2,942 MM3D
-    #     materials. Being distinctive to its offset is what makes the same enum at the same offset in
-    #     another game structural evidence rather than a coincidence of a common constant.
+    #   * DESCRIPTOR PROBE WORD -- validated by its own control. The u32 0x62C884C0 at material +0xDC is
+    #     the most common word at exactly ONE of 84 sampled offsets, in BOTH games (11,136 OoT3D
+    #     materials, 2,942 MM3D). Being distinctive to its offset is what makes the same value at the
+    #     same offset in another game structural evidence rather than a coincidence. That u32 is a
+    #     COMPOSITE of two typed fields -- its low half 0x84C0 is the TEV source code TEX0 -- and is
+    #     deliberately not named as a colour or a light enum, because nothing recovered establishes
+    #     what its high half selects.
     #
-    # So the descriptor layout is strongly corroborated and the colour block is plausible by
-    # adjacency, but NEITHER is the binary read. mm3d-decomp/docs has no fragment-lighting recovery and
-    # the MM3D binary's equivalent function is unlocated; that read is the named next RE step. The
-    # numbers that decide effort today are the consumer counts, which assume nothing.
+    # So the descriptor layout is strongly corroborated and the colour block is plausible by adjacency,
+    # but NEITHER is the binary read. mm3d-decomp/docs has no fragment-lighting recovery and the MM3D
+    # binary's equivalent function is unlocated; that read is the named next RE step. The numbers that
+    # decide effort today are the consumer counts, which assume nothing.
     #
     files = 0
     materials = 0
@@ -370,19 +378,24 @@ def main(arguments: list[str] | None = None) -> int:
     sweep = descriptor_enum_sweep(corpus)
     hits = [(offset, count) for offset, count in sweep if count]
     total_sampled = max(1, sum(count for _o, count in sweep))
-    print("\n== structural control: is the descriptor enum distinctive to ONE offset? ==")
+    print("\n== structural control: is the descriptor probe word distinctive to ONE offset? ==")
     print(f"  word offsets sampled: {len(sweep)}")
-    print(f"  offsets where 0x{FRAGMENT_LIGHT_AMB_COLOR:08X} is the most common word: {len(hits)}")
+    print(f"  offsets where 0x{DESCRIPTOR_PROBE_WORD:08X} is the most common word: {len(hits)}")
     for offset, count in sorted(hits, key=lambda item: -item[1])[:6]:
         print(f"    +0x{offset:02X}: {count} materials")
     if len(hits) == 1:
         print(
-            f"  verdict: DISTINCTIVE -- the enum is the dominant word at exactly one offset"
+            f"  verdict: DISTINCTIVE -- this word is dominant at exactly one offset"
             f" (+0x{hits[0][0]:02X}), so a match at the same offset in another game is structural"
-            " evidence and not a coincidence of a common constant"
+            " evidence and not a coincidence of a common constant. It is a composite of two typed"
+            " fields (low half 0x84C0 = TEV source code TEX0); nothing here names what the high half"
+            " selects."
         )
     else:
-        print("  verdict: NOT distinctive -- the enum is common at several offsets, so this proves nothing")
+        print(
+            "  verdict: NOT distinctive -- the word is common at several offsets, so this proves"
+            " nothing"
+        )
     print(
         f"files={files} materials={materials} fragment_enabled={len(enabled)} "
         f"fragment_primary_consumers={len(primary)} "
