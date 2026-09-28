@@ -596,6 +596,32 @@ that the multi-stage path is right — that evidence remains the corpus survey p
 chain checked against live OoT3D registers. Recorded here so nobody later reads a green MM3D comparison
 as multi-stage coverage.
 
+**MM3D's opening has a small orthographic layer, and NO screen-space sky.** Classifying all 667 draws
+by projection gives **656 perspective and 11 orthographic (2 per frame, 3 in the first)**, and all 11
+orthographic draws are unlit — the same signature OoT3D's `cmb_shader_mode_correlation.py` used to
+isolate the 2D overlay layer. The consequence for `sky/environment rendering`: **MM3D's sky is
+perspective geometry, not a full-screen quad**, so a host that renders sky as a screen-space quad would
+differ structurally from what MM3D does, and no per-pixel gate on the opening would catch it.
+
+That classification took two corrections, both the same failure shape, and both are recorded because
+the first answer in each case was a confident, plausible, wrong histogram:
+
+* **Reading `proj0` for orthographicity is wrong.** The common `proj0` is `(0, 2.4142, 0, 0)` — a
+  column of a scale matrix whose z element is 0 — while the same draws carry
+  `proj2 = (0, 0, 1.0003, 5.0016)`, whose w term of `5.0016` is a perspective divide. Testing `proj0`
+  classified **657 of 667 draws as orthographic**, i.e. "98.5% of MM3D's opening is screen-space
+  quads" — which reads as a finding and is close to the exact opposite of the truth. The test belongs
+  on `proj2`'s w term.
+* **`dif0 == 0` is not a litness signal.** Most MM3D draws carry `dif0=(0,0,0,0)` while *also*
+  reporting `picaLit=1` — 135 of 161 draws at frame 2000 — so testing `dif0` called **656 of 667 draws
+  unlit** and inverted the fragment-lighting picture this same session measured. `picaLit`, which reads
+  `regs.lighting.disable`, is the authority. The corrected split is 559 perspective+lit, 97
+  perspective+unlit, 11 orthographic+unlit.
+
+The general lesson is the one this project keeps re-learning and it is now cost three findings this
+session: a wrong element in a tuple does not raise, it produces a clean-looking histogram. Both wrong
+answers above would have been committed as evidence.
+
 **A census that was discarded, not reported.** MM3D's per-draw log carries a field named
 `texMappingMethod`, and reading its first component as an integer yields a tidy-looking distribution
 (`1`: 638, `0`: 20, `3`: 9 on unit 0) that reads exactly like the mapping-method population the
