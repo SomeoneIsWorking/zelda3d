@@ -19,7 +19,7 @@ S003 is the current focus.
 | S002 | 3DS containers, models, animations, scenes, collision, cameras, lighting, and face data are available to both engines | partial | S001 | G001, G002 |
 | S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; **OoT's PICA distance fog: measured and applied on both host routes**, MM's is missing per S005; material/fragment lighting still partial) | S002 | G001, G002 |
 | S004 | OoT3D actor animation, facial, camera, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G001 |
-| S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial (**scene-authored fog: missing** — `Zelda3D_Fog3dSet` is never called from `2ship/`, and MM3D's ZSI does not carry OoT3D's env region, so the data is still to be recovered) | S002, S003 | G002 |
+| S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial (**scene-authored fog: data RECOVERED and independently validated** — MM3D's env region is command `0x0F` in its scene ZSI, inflated first (182 of 424 are LzS), base `ptr+0x28` stride `0x20` with the N64 `EnvLightSettings` at `+0x0B`; **MM3D also has an oracle now**; the submission and a fogged-frame counterfactual are outstanding, so it renders unfogged but no longer lacks data) | S002, S003 | G002 |
 | S006 | An embedded Azahar oracle and parity tooling can compare the port with independent 3DS execution | partial | S001 | G001, G002 |
 | S007 | The AppImage accepts four direct ROMs or bounded ZIPs and persists validated choices without shipping game content | partial | S001 | G003 |
 | S008 | Linux CI builds the complete app and both cores and executes asset-free native contracts | partial | — | G003 |
@@ -476,41 +476,49 @@ them were actually drawn, so "no fragment-lit draw" is now a per-frame number in
 from a register. What would open it is a state that already has a menu — the equipment screen is worth
 30 of 205 materials in one reachable place — or, for MM3D, any MM3D frame at all.
 
-**Majora's Mask has no PICA distance fog at all, and the natural fix is refuted.** `Zelda3D_Fog3dSet` is
-called only from the SoH layer (`title_lighting.cpp`, `lighting/zelda3d_lighting.c`) and never from
-`2ship/`, so `gZelda3dFog3dOn` stays 0 for the whole game and every MM draw is unfogged on both
-routes. The per-material half already works for both games — `CmbVShaderGroup::fogEnabled` comes from
-the CMB `is_fog` byte, and `cmb_glgroups.cpp` parses it for whichever game the archive came from — so
-what MM lacks is only the frame-level submission.
+**Majora's Mask's scene lighting was NOT missing, and MM3D now has an oracle. Two of this project's
+own negatives were wrong; both are now closed.**
 
-The tempting move was to reuse OoT3D's generator for MM3D's scenes, and it does not work. Walking
-MM3D's **424** `/scenes/*_info.zsi` files with OoT3D's own `parse_env` (the 8-byte big-endian scene
-command stream, `ctype 0x0F`, `[16-byte header][count x 28-byte records]`), **only 5 files have a
-`0x0F` command at all**, and the records they do have read as noise — `zFar` values of `-2.49e10`,
-`+1.69e19` and `123150` in the same table, `fogFar` of `1.69e-19`. So MM3D's ZSI does not carry
-OoT3D's `EnvLightSettings` region at that layout, and a generated MM table from this parse would be
-fabricated numbers. MM's fog and ambient data live somewhere this parser has not found, and
-recovering them is a named `mm3d-decomp` step, not a table to transcribe. Until then MM's fog is
-recorded as **missing**, not approximated from OoT3D's table.
+*Wrong negative 1 — "MM3D's ZSI does not carry OoT3D's `EnvLightSettings` region."* It carries it, in
+the same place: command `0x0F` in the scene-header ZSI, which is `SCENE_CMD_ID_ENV_LIGHT_SETTINGS` in
+both games (`2ship/include/z64scene.h`). The reason the search found nothing is that **182 of MM3D's 424
+scene ZSIs are LzS-compressed and were parsed as plain bytes.** Inflating them first takes the hit
+count from 5 of 424 to **110 of 424**. The control that condemns the old measurement: parsing those 182
+compressed files as plain yields **256 distinct "ctypes"** spanning the whole 0x00–0xFF range, 234 of
+them outside OoT3D's 22-value command set — uniform noise across the entire byte space, which is the
+signature of data, not a command stream.
 
-That negative is **controlled**, because the first version of it was not. A hand-rolled content
-predicate (a 28-byte stride where `zFar` and `fogFar` are positive finite floats in scene ranges and
-`fogNear`'s low 10 bits are plausible) was written to search for the region without assuming its
-address — and it produced 395 of 724 OoT3D "hits" whose records were plainly not env data
-(`zFar=64.3 fogFar=90.1 amb=[164,66,145]`), including a 119-record "run" in a Kakusiana file whose
-bytes ramp through 67/68/69. An instrument that shows the wrong answer on a corpus where the answer
-is known cannot support a negative, so it was discarded rather than reported. The sound version
-runs the **one parser already validated against OoT3D's live Azahar `EnvLightSettings` list** over
-both games in the same process, so control and measurement differ only in the ROM:
+*Wrong negative 2 — "the record layout is a different format."* The layout is **different and now
+measured**: base `ptr + 0x28`, stride **0x20**, colour block at **+0x0B** (OoT3D: `ptr + 0x10`, stride
+`0x1C`, block at `+0x0A`). The discrimination is two-sided, so it is not a tuned threshold: at the MM
+layout OoT3D scores **0 of 95**; at the OoT layout MM scores **0 of 110**; at each game's correct
+layout, **110/110** and **95/95** clear the plausibility filter.
 
-| game | files with an env region through the validated parser | what the records read |
-|---|---|---|
-| OoT3D | **114 of 724** | `zFar=2000 fogFar=800 fogNear=40`, `zFar=8000 fogFar=3200`, `zFar=12800 fogFar=12800 fogNear=794` — real scene lighting |
-| MM3D | **5 of 424** | `zFar=-2.49e+10`, `fogFar=1.69e-19`, `zFar=3.83e+15` — impossible distances |
+*And the field map is confirmed by an authority that is not mine.* MM's own N64 `EnvLightSettings`
+(`2ship/include/z64environment.h`) is 0x16 bytes with `ambient@0x00, light1Dir@0x03, light1Color@0x06,
+light2Dir@0x09, light2Color@0x0C, fogColor@0x0F, blendRateAndFogNear@0x12`. The recovered 3DS record
+puts those six colour triples at `+0x0B, +0x0E, +0x11, +0x14, +0x17, +0x1A` — the **same internal
+spacing, uniformly shifted by +0x0B**, behind `[f32 zFar][f32 fogFar][u16 fogNear | blendRate<<10]`.
+So the 3DS record is the N64 struct prefixed by the two distances N64 keeps as `s16` and the packed
+blend/fog-near, and the byte at `+0x1D` the field scan could not name is MM's
+`blendRateAndFogNear`/`zFar` tail. `fogColor` is at **`+0x1A`**, and an OoT3D-derived consumer hard-coded
+to `+0x0A` would read MM3D's `fogColor` as its second light colour.
 
-So it is not a shifted address: the same parser reads real lighting in 15.7% of OoT3D's scene files
-and impossible distances in 1.2% of MM3D's. (The OoT3D 114/724 is its own note: most scene files
-carry no env region, consistent with the 114-of-724 that also carry no valid inline CMB.)
+**MM3D also has an oracle now.** The Azahar harness is game-agnostic: it takes a ROM path
+(`tools/soh3d_harness/main.cpp:117-134`) and hands it to `retro_load_game` with no identity check, and all
+18 patches in `AZAHAR_PATCH.md` are observation hooks — no OoT3D addresses, no HLE overrides. MM3D's
+image was refused for one reason only: its content is decrypted but its NCCH `flags` byte has
+`no_crypto` clear, and `ncch_container.cpp:281` rejects encrypted NCCH. `tools/ctr_oracle_rom.py` sets
+that bit **in a copy** — one byte, at a derived offset, refusing any image whose partition 0 has no NCCH
+header. MM3D then boots and renders, and its PICA fog register is **scene-driven**: `(0,0,0)` to frame
+1600, **`(187,110,110)` from 1800**, **`(90,110,0)` from 3600**. Those are the opening's colours rather
+than a scene table's, so the colour join to the recovered table is still open — but the layout is now
+confirmed by MM's own struct, which is a stronger check than a colour match would have been.
+
+**So MM's fog moves from "missing" to "data recovered and independently validated; submission and a
+fogged-frame counterfactual outstanding."** That is the opposite of what this file said a few hours
+ago, and the specific reason it was wrong — compressed bytes parsed as plain — is the same class of
+error this project has now hit twice in this campaign, so it is worth naming as a standing trap.
 
 **And it is not a compression artifact, which was the obvious next excuse.** The two containers'
 first bytes differ: OoT3D's ZSI opens `5a 53 49 01` ("ZSI\x01", content at 0) while MM3D's opens

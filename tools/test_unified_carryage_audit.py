@@ -121,6 +121,43 @@ class CarriageFollowsCallSites(unittest.TestCase):
         self.assertEqual(result.dropped, [])
 
 
+class ThePipelineClassIsAuditedToo(unittest.TestCase):
+    """Pipeline state is the OTHER place a per-draw decision lives, so it gets the same gate.
+
+    The UBO audit found two live bugs of the shape "the unified route copies the frame-level values
+    and drops the per-draw one". Depth/blend/cull are decided per draw the same way, in
+    `getUnifiedPipeline` instead of the packer, so leaving them to a hand read would be the same
+    omission one layer down. The check compares the state the two builders ASSIGN, right-hand side
+    included, so a divergence in HOW a field is derived is caught as well as one in WHETHER it is set.
+    """
+
+    def test_both_builders_set_every_compared_state_field(self) -> None:
+        verdict = audit_mod.pipeline_audit()
+        self.assertTrue(verdict["native"], "the native builder set nothing; the parse is vacuous")
+        self.assertEqual(
+            len(verdict["native"]), len(audit_mod.PIPELINE_STATE_FIELDS),
+            "some compared field was not found in the native builder; the list is stale",
+        )
+        self.assertEqual(verdict["only_native"], [], "a state field only the native route sets")
+        self.assertEqual(verdict["only_unified"], [], "a state field only the unified route sets")
+
+    def test_the_real_tree_agrees(self) -> None:
+        self.assertTrue(audit_mod.pipeline_audit()["ok"])
+
+    def test_a_diverging_right_hand_side_is_caught(self) -> None:
+        """Setting the same field to a different expression is as much a bug as not setting it."""
+        body = "pci.rasterizer_state.cull_mode = g.faceCull && sgFaceCullOn() ? BACK : NONE;"
+        self.assertEqual(
+            audit_mod.pipeline_state_fields(body),
+            {"rasterizer_state.cull_mode = g.faceCull && sgFaceCullOn() ? BACK : NONE"},
+        )
+        other = "pci.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;"
+        self.assertNotEqual(
+            audit_mod.pipeline_state_fields(body),
+            audit_mod.pipeline_state_fields(other),
+        )
+
+
 class TheAuditFailsOnADrop(unittest.TestCase):
     def test_an_unclassified_per_draw_field_is_reported_as_dropped(self) -> None:
         fixture = audit_mod.Audit(

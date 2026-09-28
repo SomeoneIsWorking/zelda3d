@@ -118,6 +118,86 @@ def written_fields(text: str, receiver: str) -> set[str]:
                                            text)}
 
 
+PIPELINES = LUS / "src" / "fast" / "zelda3d_sdl3gpu_pipelines.cpp"
+
+# The pipeline-state fields that decide a frame's appearance. Anything the two builders disagree
+# about is a carriage bug in the same family as the UBO ones, in a different place, so it is checked
+# the same way rather than being left to a hand read.
+PIPELINE_STATE_FIELDS = (
+    "rasterizer_state.cull_mode",
+    "rasterizer_state.front_face",
+    "rasterizer_state.fill_mode",
+    "rasterizer_state.enable_depth_clip",
+    "depth_stencil_state.enable_depth_test",
+    "depth_stencil_state.enable_depth_write",
+    "depth_stencil_state.compare_op",
+    "blend_state.enable_blend",
+    "blend_state.src_color_blendfactor",
+    "blend_state.dst_color_blendfactor",
+    "blend_state.color_blend_op",
+    "blend_state.src_alpha_blendfactor",
+    "blend_state.dst_alpha_blendfactor",
+    "blend_state.alpha_blend_op",
+    "depth_stencil_format",
+)
+
+
+def pipeline_state_fields(body: str) -> set[str]:
+    """Which `PIPELINE_STATE_FIELDS` a builder body assigns, with the assignment captured.
+
+    Returns `field` for a plain assignment and `field = <rhs>` when the right-hand side differs
+    between the two builders, so a divergence in HOW a field is derived is caught as well as one in
+    WHETHER it is set.
+    """
+    out: set[str] = set()
+    for field in PIPELINE_STATE_FIELDS:
+        leaf = field.rsplit(".", 1)[-1]
+        m = re.search(rf"\.{re.escape(leaf)}\s*=\s*([^;]+);", body)
+        if m is not None:
+            out.add(f"{field} = {' '.join(m.group(1).split())}")
+    return out
+
+
+def pipeline_audit() -> dict[str, object]:
+    """Compare `getPipeline` (native) with `getUnifiedPipeline` on the state they set.
+
+    This is the SECOND carriage class. The UBO audit found two live bugs of the shape "the unified
+    route copies the frame-level values and drops the per-draw one"; pipeline state is the other
+    place a per-draw decision lives, so it gets the same mechanical check rather than a hand read.
+    """
+    text = PIPELINES.read_text()
+    bodies: dict[str, str] = {}
+    for name in ("getUnifiedPipeline", "getPipeline"):
+        # Built by concatenation rather than an f-string. `\{name}` inside an f-string emits a
+        # backslash followed by the LITERAL name, which `re` reads as a `\g` group reference and
+        # rejects -- and the resulting `re.PatternError` looks nothing like "your braces are wrong",
+        # which is how this cost a debugging round trip.
+        pattern = r"::" + name + r"\s*\([^)]*\)\s*\{"
+        m = re.search(pattern, text)
+        if m is None:
+            bodies[name] = ""
+            continue
+        start = m.end()
+        depth = 1
+        i = start
+        while i < len(text) and depth:
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+            i += 1
+        bodies[name] = text[start : i - 1]
+    native = pipeline_state_fields(bodies["getPipeline"])
+    unified = pipeline_state_fields(bodies["getUnifiedPipeline"])
+    return {
+        "native": sorted(native),
+        "unified": sorted(unified),
+        "only_native": sorted(native - unified),
+        "only_unified": sorted(unified - native),
+        "ok": bool(native) and native == unified,
+    }
+
+
 def read_fields(text: str, receiver: str = "ubo") -> set[str]:
     """Fields mentioned as `receiver.X` in a shader body, minus the assignments."""
     out: set[str] = set()
@@ -235,9 +315,24 @@ def main(argv: list[str]) -> int:
         print(f"  dead (per-draw, written, read by no shader): {len(payload['dead'])} {payload['dead']}")
         print(f"  per-FRAME fields no route reads: {result.frame_unread}")
         print(f"  DROPPED (per-draw, read, not carried): {len(result.dropped)} {result.dropped}")
-    if result.dropped:
-        print(f"unified_carryage_audit: {len(result.dropped)} per-draw field(s) neither carried nor "
-              "substituted; add them to the packer or to SUBSTITUTIONS with a reason", file=sys.stderr)
+
+    pipes = pipeline_audit()
+    if args.json:
+        payload["pipeline"] = pipes
+    else:
+        print("== unified pipeline-state carriage (getPipeline vs getUnifiedPipeline) ==")
+        print(f"  state fields compared: {len(PIPELINE_STATE_FIELDS)}")
+        print(f"  native sets:  {len(pipes['native'])}")
+        print(f"  unified sets: {len(pipes['unified'])}")
+        print(f"  only native:  {pipes['only_native']}")
+        print(f"  only unified: {pipes['only_unified']}")
+    if result.dropped or not pipes["ok"]:
+        for label, fields in (("per-draw uniform", result.dropped),
+                              ("pipeline state", pipes["only_native"] or pipes["only_unified"])):
+            if fields:
+                print(f"unified_carryage_audit: {label} divergence: {fields}; the unified route must "
+                      "reproduce the native one, or SUBSTITUTIONS must name the difference",
+                      file=sys.stderr)
         return 1
     return 0
 
