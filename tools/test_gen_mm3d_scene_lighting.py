@@ -39,6 +39,15 @@ import gen_mm3d_scene_lighting as gen  # noqa: E402
 from ctr_romfs import CtrRom  # noqa: E402
 from mm_animmap_archive import lzs_decompress, lzs_is_compressed  # noqa: E402
 
+#: one `static const <Type> <sym>[] = { // name ... };` block, by symbol
+SLOT = re.compile(r"static const Zelda3dLightSlot (k\w+)\[\] = \{ // (\w+)(.*?)\n\};", re.S)
+ENV = re.compile(r"static const Mm3dEnvLightSettings (k\w+)\[\] = \{ // (\w+)(.*?)\n\};", re.S)
+#: one emitted row of either table
+SLOT_ROW = re.compile(r"^    \{.*$", re.M)
+ENV_ROW = re.compile(r"^    \{.*$", re.M)
+#: one `/* 0xNN ENUM */ { count, symbol },` scene-index row
+SCENE_INDEX = re.compile(r"/\* (0x[0-9A-F]{2}) \S+\s*\*/ \{ (\d+), (\w+) \}")
+
 MM_ROM = os.environ.get("ZELDA3D_MM3D_ROM")
 OOT_ROM = os.environ.get("ZELDA3D_OOT3D_ROM")
 
@@ -265,10 +274,21 @@ class TheCommittedTableIsPresentAndConsistent(unittest.TestCase):
         self.assertTrue(Path(gen.OUT).is_file(),
                         f"missing {gen.OUT}; run tools/gen_mm3d_scene_lighting.py")
 
+    @staticmethod
+    def _index_rows(text: str, symbol: str) -> list[str]:
+        """The scene-index rows of ONE table.
+
+        Bounded to the table's own closing brace. Scanning to end-of-file counted 226 rows for a
+        113-entry scene table once the include grew a second index -- which is exactly the kind of
+        error a new table introduces into an old test, and the reason the bound is explicit.
+        """
+        body = text.split(f"{symbol}[] = {{", 1)[1]
+        body = body.split("\n};", 1)[0]
+        return [l for l in body.splitlines() if l.strip().startswith("/*")]
+
     def test_its_row_count_matches_mms_scene_table(self) -> None:
         text = Path(gen.OUT).read_text()
-        table = text.split("kMm3dSceneLighting[] = {")[1]
-        rows = [l for l in table.splitlines() if l.strip().startswith("/*")]
+        rows = self._index_rows(text, "kMm3dSceneLighting")
         expected = len(gen.gms.n64_scenes())
         self.assertEqual(len(rows), expected,
                          "a row per scene-table entry; a mismatch shifts every later scene's palette")
@@ -281,9 +301,116 @@ class TheCommittedTableIsPresentAndConsistent(unittest.TestCase):
         self.assertIn(f"stride 0x{gen.MM3D.stride:02X}", header)
 
     def test_most_scenes_have_a_palette(self) -> None:
-        table = Path(gen.OUT).read_text().split("kMm3dSceneLighting[] = {")[1]
-        filled = len(re.findall(r"\{\s*[1-9]\d*\s*,\s*kMm3dSlots_", table))
+        table = self._index_rows(Path(gen.OUT).read_text(), "kMm3dSceneLighting")
+        filled = len([r for r in table if re.search(r"\{\s*[1-9]\d*\s*,\s*kMm3dSlots_", r)])
         self.assertGreater(filled, 90, f"only {filled} scenes have a palette")
+
+
+class TheN64ProjectionIsFaithfulAndCorrectlyShaped(unittest.TestCase):
+    """The 0x16 projection is what MM's own blend consumes, so its shape IS the contract.
+
+    The substitution installs this array as `play->envCtx.lightSettingsList`, which MM indexes with a
+    0x16 stride. A projection with the wrong number of fields per row would read slot 0 correctly and
+    every later slot at the wrong offset -- a plausible frame, not a crash, and not something a build
+    error would catch either. The C++ side machine-checks the stride with a `static_assert`; these
+    checks cover the data, which the compiler cannot see.
+    """
+
+    @staticmethod
+    def _body(symbol: str) -> str:
+        """The text of ONE scene index, bounded to its own closing brace.
+
+        Bounded explicitly because a to-end-of-file scan silently absorbed the second index once the
+        include grew one -- a 113-entry scene table counted as 226, and the failure surfaced in a test
+        that had nothing to do with the change.
+        """
+        body = Path(gen.OUT).read_text().split(f"{symbol}[] = {{", 1)[1]
+        return body.split("\n};", 1)[0]
+
+    def setUp(self) -> None:
+        self.text = Path(gen.OUT).read_text()
+        # Keyed by SCENE NAME, not symbol: the two tables deliberately use different symbol prefixes
+        # (kMm3dSlots_ / kMm3dEnv_), so comparing symbols would report every scene as unpaired.
+        self.slots = {name: body for _sym, name, body in SLOT.findall(self.text)}
+        self.env = {name: body for _sym, name, body in ENV.findall(self.text)}
+
+    def test_both_tables_are_emitted(self) -> None:
+        self.assertTrue(self.slots, "no 0x20 slot tables in the generated include")
+        self.assertTrue(self.env, "no 0x16 N64 projection in the generated include")
+        self.assertEqual(set(self.slots), set(self.env),
+                         "a scene has a 0x20 table but no projection, or the reverse; the projection "
+                         "must cover exactly the scenes the palette covers")
+
+    def test_every_projected_row_is_exactly_0x16_bytes(self) -> None:
+        """18 u8 colour bytes plus two s16 = 22 bytes. Any other count shifts every later slot."""
+        for name, body in self.env.items():
+            for index, row in enumerate([r for r in body.splitlines() if r.strip()]):
+                values = re.findall(r"-?\d+", row)
+                self.assertEqual(
+                    len(values), 20,
+                    f"{name} row {index} has {len(values)} values, not 20 "
+                    f"(18 u8 + 2 s16 == 0x16); MM would index it at the wrong offset")
+
+    def test_the_projection_preserves_the_0x20_colours_exactly(self) -> None:
+        """The projection is a REARRANGEMENT, not a second parse.
+
+        This is the check that would catch the two tables disagreeing -- which is what a layout or
+        capture-group mistake looks like once the numbers are in a file. All six colour triples must be
+        byte-identical between the 0x20 record and the 0x16 projection, because MM's N64 struct IS the
+        3DS record's tail. Only the s16 zFar is allowed to differ, and only by clamping.
+        """
+        for name in self.slots:
+            wide = SLOT_ROW.findall(self.slots[name])
+            narrow = ENV_ROW.findall(self.env[name])
+            self.assertEqual(len(wide), len(narrow), f"{name}: row counts differ")
+            for index, (w, n) in enumerate(zip(wide, narrow)):
+                wv = [int(x) for x in re.findall(r"-?\d+", w)]
+                nv = [int(x) for x in re.findall(r"-?\d+", n)]
+                # 0x20 row: 0-2 amb, 3-5 l0dir, 6-8 l0col, 9-11 l1dir, 12-14 l1col, 15-17 fogCol,
+                #            18 fogNear, 19 fogFar, 20 zFar            (21 values)
+                # 0x16 row: 0-17 the same six triples at the SAME indices, 18 blendRateAndFogNear,
+                #            19 zFar                                  (20 values)
+                # The colours landing at identical indices is the whole reason this is a projection and
+                # not a re-parse: both are the N64 struct's own field order, dir BEFORE colour.
+                self.assertEqual(len(wv), 21, f"{name}[{index}] 0x20 row has {len(wv)} values")
+                for label, lo, hi in (("ambient", 0, 3), ("light1Dir", 3, 6), ("light1Color", 6, 9),
+                                      ("light2Dir", 9, 12), ("light2Color", 12, 15), ("fogCol", 15, 18)):
+                    self.assertEqual(wv[lo:hi], nv[lo:hi], f"{name}[{index}] {label} differs")
+                # The 0x20 row's fogNear is the low 10 bits, and the projection carries the whole
+                # packed u16 (fogNear | blendRate<<10), so only the low 10 bits are comparable here.
+                self.assertEqual(wv[18], nv[18] & 0x3FF, f"{name}[{index}] fogNear differs")
+                if nv[19] != wv[20]:
+                    self.assertEqual(nv[19], gen.S16_MAX,
+                                     f"{name}[{index}] zFar differs by something other than a clamp")
+
+    def test_the_clamp_count_is_emitted_and_bounded(self) -> None:
+        """The clamp is a generator-side fact; nothing downstream can detect it by inspection."""
+        m = re.search(r"#define MM3D_CLAMPED_ZFAR_SLOTS (\d+)", self.text)
+        self.assertIsNotNone(m, "the clamp count is not emitted, so the loss is invisible at runtime")
+        clamped = int(m.group(1))
+        total = sum(len(ENV_ROW.findall(b)) for b in self.env.values())
+        self.assertGreaterEqual(clamped, 0)
+        self.assertLessEqual(clamped, total,
+                             f"{clamped} clamped slots out of {total} emitted")
+
+    def test_both_scene_indices_cover_the_same_rows(self) -> None:
+        """`kMm3dSceneLighting` (PICA window) and `kMm3dEnvList` (substitution) must agree, so one
+        sceneNum lookup serves both the colours and the fog window."""
+        wide = SCENE_INDEX.findall(self._body("kMm3dSceneLighting"))
+        narrow = SCENE_INDEX.findall(self._body("kMm3dEnvList"))
+        self.assertEqual(len(wide), len(narrow), "the two scene indices have different row counts")
+        self.assertEqual([w[0] for w in wide], [n[0] for n in narrow],
+                         "the two scene indices disagree on which scenes have palettes")
+        for wide_row, narrow_row in zip(wide, narrow):
+            self.assertEqual(wide_row[1], narrow_row[1],
+                             f"scene 0x{wide_row[0]} has a different slot count in the two indices")
+            # And the symbol each index names must be its OWN table's, with 0 standing for "this
+            # scene has no palette" (11 of MM's 113 entries), which both indices must agree on.
+            self.assertTrue(wide_row[2] == "0" or wide_row[2].startswith("kMm3dSlots_"), wide_row[2])
+            self.assertTrue(narrow_row[2] == "0" or narrow_row[2].startswith("kMm3dEnv_"),
+                            narrow_row[2])
+            self.assertEqual(wide_row[2] == "0", narrow_row[2] == "0",
+                             f"scene 0x{wide_row[0]}: one index has a palette and the other does not")
 
 
 if __name__ == "__main__":
