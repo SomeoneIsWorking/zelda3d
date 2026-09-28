@@ -1476,7 +1476,38 @@ s16, which is why 130 slots are recorded as clamped.
 
 *This is the strongest check in the MM fog campaign precisely because it needs no oracle*: it compares
 the port against the N64 game's own computation on the same frame, so it falsifies a wrong blend
-without a pixel comparison. The 1-in-60 random-colour test is withdrawn as support for the
+without a pixel comparison.
+
+**Warping the host then exposed a second, larger defect: in override scenes the window was built from a
+STALE schedule.** MM could not previously be warped at all, so this was invisible until now. The capture
+sits INSIDE MM's time-based branch, and that branch is guarded by
+`lightMode == LIGHT_MODE_TIME && lightSettingOverride == LIGHT_SETTING_OVERRIDE_NONE`
+(`z_kankyo.c:1339`). In any scene where the game sets a light-setting override -- or does not use
+time-based lights -- the branch never runs, so `gZelda3dEnvBlend` silently kept its last value.
+
+Measured in `z2_lost_woods`, where the override is set: the window read `near=229.5`, which is exactly
+`lerp(160, 632, 0.147)` of the recovered slots -- i.e. exactly the stale capture -- while MM's own
+`lightSettings` held slot 1 outright (`fogNear=632`, `fogColor=(28,20,0)`). **The two numbers disagreed
+by 402 and both were internally consistent, which is exactly why nothing looked wrong.** A fog window
+is four plausible numbers, so a stale one is indistinguishable from a live one by eye.
+
+Fixed by `Mm3d_CaptureEnvBlendForNonTimePath`, called from `Environment_UpdateLights` after the
+light-settings block and before the `lightBlendEnabled = true` that follows it (that line would erase the
+distinction). It reproduces whichever rule actually ran, in the shared schedule's own vocabulary:
+blending maps to `Lerp(Lerp(prev, light, w), Lerp(prev, light, w), 0)`, and the plain copy to
+`Lerp(light, light, 0)`. `FULL_CONTROL` is left alone, because there something outside `z_kankyo` owns
+`lightSettings` and the context says nothing about which slots produced it.
+
+Verified across three scenes, each matching its recovered 3DS record with residual 0.00 AND agreeing with
+MM's own blend: `z2_lost_woods` (override path, d=0.00, was 402), scene 99 (time-based, d=0.00), and
+`z2_clocktower` (time-based, d <= 1.0, MM's own integer quantisation). The colour likewise: Lost Woods'
+`live=(28,20,0)` reaches the renderer as `uFog=(0.110,0.078,0.000)` with the two-LERP predicting it to
+within 0.
+
+Also recorded, because it cost a crash and is not a defect: warping to `z2_lost_woods` via entrance
+`0xC40B` crashes MM in `Actor_InitContext` after the room load fails (`Room: 127`). Spawns `0x00`/`0x03`
+of the same scene load fine, so it is a bad spawn argument reaching a room the entrance cannot resolve,
+not a lighting or warp-path fault. The 1-in-60 random-colour test is withdrawn as support for the
 strong claim: it refuted interpolation of the table, which was never in dispute.
 
 **MM3D's fog COLOUR is now CLOSED as a port, on the host side.** `Mm3d_UpdateFogWindow` now feeds
