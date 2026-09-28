@@ -1,28 +1,37 @@
 #!/usr/bin/env python3
-"""Find the 3DS fragment-lighting configuration object live, by what the recovered chain says about it.
+"""A RAM scan for the 3DS fragment-lighting configuration object -- KEPT AS A DOCUMENTED DEAD END.
 
-**Why this exists.** `FUN_003f9b5c` -- the top of the confirmed PICA lighting-config chain, whose
-`arg1` IS the 0x4C8-byte object -- has zero ARM `BL` callers, so the object is not constructed in the
-code image and the static route is closed. The project's own next step was "a runtime capture of the
-copy's source pointer", and this is that route taken as far as bulk reads allow.
+**Do not read its results as findings. The signature it searches for is refuted by the live data.**
 
-**What has already been eliminated, so this does not repeat it.** The object is NOT the per-material
-record: `lit_object_dump.py --slots` shows real material data at `CmbRenderer + 0x400 + i*0x4C8`, but
-its whole `+0x180..0x1C0` region reads zero for every record measured, and that is exactly where
-`FUN_004c6364` writes and `FUN_00371758` copies. And the constructor's two marker bytes
-(`+0x18A`, `+0x18D`, the only two `FUN_004c6264` sets) give 4500 candidates in 32 MB -- far too many.
+It looked for `+0x18A == 1 AND +0x18D == 1`, on the strength of `FUN_004c6264` being the object's
+constructor and setting exactly those two bytes. But the object is already located and live-readable at
+`CmbRenderer + 0x400 + index * 0x4C8` (`oot3d-decomp/docs/fragment_lighting.md`, 2026-09-27), and
+measured there the bytes are `+0x18A = 0x80, +0x18D = 0x00` on slot 0 and `0x00/0x00` on slots 1-3 --
+never `1`. So the signature matches no real object at its known address, and all 7508 hits were false
+positives. `+0x18A` is *source data* carried in the object, not a marker the constructor leaves behind,
+which is exactly the doc's reading; assuming otherwise is what made this scan pointless.
 
-**The discriminator that does work.** `FUN_00371758` is a pure 32-byte block copy, so the object's
-copied window is a VERBATIM slice of a 0x4C8-byte source and must therefore occur more than once in
-memory: once in the source, once in the object. A random 32-byte window occurs once. Measured here:
-**0 of the 4500 candidates duplicate**, against a control where 45 of 200 sampled windows *do* --
-so duplication is common in this image and none of those 4500 is a copy.
+Its 4500 and 7508 counts, and its stage-2 copy-window result, are therefore void.
 
-**Two regions, because one was not enough.** The ARM11 heap is what the first version scanned. The
-linear heap reads 88% non-zero at the title against the heap's 20%, which is what a loaded asset region
-looks like, and a 3DS file container is exactly the kind of "data-container object" the code-image
-search already failed to find. So both are scanned, and `verdict()` refuses to conclude from a read
-that came back empty -- see its docstring for the false negative that made that gate necessary.
+**What is worth keeping is the method, and this file is kept for that.** The non-zero-density gate in
+`verdict()` exists because a first run reported "no candidate" from **0 non-zero bytes in 32 MB** -- the
+title demo had not been run, so the fragment path had produced no configuration and the read was simply
+empty. A verdict drawn from an unpopulated read is a broken instrument, not a negative result, and the
+two are indistinguishable from the output. That mistake was then made a SECOND time in a separate probe,
+which produced a false negative that refuted a correctly-recorded project finding; re-measured with
+`run 400`, the region it claimed was zero is populated (32/64 non-zero on slot 0).
+
+So the two things to take from this file:
+
+* **`run 400` is a precondition of every memory read in this campaign.** The title demo has to be
+  running for the fragment path to have produced a configuration; without it the heap reads as zero and
+  every statistic drawn from it is a plausible wrong number.
+* **Gate on density before concluding anything.** `verdict()` refuses below 0.1% non-zero, and
+  `window_verdict()` refuses to turn a negative about one offset into a negative about the object.
+
+For the real question -- the PROVENANCE of the object's 0x4C8 source -- use
+`oot3d-decomp/docs/fragment_lighting.md`, which locates the object, and read that row before starting
+anything new.
 """
 
 from __future__ import annotations
