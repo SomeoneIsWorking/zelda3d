@@ -17,7 +17,7 @@ S003 is the current focus.
 | --- | --- | --- | --- | --- |
 | S001 | One launcher provisions, validates, builds, and chooses between the OoT and MM game cores | verified | — | G003 |
 | S002 | 3DS containers, models, animations, scenes, collision, cameras, lighting, and face data are available to both engines | partial | S001 | G001, G002 |
-| S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; **OoT's PICA distance fog: measured and applied on both host routes**, MM's is missing per S005; scene fog: **OoT closed, MM3D CONFIRMED by prediction** — the recovered MM3D record's window reproduces MM3D's authored PICA LUT to 1.19 byte steps (mean-abs 0.00466, control 0.02117), so the fog port is feasible with the existing host mechanism, and MM3D's camera near plane is ~77 against OoT3D's 7; material/fragment lighting still partial — **the per-light transport contract is now MEASURED on MM3D's registers** (per-slot: `diffuse`, `specular_0` and the light direction; MM3D's two lit slots are both `directional`, exactly antiparallel in x, and NOT the same colour, so neither a negated-direction nor a copied-colour reduction works), and **the two-light configuration counterfactual is now MEASURED in MM3D** (`max_light_index=1`/`slot_mapping=[0,1,...]` 12/12, `config0=0x80000400` 12/12, `config1` `0xff7fffff` 11/12 and `0xff7effff` 1/12 so it is not a constant; the host's slot count of 2 is confirmed with a denominator), and the builder's one open `+0x18A` bit is cross-title) | S002 | G001, G002 |
+| S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; **OoT's PICA distance fog: measured and applied on both host routes**, MM's is missing per S005; scene fog: **OoT closed, MM3D CONFIRMED by prediction** — the recovered MM3D record's window reproduces MM3D's authored PICA LUT to 1.19 byte steps (mean-abs 0.00466, control 0.02117), so the fog port is feasible with the existing host mechanism, and MM3D's camera near plane is ~77 against OoT3D's 7; material/fragment lighting still partial — **the per-light transport contract is now MEASURED on MM3D's registers** (per-slot: `diffuse`, `specular_0` and the light direction; MM3D's two lit slots are both `directional`, exactly antiparallel in x, and NOT the same colour, so neither a negated-direction nor a copied-colour reduction works), and **the two-light configuration counterfactual is now MEASURED in MM3D** (`max_light_index=1`/`slot_mapping=[0,1,...]` 12/12, `config0=0x80000400` 12/12, `config1` `0xff7fffff` 11/12 and `0xff7effff` 1/12 so it is not a constant; the host's slot count of 2 is confirmed with a denominator), and the builder's one open `+0x18A` bit is cross-title **and is now NAMED: it is `config0` bit 17 = `shadow_secondary`**), and **the captured configuration is now REDUCED to its shading terms: ZERO optional terms for 11 of MM3D's 12 lit captures and exactly `lut:Distribution0` for the 12th, which makes fragment lighting a bounded port rather than the large speculative surface it was framed as (see "The captured configuration needs NO optional lighting term")** | S002 | G001, G002 |
 | S004 | OoT3D actor animation, facial, camera, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G001 |
 | S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial (**scene lighting SUBMITTED and the PICA fog WINDOW is now FED to the renderer** — MM's `z_kankyo` captures the blend schedule and `Mm3d_UpdateFogWindow` feeds `Zelda3D_Fog3dSet` with the recovered window and MM3D's measured camera near plane ~77, using the SHARED window rule `Zelda3D_EnvBlendWindow` that OoT3D also uses, so the two-LERP exists once (8 unit tests) -- and **its runtime effect in MM gameplay is now OBSERVED and CROSS-CHECKED**: the `fog` REPL command reports the live window, the captured schedule, AND independently re-reads the recovered 3DS record, so the diagnostic can be wrong. In `z2_clocktower` (scene 111) the live window is `near=926.0 far=20000.0 zFar=52000.0 camNear=77.0` at blend weight 0, which is **exactly** recovered slot 1 (`926, 20000, 52000`, residual 0.00 over all three distances); at weight 0.032 it reads `911.0 / 20000.0 / 51617.7`, which is MM's own LERP between slots 1 and 0, and the diagnostic then says `no recovered slot matches (expected mid-blend)` instead of claiming agreement. The 3DS record demonstrably reaches MM's renderer. Getting that run required fixing two real defects, both recorded below; **scene lighting is now SUBMITTED**: the recovered 3DS records are installed into MM's own `lightSettingsList` at `2ship/2s2h/z_scene_2SH.cpp:281` `Scene_CommandEnvLightSettings`, so MM's N64 blend — time LERP, config LERP and the additive `adjLightSettings` term — operates on 3DS data with no reimplementation; **fog's window is validated against live hardware** (slot 2 predicts MM3D's authored PICA LUT to 1.19 byte steps) the fog COLOUR still needs MM's runtime `adjLightSettings` (its blend is ADDITIVE, so the colour is outside the table's convex hull), so **this is not MM fog PARITY**: the window feeding the curve is the recovered 3DS one and is unit-tested against the validated value, but the colour the renderer actually hazes toward is still the N64 one, and no MM frame has been compared either way; previously: scene-authored fog **data RECOVERED and independently validated** — MM3D's env region is command `0x0F` in its scene ZSI, inflated first (182 of 424 are LzS), base `ptr+0x28` stride `0x20` with the N64 `EnvLightSettings` at `+0x0B`; **MM3D also has an oracle now**; the table is generated with 102/113 scenes populated; the fogged-frame counterfactual EXISTS -- the opening runs PICA fog mode 5 on 75-84% of its draws and its per-draw fog colour matches the frame-level az_fog register exactly, including the transition between frames 3200 and 3800, so an earlier 'the opening is fog mode 0' reading of this project was wrong; the submission is outstanding and is NOT a copy of SoH's -- MM's z_kankyo ADDS a per-slot adjLightSettings offset to each of its four source colours before the time LERP, so the shared contract needs that term; so it renders unfogged but no longer lacks data) | S002, S003 | G002 |
 | S006 | An embedded Azahar oracle and parity tooling can compare the port with independent 3DS execution | partial | S001 | G001, G002 |
@@ -485,14 +485,116 @@ arming frame and the next one, reported here rather than dropped):
   independent titles with separate material compilers land on it, so it is the platform's baseline
   configuration word, not a fixture coincidence.
 * **`config1` is NOT a constant:** `0xff7fffff` on 11 of 12 and `0xff7effff` on 1, a real per-material
-  difference at bit `0x11`, which the recovered builder names `MODE_SPOT_INDEX`. Any host that hardcodes
-  `config1` is wrong for the materials that differ.
+  difference. **The difference is at bit 16 (`0x10`), NOT bit `0x11`, and it is `disable_lut_d0`** --
+  an earlier revision of this row said "bit `0x11`, which the recovered builder names
+  `MODE_SPOT_INDEX`", which is wrong twice over and is corrected here. The XOR is `0x00010000`,
+  which is bit 16 under any reading; bit `0x11` (17) is **set in both words** and so cannot be
+  their difference. `Azahar/src/video_core/pica/regs_lighting.h:200` names bit 16 `disable_lut_d0`
+  and bit 17 `disable_lut_d1`. The recovered builder independently agrees that bit **16** is fed
+  by object byte `0x18F` (`MODE_SPOT`), not by `0x190` (`MODE_SPOT_INDEX`, which feeds bit 17) --
+  so the caption disagreed with the builder it cited as well as with the register map. The
+  consequence is not cosmetic: this is a **specular** difference, not a spot one, and section
+  "The captured configuration needs no optional lighting term" below shows it is the only
+  optional term any captured MM3D draw needs. Any host that hardcodes `config1` is still wrong for
+  the material that differs -- now for a knowable reason. Pinned by
+  `tools/test_pica_lighting_registers.py::CapturedWordDiffTests`, which also asserts bit 17 is set
+  in both words so the wrong reading cannot come back.
 * **This strengthens the one open bit.** The builder's constructor default predicts
-  `config0 = 0x80020400` — the observed word plus bit `0x11`, which comes solely from the
-  constructor's `+0x18A = 1`, a byte `FUN_004c6364` does not write. The single OoT3D fixture already
+  `config0 = 0x80020400` — the observed word plus bit `0x11` (17), which comes solely from the
+  constructor's `+0x18A = 1`, a byte `FUN_004c6364` does not write. **That bit is now NAMED: it is
+  `config0` bit 17 = `shadow_secondary`** (`regs_lighting.h:203`), and the builder's
+  `CONFIG0_BITS[0x18A] = 0x11` is consistent with that. The single OoT3D fixture already
   showed that bit clear; MM3D shows it clear on 12 of 12 draws in a different title. "The ordinary
   lit path clears `+0x18A`" is now cross-title, not a single observation. Which code clears it is
   still open, and is recorded as such rather than guessed.
+
+**The captured configuration needs NO optional lighting term, which is what makes `FRAG_PRIMARY`
+portable at all.** Until now the blocker on fragment lighting has been framed as "the PICA
+fixed-function light/LUT calculation is not ported", i.e. as a large speculative surface:
+`ComputeFragmentsColors` (`Azahar/src/video_core/renderer_software/sw_lighting.cpp:24-333`)
+evaluates six lighting LUTs, distance attenuation, spotlight attenuation, a bump map and shadow. A
+port that implements "all of it" for both titles is a lot of speculative surface, and both
+captured titles' *titles* being fragment-free is what kept it unexercised.
+
+But `config0` and `config1` are **per draw**, and they say exactly which of those terms can be
+non-trivial. Reducing the oracle's own captured words through the register map
+(`tools/pica_lighting_registers.py`, which PARSES `regs_lighting.h` rather than transcribing it,
+because a wrong bit does not raise — it produces a clean number) gives:
+
+```
+config0=0x80000400 config1=0xff7fffff
+  lighting config = 0 (Config0)
+  bump_mode=0 clamp_highlights=False enable_shadow=False
+  Distribution0          config_supports=True  lut_enabled=False
+  Distribution1          config_supports=False lut_enabled=False
+  Fresnel                config_supports=False lut_enabled=False
+  ReflectRed             config_supports=True  lut_enabled=False
+  ReflectGreen           config_supports=False lut_enabled=False
+  ReflectBlue            config_supports=False lut_enabled=False
+  SpotlightAttenuation   config_supports=True  (gated per slot, all 8 slots disabled)
+  per-slot: shadow=False spot_atten=False dist_atten=False
+  ACTIVE TERMS (0): none
+```
+
+**Zero.** So for 11 of MM3D's 12 captured lit draws, `ComputeFragmentsColors` degenerates to a
+closed form with **no half-vector, no LUT, no attenuation, no shadow and no bump**: for each
+enabled slot `num = light_enable.GetNum(slot)`, with `L = normalize(position)` (both MM3D slots are
+`directional`), `n_dot_l = max(dot(L, N), 0)` (or `|.|` when `two_sided_diffuse`),
+
+```
+diffuse  = global_ambient + Σ_slots ( light.diffuse * n_dot_l + light.ambient )
+specular = Σ_slots ( light.specular_0 + light.specular_1 )
+```
+
+each clamped to `[0,1]`. The single most counter-intuitive consequence: **the specular is FLAT.**
+With `disable_lut_d0 = 1` the code leaves `d0_lut_value` at its initial `1.0f`
+(`sw_lighting.cpp:214`), so `specular_0` is added with no `N·H` term at all. A port that
+implements textbook Blinn-Phong specular here would be wrong on **75–88% of MM3D's materials**,
+and would look plausible.
+
+**The 1-of-12 variant is the whole exception**, and it is exactly the bit identified above:
+`0xff7effff` clears bit 16, so `disable_lut_d0 = 0` while `Config0` does support `Distribution0`,
+and the reduction is `ACTIVE TERMS (1): lut:Distribution0` — one real half-vector specular
+(`N·H` through the distribution-0 LUT, with `lut_input.d0` selecting the dot product). So the port
+needs the reduced form as the common case and `Distribution0` as the exception, and nothing else.
+
+**The instrument is falsifiable in both directions**, which is the only reason to believe it. The
+same reducer, fed a maximally-enabled but still legal hardware word (bit 18 kept set so the word
+could exist), reports **14 active terms** — bump, shadow, clamp-highlights, per-slot shadow, spot
+and distance attenuation, all six LUTs and both Fresnel alpha terms. An instrument that could only
+ever say "nothing needed" would be indistinguishable from a broken one, so the positive direction is
+tested too (`test_instrument_can_report_the_other_answer`).
+
+23 tests, all mutation-verified: the wrong-bit mutation, an emptied `Distribution1` exclusion set,
+removing the hardwired-bit-18 refusal, a shadow gate reading the wrong 8-bit field, closing the
+documented `Config7 == 8` hole, and reading `bump_mode` from the wrong field each fail
+(`tools/check_pica_lighting_registers_mutations.py`, 6/6 caught, target restored byte-identical).
+
+**Two instrument defects found while verifying it, both of the "reports success while measuring
+nothing" class this project keeps re-learning, and both recorded so neither is repeated.** (1) The
+`SpotlightAttenuation` sampler is gated per slot by `disable_spot_atten[0-7]`, **not** by a
+`disable_lut_sp` bit — bit 18 is a hardwired dummy precisely because no such bit exists
+(`regs_lighting.h:203-205`). Treating the sampler set as one list raised `KeyError` on the first
+real capture, so the two sets are now explicit. (2) **The mutation harness was measuring a stale
+`.pyc`.** A mutation that preserves the file *size* (`8:` -> `7:`) leaves the cached bytecode valid
+under Python's `(mtime, size)` staleness check, so the "mutated" run imported the ORIGINAL module
+and the check reported a clean pass for a mutation that was never in effect; one mutation also
+`continue`d without restoring, leaving the previous mutation on disk for the next run. The driver
+now purges `__pycache__` and asserts the target is restored byte-identically, and it reports
+`applied=` per mutation so a harness failure is visibly different from a surviving mutant.
+
+**What this does and does not unblock.** It does NOT change the state of the port: `fragPrimary`
+is still bound to the vertex-lit primary and `fragSecondary` to zero at
+`zelda3d_sdl3gpu_shaders.cpp:386-387` and `unified_shader.cpp:437-438`, so **the user-visible
+result of this turn is unchanged** and no parity row may move on it. What it changes is that the
+remaining work is now a bounded, specified surface rather than an open one: the TEV evaluator
+already takes `fragPrimary`/`fragSecondary` as parameters (`zelda3d_tev_glsl.h:71`), the combiner
+source codes 1 and 2 already exist (`cmb_glgroups.cpp:33-36`), the per-material gate is already
+transported (`cmb_glgroups.cpp:189` -> `zelda3d_sdl3gpu_pass.cpp:923`), and the eight slot-enable
+bytes plus the mode bytes are already transcribed and mutation-tested. The remaining unknowns are
+the per-slot **colour** values (`diffuse`/`ambient`/`specular_0`/`specular_1`) and their producer,
+plus a counterfactual — and the counterfactual is the cheap half now, because MM3D's reproducible
+Lost Woods state is 75.2% fragment-lit with no gameplay `PlayState` needed.
 
 **A trap this measurement walked into, recorded so it is not walked into again.** `light_enable` is
 **not a bitmask of enabled slots** — Azahar reads it as a per-slot *light index*
