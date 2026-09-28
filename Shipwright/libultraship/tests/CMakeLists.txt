@@ -33,6 +33,7 @@ add_executable(lus_tests
     zelda3d_env_blend_tests.cpp
     townsfolk_body_colors_tests.cpp
     fifo_rpc_tests.cpp
+    scripted_input_fifo_lifetime_tests.cpp
     zelda3d_test_stubs.cpp
 )
 

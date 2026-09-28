@@ -22,3 +22,8 @@ int Z3D_AutoWarpEntrance(void) {
     }
     return -1;
 }
+
+int Z3D_ReextractSuppressed(void) {
+    const char* v = getenv("ZELDA3D_MM_NO_REEXTRACT");
+    return (v != NULL && v[0] != '\0') ? 1 : 0;
+}

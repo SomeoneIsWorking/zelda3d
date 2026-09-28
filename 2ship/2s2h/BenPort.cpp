@@ -1,4 +1,5 @@
 #include "BenPort.h"
+#include "Z3DBoot.h"
 #include "port/core_boot_error.h"
 #include <cstdlib>
 #include <iostream>
@@ -153,6 +154,15 @@ typedef struct {
 Fast::Fast3dWindow* benFast3dWindow = nullptr;
 static ArchiveVersion DetectArchiveVersion(std::string path, bool isO2rType);
 static bool VerifyArchiveVersion(ArchiveVersion version);
+/// The one place a ZAPD extraction runs. The four call sites below were byte-identical copies, so
+/// this was the only rule with four implementations -- and four chances to fix three of them.
+static void MmRunExtraction(Extractor& extractor, const std::string& installPath, std::atomic<size_t>* count,
+                            std::atomic<size_t>* total) {
+    extractor.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName), count, total);
+    *count = 0;
+    *total = 0;
+}
+
 std::string portArchivePath = "";
 static bool shipArchiveVersionMatch = false;
 
@@ -456,8 +466,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                     BenGui::RegisterPopup(
                         "Run 2 Ship 2 Harkinian", "All files have been processed. Run 2S2H?", "Yes", "No",
                         [&]() {
-                            if (!std::filesystem::exists(Ship::Context::GetAppDirectoryPath(appShortName) +
-                                                         "/mm.o2r")) {
+                            if (!std::filesystem::exists(
+                                    Ship::Context::LocateFileAcrossAppDirs("mm.o2r", appShortName))) {
                                 extractStep = ES_EXTRACT;
                                 promptStep = PS_FILE_CHECK;
                             } else {
@@ -471,25 +481,22 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                 args.erase(args.begin());
                 extract = Extractor();
                 if (extract.RunFileStandalone(file)) {
-                    bool doExtract = true;
-                    if (std::filesystem::exists(Ship::Context::GetAppDirectoryPath(appShortName) + "/mm.o2r")) {
-                        std::string msg = "Archive for current ROM, mm.o2r, already exists.\nExtract again?";
-                        BenGui::RegisterPopup("Confirm Re-extract", msg.c_str(), "Yes", "No", [&]() {
-                            extractionTask = threadPool->submit_task([&]() -> void {
-                                extract.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
-                                                 &extractCount, &totalExtract);
-                                extractCount = totalExtract = 0;
+                    if (std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("mm.o2r", appShortName))) {
+                        if (Z3D_ReextractSuppressed()) {
+                            extractStep = ES_VERIFY;
+                        } else {
+                            std::string msg = "Archive for current ROM, mm.o2r, already exists.\nExtract again?";
+                            BenGui::RegisterPopup("Confirm Re-extract", msg.c_str(), "Yes", "No", [&]() {
+                                extractionTask = threadPool->submit_task([&]() -> void {
+                                    MmRunExtraction(extract, installPath, &extractCount, &totalExtract);
+                                });
                             });
-                        });
+                        }
                     } else {
-                        extractionTask = threadPool->submit_task([&]() -> void {
-                            extract.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
-                                             &extractCount, &totalExtract);
-                            extractCount = totalExtract = 0;
-                        });
+                        extractionTask = threadPool->submit_task(
+                            [&]() -> void { MmRunExtraction(extract, installPath, &extractCount, &totalExtract); });
                     }
                 } else {
-                    bool open = true;
                     std::string msg = "File\n" + std::string(file) + "\nis not a ROM or does not match supported ROMs.";
                     BenGui::RegisterPopup("2S2H ROM Error", msg.c_str());
                 }
@@ -533,11 +540,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                             continue;
                         }
                         extractionTask = threadPool->submit_task([&]() -> void {
-                            extract.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
-                                             &extractCount, &totalExtract);
+                            MmRunExtraction(extract, installPath, &extractCount, &totalExtract);
                             promptStep = PS_SECOND;
-                            extractCount = 0;
-                            totalExtract = 0;
                         });
                         continue;
                     }
@@ -549,11 +553,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                                     extractStep = ES_VERIFY;
                                 } else {
                                     extractionTask = threadPool->submit_task([&]() -> void {
-                                        extract.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
-                                                         &extractCount, &totalExtract);
+                                        MmRunExtraction(extract, installPath, &extractCount, &totalExtract);
                                         extractStep = ES_VERIFY;
-                                        extractCount = 0;
-                                        totalExtract = 0;
                                     });
                                 }
                             },
@@ -991,7 +992,6 @@ ArchiveVersion ReadPortVersionFromArchive(std::string archivePath, bool isO2rTyp
 // Otherwise show a message and exit
 // For Windows/Mac/Linux if the version doesn't match, offer to regenerate it
 ArchiveVersion DetectArchiveVersion(std::string fileName, bool isO2rType) {
-    bool isArchiveOld = false;
     std::string archivePath = Ship::Context::LocateFileAcrossAppDirs(fileName, appShortName);
 
     // Doesn't exist so nothing to do here

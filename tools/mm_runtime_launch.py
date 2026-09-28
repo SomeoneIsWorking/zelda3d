@@ -45,6 +45,12 @@ class RuntimeLaunchProvisioner:
                 "LIBGL_ALWAYS_SOFTWARE": "1",
                 "GALLIUM_DRIVER": "llvmpipe",
                 "ZELDA3D_MM_WARP": "1",
+                # An automated session has nobody to answer MM's "Archive for current ROM, mm.o2r,
+                # already exists. Extract again?" popup, and an undismissable popup is a hang: the
+                # core would sit in its boot-time prompt loop instead of reaching gameplay. The
+                # build tree already carries the extracted mm.o2r, so the headless path skips the
+                # re-extraction and goes straight to the game. Interactive launches are unaffected.
+                "ZELDA3D_MM_NO_REEXTRACT": "1",
                 "SHIP_SCRIPTED_FIFO": str(self.paths.input_fifo),
                 "ZELDA3D_MM_REPL": str(self.paths.repl_fifo),
             }

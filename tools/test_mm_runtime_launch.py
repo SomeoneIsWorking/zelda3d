@@ -36,6 +36,9 @@ class RuntimeLaunchEnvironmentTests(unittest.TestCase):
             self.assertEqual(env["SHIP_SCRIPTED_FIFO"], str(paths.input_fifo))
             self.assertEqual(env["ZELDA3D_MM_REPL"], str(paths.repl_fifo))
             self.assertEqual(env["ZELDA3D_MM_ENTRANCE"], "0x5400")
+            # The headless session must skip the re-extraction prompt: nothing can dismiss that
+            # popup, so leaving it enabled would hang every automated run before gameplay.
+            self.assertEqual(env["ZELDA3D_MM_NO_REEXTRACT"], "1")
             self.assertEqual(env["FROM_DOTENV"], "yes")
             self.assertEqual(env["EXTRA"], "argument")
 

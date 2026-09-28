@@ -22,6 +22,10 @@
 
 #include "ultra64.h"
 
+// The slot record type, for Mm3d_SceneFogSlot's return value. Game-agnostic: both games' generated
+// tables are filled from this one type.
+#include "lighting/zelda3d_env_record.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -47,6 +51,19 @@ void Mm3d_UpdateFogWindow(PlayState* play);
 
 /// Diagnostics: whether the fog window was installed this frame, and the values it used.
 bool Mm3d_QueryFogWindow(float* outFogNear, float* outFogFar, float* outZFar, float* outCameraNear);
+
+/**
+ * The recovered 3DS fog distances for one slot of one scene, straight from the generated table.
+ *
+ * The independent read. `Mm3d_QueryFogWindow` answers "what did the renderer get", which has been
+ * through the capture, the blend and the feed; this answers "what does the recovered 3DS record say",
+ * which has not. A diagnostic that only reports the first cannot tell a correct value from a
+ * same-shaped wrong one, so callers are expected to compare the two.
+ *
+ * NULL when the scene has no recovered palette or `slot` is out of range -- a caller must not read
+ * through it.
+ */
+const Zelda3dLightSlot* Mm3d_SceneFogSlot(s16 sceneId, u8 slot);
 
 #ifdef __cplusplus
 }
