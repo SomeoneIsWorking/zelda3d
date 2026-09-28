@@ -118,6 +118,18 @@ POSE column is noted. **Last swept 2026-07-15T12:36Z.**
 > **116–143 of 131–161 draws per frame** (frames 1200–3800) with `config0=0x80000400` 12/12,
 > `max_light_index=1` 12/12, and `config1` `0xff7fffff` 11/12 vs `0xff7effff` 1/12. See
 > `docs/project-state.md` S003/S005 and `oot3d-decomp/docs/fragment_lighting.md`.
+>
+> **MM3D also has a reproducible, pixel-exact oracle state** (`tools/mm3d_oracle_state.py`), reached
+> without a gameplay `PlayState` by paging MM3D's opening with confirm: the story crawl, then the Lost
+> Woods 3D sequence. The state round-trips **byte-for-byte across a process boundary** — 3390 draws,
+> PICA fog `(40,140,220)`, fog-LUT minimum 0.4915 (50.8% attenuation), identical frame SHA
+> `4ac8d6cc2fc9d4b9`, mean-abs 0.0000 against the 0.73 noise floor. **This is what makes an MM3D
+> A/B possible at all**: every MM measurement before it was addressable only as "this exact frame count
+> from a cold boot", and the drive is sensitive to those counts. It does not open gameplay —
+> `docs/issues/0023` still governs that — but the cutscene-reachable 3D surface (scene fog with a real
+> palette, a skinned character model, alpha foliage, multiple texture units, depth) is now a stable
+> carrier for recorded parity evidence, and **MM3D fog is comparable** where the opening was not
+> (1.6% attenuation there, 50.8% here).
 
 ### Gameplay scene parity (Kokiri Forest) — closed 2026-07-22
 

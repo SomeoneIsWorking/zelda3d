@@ -716,6 +716,37 @@ settings and are not table values at all. A second cause cannot be separated wit
 here: an opening **cutscene** may use a cutscene-specific palette rather than the scene's env palette.
 Both are recorded; neither is guessed away.
 
+**MM3D NOW HAS A REPRODUCIBLE, PIXEL-EXACT ORACLE STATE — this is the session's largest MM3D unblock.**
+Everything above was addressable only as "the state after this exact frame count from a cold boot", which
+is an anecdote rather than evidence. `tools/mm3d_oracle_state.py` fixes that: `drive` recreates the
+state, `verify` proves the round trip, `info` prints what is recorded.
+
+* **The drive**: `run 900` -> 14 confirms at 150 frames apart (paging the crawl) -> **900 unpressed**
+  (the exit transition does not advance on its own) -> 1400 settle. Those counts are load-bearing, not
+  tuning, and changing them lands elsewhere in the cutscene.
+* **The state**: `savestate` writes 23 MB to gitignored `scratch/harness/save/mm3d/lost_woods.state`.
+  It is ROM-derived and is never committed; the tool regenerates it.
+* **The round trip, across a process boundary**: save, tear the emulator down, boot a **fresh**
+  process, load, and compare. It reproduces **byte-for-byte** — draw count 3390, PICA fog
+  `(40,140,220)`, fog-LUT minimum **0.4915**, and identical frame SHA `4ac8d6cc2fc9d4b9`
+  (mean-abs **0.0000** against this project's 0.73 instrument noise floor). A same-process load would
+  have proved neither, since `LoadStateBuffer` rejects a foreign title anyway
+  (`savestate.cpp:266`; OoT3D `0x0004000000033500` vs MM3D `0x0004000000125500`).
+* **The frame is compared byte-for-byte deliberately.** Draw count, fog colour and fog-LUT minimum
+  would ALL still match if a restore recovered PICA registers without recovering the image — which
+  would let a bogus parity claim straight through. Byte comparison is the only version of this check
+  that can fail.
+* **A methodological error, caught and recorded**: the first round trip measured a mean-abs
+  difference of **23.5** and looked like a failed restore. It was the experiment's own ordering —
+  fingerprinting advances 60 frames, and the state was being saved *after* it, so the two frames were
+  60 frames apart in the cutscene's animation. Saving before fingerprinting makes them identical. A
+  "restore failed" conclusion from a 23.5 difference would have been confidently wrong.
+
+So MM3D now has the same kind of stable measurement point OoT3D has had all along, reached **without**
+a gameplay `PlayState`. `docs/issues/0023` still governs reaching gameplay, and the high-level harness
+commands still need MM3D's own recovered addresses — but the cutscene-reachable 3D surface is now
+stable enough to carry recorded oracle evidence.
+
 **A census that was discarded, not reported.** MM3D's per-draw log carries a field named
 `texMappingMethod`, and reading its first component as an integer yields a tidy-looking distribution
 (`1`: 638, `0`: 20, `3`: 9 on unit 0) that reads exactly like the mapping-method population the
