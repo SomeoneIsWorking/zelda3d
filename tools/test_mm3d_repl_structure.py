@@ -24,6 +24,7 @@ class MmReplStructureTests(unittest.TestCase):
             "actors",
             "cam",
             "fog",
+            "fogcolour",
             "linkequip",
             "linkform",
             "linkinfo",
