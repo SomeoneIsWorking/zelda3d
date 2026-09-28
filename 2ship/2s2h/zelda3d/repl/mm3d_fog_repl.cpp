@@ -2,6 +2,7 @@
 
 #include "2s2h/zelda3d/mm3d_fog_window.h"
 #include "2s2h/zelda3d/mm3d_scene_lighting.h"
+#include "fast/zelda3d_fog.h"
 #include "lighting/zelda3d_env_blend.h"
 
 #include <fmt/format.h>
@@ -70,6 +71,7 @@ std::string MatchAgainstTable(s16 sceneId, const Zelda3dEnvBlend& blend, f32 fog
 static void ReplyFogColour(PlayState* play, Zelda3DMmReplReply reply, void* user) {
     const EnvironmentContext& env = play->envCtx;
     const CurrentEnvLightSettings& live = env.lightSettings;
+    const Zelda3dEnvBlend& blend = gZelda3dEnvBlend;
 
     // Which list is installed. A residual is uninterpretable without this: it is the difference
     // between the N64 and 3DS palettes if the substitution did not happen, and nothing at all if it did.
@@ -82,9 +84,16 @@ static void ReplyFogColour(PlayState* play, Zelda3DMmReplReply reply, void* user
     std::string line =
         fmt::format("fogcolour scene={} live=({},{},{}) list={} slots={}", play->sceneId, live.fogColor[0],
                     live.fogColor[1], live.fogColor[2], source, static_cast<int>(env.numLightSettings));
-    line += fmt::format(" lightSetting={} prev={} blendEnabled={} override={}", static_cast<int>(env.lightSetting),
-                        static_cast<int>(env.prevLightSetting), env.lightBlendEnabled ? 1 : 0,
-                        static_cast<int>(env.lightSettingOverride));
+    line += fmt::format(" lightSetting={} prev={} blendEnabled={} blend={:.3f} rate={} override={} mode={}",
+                        static_cast<int>(env.lightSetting), static_cast<int>(env.prevLightSetting),
+                        env.lightBlendEnabled ? 1 : 0, static_cast<double>(env.lightBlend),
+                        static_cast<int>(env.lightBlendRateOverride), static_cast<int>(env.lightSettingOverride),
+                        static_cast<int>(env.lightMode));
+    // The state that could move a colour no slot pair can explain: weather, storms and the time
+    // sequence. Reported so a drift is attributable instead of mysterious.
+    line += fmt::format(" storm={}/{} sandstorm={} timeSeq={} skyboxTime={}", static_cast<int>(env.stormState),
+                        static_cast<int>(env.stormRequest), static_cast<int>(env.sandstormState),
+                        static_cast<int>(env.timeSeqState), static_cast<int>(gSaveContext.skyboxTime));
     if (!substituted || env.lightSetting >= env.numLightSettings) {
         line += " | no record to compare against";
         reply(line.c_str(), user);
@@ -101,10 +110,45 @@ static void ReplyFogColour(PlayState* play, Zelda3DMmReplReply reply, void* user
         line +=
             fmt::format(" | plain branch -> record slot {} fogCol=({},{},{}) {}", env.lightSetting, slot.fogColor[0],
                         slot.fogColor[1], slot.fogColor[2], exact ? "MATCHES EXACTLY" : "DIFFERS");
+    } else if (!blend.valid) {
+        line += " | no captured schedule, so MM's non-time-based blend applies and there is nothing to predict";
     } else {
-        line += fmt::format(" | blend branch -> lerp(prev={}, lightSetting={}); not compared here",
-                            env.prevLightSetting, env.lightSetting);
+        // `Zelda3D_EnvBlendCapture` is called from exactly one place -- inside the time-based branch --
+        // so `blend.valid` PROVES that branch ran, and MM's colour this frame is its two-LERP. Since the
+        // capture-order fix, that two-LERP runs in the same direction as the window's (weight-0 slot
+        // first), so the colour is predictable from the table alone and can be checked rather than
+        // described. Before the fix the two ran in OPPOSITE directions, which is what made the earlier
+        // cross-branch comparison report a meaningless residual.
+        const float wTime = std::clamp(blend.wTime, 0.0f, 1.0f);
+        const float wConfig = std::clamp(blend.wConfig, 0.0f, 1.0f);
+        const auto lerp = [wTime](const Zelda3dLightSlot* a, const Zelda3dLightSlot* b, int c) {
+            const float lo = static_cast<float>(a->fogCol[c]);
+            const float hi = static_cast<float>(b->fogCol[c]);
+            return lo + (hi - lo) * wTime;
+        };
+        const Zelda3dLightSlot* s0 = Mm3d_SceneFogSlot(play->sceneId, blend.idx[0]);
+        const Zelda3dLightSlot* s1 = Mm3d_SceneFogSlot(play->sceneId, blend.idx[1]);
+        const Zelda3dLightSlot* s2 = Mm3d_SceneFogSlot(play->sceneId, blend.idx[2]);
+        const Zelda3dLightSlot* s3 = Mm3d_SceneFogSlot(play->sceneId, blend.idx[3]);
+        if (s0 == nullptr || s1 == nullptr || s2 == nullptr || s3 == nullptr) {
+            line += " | a captured index is outside the recovered table, so the colour is not predictable";
+        } else {
+            int worst = 0;
+            for (int c = 0; c < 3; c++) {
+                const float first = lerp(s0, s1, c);
+                const float second = lerp(s2, s3, c);
+                const int predicted = static_cast<int>(std::lround(first + (second - first) * wConfig));
+                worst = std::max(worst, std::abs(static_cast<int>(live.fogColor[c]) - predicted));
+            }
+            line += fmt::format(" | time-based two-LERP predicts the live colour to within {} (integer quantisation)",
+                                worst);
+        }
     }
+    // What the renderer is actually handed. Fed from the same live struct, so this is the value the
+    // host hazes toward rather than a prediction of it -- and the comparison above is what makes it
+    // the 3DS colour.
+    line += fmt::format(" | renderer uFog=({:.3f},{:.3f},{:.3f})", static_cast<double>(gZelda3dFogColor[0]),
+                        static_cast<double>(gZelda3dFogColor[1]), static_cast<double>(gZelda3dFogColor[2]));
     reply(line.c_str(), user);
 }
 
@@ -166,6 +210,31 @@ extern "C" s32 Zelda3D_MmFogReplDispatch(PlayState* play, const char* command, Z
     line += fmt::format(" ON near={:.1f} far={:.1f} zFar={:.1f} camNear={:.1f}", static_cast<double>(fogNear),
                         static_cast<double>(fogFar), static_cast<double>(zFar), static_cast<double>(cameraNear));
     line += MatchAgainstTable(play->sceneId, blend, fogNear, fogFar, zFar);
+
+    // THE DECISIVE CHECK, and the one that would have caught the reversed blend order. MM computes
+    // `envCtx->lightSettings.fogNear` and `.zFar` for itself, from the same list and the same weights,
+    // one screen earlier in this very function. So the window we feed must agree with them -- and
+    // nothing else in this project could have noticed a pair lerped backwards, because both orders
+    // yield a perfectly ordinary-looking window.
+    //
+    // `fogNear` is expected to agree exactly. `zFar` CANNOT: the 0x16 projection clamps zFar to s16
+    // (130 slots in MM's own table), while the 0x20 record the window reads keeps the true f32. So a
+    // zFar disagreement is a known, recorded consequence of the stride, not a defect, and it is
+    // reported rather than used to fail.
+    const CurrentEnvLightSettings& own = play->envCtx.lightSettings;
+    const double nearDelta = std::abs(static_cast<double>(own.fogNear) - fogNear);
+    // Tolerance 1.0, and deliberately not tighter: MM stores fogNear packed as
+    // `blendRateAndFogNear & 0x3FF` and blends it with the integer `LERPIMP_ALT`, while the 0x20
+    // record keeps the exact f32. A sub-unit difference is therefore MM's own quantisation rather
+    // than a wrong blend, and a half-unit threshold would report that as a failure every frame.
+    if (nearDelta <= 1.0) {
+        line += fmt::format(" | fogNear AGREES with MM's own blend (d={:.2f}, MM's integer quantisation)", nearDelta);
+    } else {
+        line += fmt::format(" | fogNear DISAGREES with MM's own blend ({} vs {:.1f}, d={:.2f})", own.fogNear,
+                            static_cast<double>(fogNear), nearDelta);
+    }
+    line += fmt::format(" (MM zFar={} vs 3DS zFar={:.0f}; the 0x16 stride clamps zFar to s16)", own.zFar,
+                        static_cast<double>(zFar));
     reply(line.c_str(), user);
     return 1;
 }

@@ -59,6 +59,19 @@ extern Zelda3dEnvBlend gZelda3dEnvBlend;
  *
  * `firstA`/`firstB` are the pair `wTime` lerps and `secondA`/`secondB` the pair `wConfig` then lerps
  * between, in the order the game's own colour loops used them.
+ *
+ * THE ORDERING IS PART OF THE CONTRACT, AND THE TWO GAMES DIFFER -- which is the whole reason the
+ * indices are captured instead of derived. The rule below is `Lerp(Lerp(firstA, firstB, wTime),
+ * Lerp(secondA, secondB, wTime), wConfig)`, so the caller must pass the slot that sits at weight 0
+ * FIRST. OoT passes `TIME_ENTRY_1F.unk_04, .unk_05`, matching the `LERP(list[unk_04], list[unk_05],
+ * sp8C)` immediately below its own capture. MM passes `sp97, sp95`, because MM evaluates the same pair
+ * the other way round: `Environment_LerpColor(to, from, w)` returns `from + (to - from) * w` and
+ * `S16_LERP(a, b, w)` is `b + (a - b) * w`, so with `LerpColor(list[sp95], list[sp97], w)` the weight-0
+ * slot is `sp97`. Capturing MM as `(sp95, sp97, ...)` therefore made this rule lerp both pairs
+ * BACKWARDS -- which fed the renderer the wrong end of MM's fog blend while producing a perfectly
+ * ordinary-looking window. Both orders are valid lerps, so no shape-based test can see it; only
+ * comparing the shared rule's result against the value the game's own code computed for the same
+ * frame can, which is what `fog` now reports.
  */
 void Zelda3D_EnvBlendCapture(int firstA, int firstB, int secondA, int secondB, float wTime, float wConfig);
 

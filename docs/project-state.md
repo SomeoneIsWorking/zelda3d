@@ -1441,18 +1441,58 @@ colour was `(105,195,255)` and `z2_clocktower` slot 0's `fogCol` is `{105,195,25
 substitution is `list=SUBSTITUTED 3DS records`, 29 slots. So the colour is derivable from the table, and
 the host does not need a new blend: it can read the colour MM already computed from the 3DS data.
 
-*Still open, precisely.* The colour is not static. With `lightSetting=0`, `prevLightSetting=0` and
-`blendEnabled=1` -- a LERP of slot 0 against itself, which cannot change a value -- the live colour still
-drifts: `(105,195,255)` -> `(105,193,252)` -> `(105,181,236)`, red pinned while green and blue fall. So
-something modulates it that is not the slot list and not `spA4`. Naming it is the next grounded step;
-until then the honest statement is that MM's fog colour comes from the 3DS table and carries an
-unattributed time-varying modulation. The 1-in-60 random-colour test is withdrawn as support for the
+*The drift is MM's own time-of-day blend, and tracking it down found a real defect in the WINDOW feed.*
+The colour was not drifting for a mysterious reason: sampling `fogcolour` alongside the state that
+governs it showed `gSaveContext.skyboxTime` advancing 16384 -> 16789 while every slot index stayed put,
+and the values are arithmetically consistent with a two-LERP between `z2_clocktower` slots 0 and 1 at
+w ~ 0.075 (slot 0 fogCol `(105,195,255)`, slot 1 `(110,22,16)`; red moves +5w, which rounds to 0, so
+"red pinned" was the rounding, not a pin). So the colour is ordinary MM behaviour on 3DS data.
+
+**But the same reading exposed that MM's PICA fog WINDOW was lerping each pair BACKWARDS.** The
+capture was `Zelda3D_EnvBlendCapture(sp95, sp97, sp94, sp96, ...)`, while the shared rule is
+`Lerp(Lerp(idx[0], idx[1], wTime), Lerp(idx[2], idx[3], wTime), wConfig)` -- so the weight-0 slot must be
+passed FIRST. MM's own code puts it second: `Environment_LerpColor(to, from, w)` returns
+`from + (to - from) * w` and `S16_LERP(a, b, w)` is `b + (a - b) * w`, so with
+`LerpColor(list[sp95], list[sp97], w)` the weight-0 slot is `sp97`. OoT gets this right -- it captures
+`(TIME_ENTRY_1F.unk_04, .unk_05)` directly above its own `LERP(list[unk_04], list[unk_05], sp8C)`.
+
+Measured consequence in `z2_clocktower`, before the fix: the window reported `near=926` (slot 1) at
+`wTime=0` while MM's own `envCtx->lightSettings.fogNear` was `456` (slot 0) -- a **470-unit error at
+rest**, growing as `skyboxTime` advanced, because the whole pair was interpolated in the wrong
+direction. Both orders are valid lerps, so the window still looked entirely ordinary: right shape,
+plausible ramp, wrong end. Fixed to `Zelda3D_EnvBlendCapture(sp97, sp95, sp96, sp94, ...)` -- a
+one-line change; `z_kankyo.c` is vendored decomp pinned at 3728 lines and `2ship/src/` is excluded from
+the clang gate as generated decomp, so the ordering contract is documented in the shared header
+(`zelda3d_env_blend.h`) instead of in a comment the seam cannot afford.
+
+The `fog` command now proves the fix against the game's OWN arithmetic: it compares the fed window with
+`envCtx->lightSettings.fogNear`, which MM computed for itself from the same list and weights earlier in
+the same function. After the fix the two agree at every sampled weight (d = 0.00, 0.98, 0.15) against
+**470 before**. The residual is MM's own quantisation -- it stores `fogNear` packed as
+`blendRateAndFogNear & 0x3FF` and blends with the integer `LERPIMP_ALT`, while the 0x20 record keeps the
+exact f32 -- so the tolerance is 1.0, and a tighter one would report that as a failure every frame.
+`zFar` legitimately disagrees (`MM zFar=32767` vs `3DS zFar=40000`): the 0x16 projection clamps zFar to
+s16, which is why 130 slots are recorded as clamped.
+
+*This is the strongest check in the MM fog campaign precisely because it needs no oracle*: it compares
+the port against the N64 game's own computation on the same frame, so it falsifies a wrong blend
+without a pixel comparison. The 1-in-60 random-colour test is withdrawn as support for the
 strong claim: it refuted interpolation of the table, which was never in dispute.
 
-Gap: MM3D coverage is substantially incomplete and must be established independently from OoT results. The
-fog WINDOW is observed and cross-checked at runtime and the scene-lighting substitution is verified by
-pointer identity; the fog COLOUR's additive term is measured but unattributed, and no MM frame has been
-compared against the oracle either way.
+**MM3D's fog COLOUR is now CLOSED as a port, on the host side.** `Mm3d_UpdateFogWindow` now feeds
+`gZelda3dFogColor` from `envCtx->lightSettings.fogColor` -- the value MM itself blended from the
+substituted 3DS records -- in the same pattern OoT's `Zelda3D_UpdateFog` already used, so the host
+hazes toward the 3DS colour instead of the N64 one. Verified live: `live=(105,195,255)` reaches the
+renderer as `uFog=(0.412,0.765,1.000)`, and the `fogcolour` command now reports that value so the feed
+is observable rather than asserted. **No blend is reimplemented here**: the arithmetic is MM's, and the
+`fogcolour` check proves it -- the time-based two-LERP over the 3DS table predicts MM's live colour to
+within 0-1 (integer quantisation) across its time-of-day drift, so the value the renderer gets is the
+3DS one. Both halves of MM3D's scene fog are therefore now on 3DS data.
+
+Gap: MM3D coverage is substantially incomplete and must be established independently from OoT results.
+The fog WINDOW and COLOUR are both observed, cross-checked and fed, and the scene-lighting substitution
+is verified by pointer identity -- but **no MM frame has yet been compared against the oracle**, so this
+is a correct port, not recorded parity: `lighting.pica-fog` stays open for MM until an A/B exists.
 
 ### S006 — Independent oracle comparisons
 

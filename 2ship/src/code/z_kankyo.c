@@ -1468,7 +1468,7 @@ void Environment_UpdateLights(PlayState* play, EnvironmentContext* envCtx, Light
                         S16_LERP(lightSettingsList[(s32)sp96].zFar, lightSettingsList[(s32)sp94].zFar, temp_fv0);
                     envCtx->lightSettings.zFar = LERPIMP_ALT(blend16[0], blend16[1], var_fs3);
 
-                    Zelda3D_EnvBlendCapture(sp95, sp97, sp94, sp96, temp_fv0, var_fs3);
+                    Zelda3D_EnvBlendCapture(sp97, sp95, sp96, sp94, temp_fv0, var_fs3);
 
                     break;
                 }
