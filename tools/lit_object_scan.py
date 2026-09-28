@@ -42,13 +42,12 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
 
+import harness_memory_read as memory_read  # noqa: E402
 from harness_process import spawn  # noqa: E402
-from lit_object_dump import boot  # noqa: E402
 
-# 64 KiB per dumprange. Larger probes killed the harness outright on the sparse segments, and a dead
-# harness loses the whole run, so the chunk size is set by the most fragile region rather than the
-# fastest one.
-CHUNK = 0x10000
+# The chunk size and the warm-up both come from the shared memory owner now, so this tool cannot skip
+# either. See harness_memory_read's docstring for the failure that made that necessary.
+CHUNK = memory_read.DEFAULT_CHUNK
 MARKER_A = 0x18A
 MARKER_B = 0x18D
 # Where `FUN_00371758` copies, relative to the object base, and how much.
@@ -134,13 +133,13 @@ def scan(harness) -> tuple[bytearray, int, int, list[int], int]:
         va = base
         while va < limit:
             size = min(CHUNK, limit - va)
-            if OUT.exists():
-                OUT.unlink()
-            harness.send(f"dumprange 0x{va:08x} 0x{size:x} {OUT}")
-            if not OUT.exists() or OUT.stat().st_size != size:
-                print(f"  stopped at 0x{va:08x}: dumprange returned nothing (region ends here?)")
+            # `read_region` returns None where the harness declines the range -- which is information,
+            # the end of a segment -- and raises where the read happened but is unusable, which is a
+            # bug. The two are never allowed to look alike.
+            blob = memory_read.read_region(harness, va, size, OUT, allow_zero=True)
+            if blob is None:
+                print(f"  stopped at 0x{va:08x}: the harness declined the range (region ends here?)")
                 break
-            blob = OUT.read_bytes()
             image += blob
             read += len(blob)
             nonzero += sum(1 for byte in blob if byte)
@@ -157,12 +156,7 @@ def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     harness = spawn()
     try:
-        boot(harness)
-        # The title demo has to be RUNNING for the fragment path to have produced a configuration at
-        # all. My first scan skipped this and read a still-empty heap. Same remedy as
-        # lit_object_dump.py, same reason.
-        harness.send("run 400", per_line_timeout=300.0)
-        print("[lit_object_scan] " + (harness.send("playstate") or "").strip())
+        print("[lit_object_scan] " + memory_read.warm(harness).strip())
 
         image, read, nonzero, both, single = scan(harness)
         print(f"scanned {read} bytes across {len(REGIONS)} region(s)")

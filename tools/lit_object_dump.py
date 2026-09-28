@@ -34,6 +34,7 @@ REPO = Path(__file__).resolve().parent.parent
 if str(REPO / "tools") not in sys.path:
     sys.path.insert(0, str(REPO / "tools"))
 
+import harness_memory_read as memory_read  # noqa: E402
 from harness_process import spawn  # noqa: E402
 
 OUT = REPO / "scratch" / "lit_object"
@@ -46,21 +47,24 @@ INTERESTING_OFFSET = 0x18A
 RECORDED_CANDIDATES = (0x081D1538, 0x081D3AA0)
 
 
-def boot(harness) -> None:
-    response = harness.send("soh_boot")
-    if not response.startswith("ok"):
-        raise SystemExit(f"soh_boot failed: {response}")
+# Both the warm-up and the read now live in `harness_memory_read`, which is the single owner of the
+# precondition. They were inline here, which is exactly why a second script that reimplemented the read
+# without them produced a confident wrong answer -- see that module's docstring.
+boot = memory_read.warm
 
 
 def dump(harness, va: int, size: int, path: Path) -> bool:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        path.unlink()
-    reply = harness.send(f"dumprange 0x{va:08x} 0x{size:x} {path}")
-    if path.exists() and path.stat().st_size == size:
+    """Read one object-sized range. `allow_zero` because a zeroed slot IS a real observation here:
+    the per-material records differ in density and several are legitimately empty."""
+    try:
+        memory_read.read_memory(harness, va, size, path)
         return True
-    print(f"  dumprange 0x{va:08x} failed: {reply.strip()}", file=sys.stderr)
-    return False
+    except memory_read.MemoryReadUnusable as error:
+        if "zero bytes" in str(error):
+            path.write_bytes(b"\x00" * size)
+            return True
+        print(f"  dumprange 0x{va:08x} failed: {error}", file=sys.stderr)
+        return False
 
 
 def describe(blob: bytes) -> str:
@@ -95,10 +99,7 @@ def main() -> int:
     os.environ.setdefault("HARNESS_STDERR", str(REPO / "scratch" / "logs" / "lit_object_dump.log"))
     harness = spawn()
     try:
-        boot(harness)
-        # The title demo has to be running for the fragment path to have produced a configuration.
-        harness.send("run 400", per_line_timeout=300.0)
-        print("[lit_object_dump] " + (harness.send("playstate") or "").strip())
+        print("[lit_object_dump] " + boot(harness).strip())
 
         if args.slots:
             base = args.renderer + 0x400
