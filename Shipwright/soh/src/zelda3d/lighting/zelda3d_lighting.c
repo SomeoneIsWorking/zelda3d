@@ -9,7 +9,10 @@ void Zelda3D_Fog3dOff(void);
 
 int gZelda3dScenePaletteN = 0;
 const Zelda3dLightSlot* gZelda3dScenePalette = NULL;
-Zelda3dEnvBlend gZelda3dEnvBlend;
+// gZelda3dEnvBlend is defined in the SHARED owner (zelda3d_shared/lighting/
+// zelda3d_env_blend.c) because Majora's Mask captures the same schedule; defining it here as
+// well was a link-time multiple definition, which is the failure mode of moving a global
+// without moving every definition of it.
 Zelda3dEnvColors gZelda3dEnvColors;
 float gZelda3dTintDiff = 0.5f;
 float gZelda3dTintMul = 1.0f;
@@ -102,23 +105,23 @@ void Zelda3D_SceneLightSettingsOverride(PlayState* play) {
     // fog with the ROM's own per-scene values, part of the oracle's world render (distant-terrain
     // A/B: oracle (172,169,93) vs un-fogged (80,77,33) at rows 0.14-0.20).
     {
-        f32 cfgA, cfgB, fogNear, fogFar, zFar;
+        f32 fogNear, fogFar, zFar;
         const f32 kGameplayCamNear3ds = 7.0f; // measured from the oracle's live projection (above)
         f32 fwd[3];
         f32 eye[3] = { play->view.eye.x, play->view.eye.y, play->view.eye.z };
-        cfgA = LERP((f32)pal[a0].fogNear, (f32)pal[a1].fogNear, wT);
-        cfgB = LERP((f32)pal[b0].fogNear, (f32)pal[b1].fogNear, wT);
-        fogNear = LERP(cfgA, cfgB, wC);
-        cfgA = LERP(pal[a0].fogFar, pal[a1].fogFar, wT);
-        cfgB = LERP(pal[b0].fogFar, pal[b1].fogFar, wT);
-        fogFar = LERP(cfgA, cfgB, wC);
-        cfgA = LERP(pal[a0].zFar, pal[a1].zFar, wT);
-        cfgB = LERP(pal[b0].zFar, pal[b1].zFar, wT);
-        zFar = LERP(cfgA, cfgB, wC);
-        fwd[0] = play->view.lookAt.x - play->view.eye.x;
-        fwd[1] = play->view.lookAt.y - play->view.eye.y;
-        fwd[2] = play->view.lookAt.z - play->view.eye.z;
-        if (fogFar > fogNear && zFar > kGameplayCamNear3ds) {
+        // The window blend is the shared rule, not a second copy: Zelda3D_EnvBlendWindow applies the
+        // same two-LERP the block above already spells out for the colours, and Majora's Mask now uses
+        // this same function on its own table. It also REFUSES a degenerate window (far at or before
+        // near, or a non-positive far plane) instead of feeding it on, which is decided from the data
+        // rather than left for the host's guard to catch.
+        // SoH's palette is a flat pointer plus a count; the shared rule takes the same pair in the
+        // `Zelda3dSceneLight` shape both generated tables already use, so it is wrapped here rather
+        // than given a second entry point.
+        const Zelda3dSceneLight scene = { (unsigned char)n, pal };
+        if (Zelda3D_EnvBlendWindow(&scene, &fogNear, &fogFar, &zFar, NULL)) {
+            fwd[0] = play->view.lookAt.x - play->view.eye.x;
+            fwd[1] = play->view.lookAt.y - play->view.eye.y;
+            fwd[2] = play->view.lookAt.z - play->view.eye.z;
             Zelda3D_Fog3dSet(kGameplayCamNear3ds, zFar, fogNear, fogFar, eye, fwd);
         } else {
             Zelda3D_Fog3dOff();

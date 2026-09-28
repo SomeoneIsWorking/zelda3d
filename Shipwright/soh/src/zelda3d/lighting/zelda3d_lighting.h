@@ -10,17 +10,15 @@
 // failure that reads MM3D's fogColor as its second light colour.
 #include "lighting/zelda3d_env_record.h"
 
+// The blend SCHEDULE (which four slots, and the two weights) is also title-neutral -- both N64 games
+// compute the same two-LERP and both capture it the same way -- and the window blend derived from it
+// is one rule that must not be written twice. Both live in the shared owner. Colours stay here: MM's
+// are produced by its own ADDITIVE blend, so there is no shared colour rule to have.
+#include "lighting/zelda3d_env_blend.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct {
-    unsigned char valid;
-    unsigned char timeBased;
-    unsigned char idx[4];
-    float wTime;
-    float wConfig;
-} Zelda3dEnvBlend;
 
 typedef struct {
     unsigned char valid;
@@ -29,7 +27,6 @@ typedef struct {
     float l2col[3];
 } Zelda3dEnvColors;
 
-extern Zelda3dEnvBlend gZelda3dEnvBlend;
 extern Zelda3dEnvColors gZelda3dEnvColors;
 extern float gZelda3dTintDiff;
 extern float gZelda3dTintMul;

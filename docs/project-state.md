@@ -19,7 +19,7 @@ S003 is the current focus.
 | S002 | 3DS containers, models, animations, scenes, collision, cameras, lighting, and face data are available to both engines | partial | S001 | G001, G002 |
 | S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; **OoT's PICA distance fog: measured and applied on both host routes**, MM's is missing per S005; scene fog: **OoT closed, MM3D CONFIRMED by prediction** — the recovered MM3D record's window reproduces MM3D's authored PICA LUT to 1.19 byte steps (mean-abs 0.00466, control 0.02117), so the fog port is feasible with the existing host mechanism, and MM3D's camera near plane is ~77 against OoT3D's 7; material/fragment lighting still partial — **the per-light transport contract is now MEASURED on MM3D's registers** (per-slot: `diffuse`, `specular_0` and the light direction; MM3D's two lit slots are both `directional`, exactly antiparallel in x, and NOT the same colour, so neither a negated-direction nor a copied-colour reduction works), and **the two-light configuration counterfactual is now MEASURED in MM3D** (`max_light_index=1`/`slot_mapping=[0,1,...]` 12/12, `config0=0x80000400` 12/12, `config1` `0xff7fffff` 11/12 and `0xff7effff` 1/12 so it is not a constant; the host's slot count of 2 is confirmed with a denominator), and the builder's one open `+0x18A` bit is cross-title) | S002 | G001, G002 |
 | S004 | OoT3D actor animation, facial, camera, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G001 |
-| S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial (**scene lighting is now SUBMITTED**: the recovered 3DS records are installed into MM's own `lightSettingsList` at `2ship/2s2h/z_scene_2SH.cpp:281` `Scene_CommandEnvLightSettings`, so MM's N64 blend — time LERP, config LERP and the additive `adjLightSettings` term — operates on 3DS data with no reimplementation; **fog's window is validated against live hardware** (slot 2 predicts MM3D's authored PICA LUT to 1.19 byte steps) but the fog COLOUR still needs the runtime offsets, so the fog curve is not yet fed to the renderer; previously: scene-authored fog **data RECOVERED and independently validated** — MM3D's env region is command `0x0F` in its scene ZSI, inflated first (182 of 424 are LzS), base `ptr+0x28` stride `0x20` with the N64 `EnvLightSettings` at `+0x0B`; **MM3D also has an oracle now**; the table is generated with 102/113 scenes populated; the fogged-frame counterfactual EXISTS -- the opening runs PICA fog mode 5 on 75-84% of its draws and its per-draw fog colour matches the frame-level az_fog register exactly, including the transition between frames 3200 and 3800, so an earlier 'the opening is fog mode 0' reading of this project was wrong; the submission is outstanding and is NOT a copy of SoH's -- MM's z_kankyo ADDS a per-slot adjLightSettings offset to each of its four source colours before the time LERP, so the shared contract needs that term; so it renders unfogged but no longer lacks data) | S002, S003 | G002 |
+| S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial (**scene lighting SUBMITTED and the PICA fog WINDOW is now FED to the renderer** — MM's `z_kankyo` captures the blend schedule and `Mm3d_UpdateFogWindow` feeds `Zelda3D_Fog3dSet` with the recovered window and MM3D's measured camera near plane ~77, using the SHARED window rule `Zelda3D_EnvBlendWindow` that OoT3D also uses, so the two-LERP exists once; **scene lighting is now SUBMITTED**: the recovered 3DS records are installed into MM's own `lightSettingsList` at `2ship/2s2h/z_scene_2SH.cpp:281` `Scene_CommandEnvLightSettings`, so MM's N64 blend — time LERP, config LERP and the additive `adjLightSettings` term — operates on 3DS data with no reimplementation; **fog's window is validated against live hardware** (slot 2 predicts MM3D's authored PICA LUT to 1.19 byte steps) the fog COLOUR still needs MM's runtime `adjLightSettings` (its blend is ADDITIVE, so the colour is outside the table's convex hull), so **this is not MM fog PARITY** — the curve is right and the colour is still the N64 one; previously: scene-authored fog **data RECOVERED and independently validated** — MM3D's env region is command `0x0F` in its scene ZSI, inflated first (182 of 424 are LzS), base `ptr+0x28` stride `0x20` with the N64 `EnvLightSettings` at `+0x0B`; **MM3D also has an oracle now**; the table is generated with 102/113 scenes populated; the fogged-frame counterfactual EXISTS -- the opening runs PICA fog mode 5 on 75-84% of its draws and its per-draw fog colour matches the frame-level az_fog register exactly, including the transition between frames 3200 and 3800, so an earlier 'the opening is fog mode 0' reading of this project was wrong; the submission is outstanding and is NOT a copy of SoH's -- MM's z_kankyo ADDS a per-slot adjLightSettings offset to each of its four source colours before the time LERP, so the shared contract needs that term; so it renders unfogged but no longer lacks data) | S002, S003 | G002 |
 | S006 | An embedded Azahar oracle and parity tooling can compare the port with independent 3DS execution | partial | S001 | G001, G002 |
 | S007 | The AppImage accepts four direct ROMs or bounded ZIPs and persists validated choices without shipping game content | partial | S001 | G003 |
 | S008 | Linux CI builds the complete app and both cores and executes asset-free native contracts | partial | — | G003 |
@@ -913,6 +913,45 @@ vertex-shader uniforms at index 92** (`Azahar/src/video_core/pica/pica_core.cpp:
 `log_v4("texMappingMethod", 92)`), not as a texmap register. Components come out as `0.640625`,
 `0.3125` and `-2.51715e+16` — float bits, not enum values. The census was deleted rather than written
 down, and the field's name is a trap: a plausible integer histogram from a float tuple.
+
+**The PICA fog WINDOW is now fed, and the blend rule that produces it is shared rather than
+duplicated.** MM's `z_kankyo` calls `Zelda3D_EnvBlendCapture` right after its own window blend —
+`sp95`/`sp97` for the time pair, `sp94`/`sp96` for the config pair, with `temp_fv0` and `var_fs3` — and
+`Environment_Update` calls `Mm3d_UpdateFogWindow(play)` immediately after `Environment_UpdateLights`, the
+only point where that captured schedule is fresh. The window comes from
+`Zelda3D_EnvBlendWindow(palette, ...)`, **the same function OoT3D's override now uses**, over MM3D's own
+table. So the two-LERP-over-four-slots rule exists once, in
+`Shipwright/zelda3d_shared/lighting/zelda3d_env_blend.{h,c}`, and the two games differ only in their
+data and in their camera near plane.
+
+Three things the structure check and the compiler caught, all of which would otherwise have shipped
+silently:
+
+* **A legacy decomp seam may not grow AT ALL.** Inlining the capture into
+  `2ship/src/code/z_kankyo.c` took it from 3728 to 3762 lines and failed `verify_clang`'s structure
+  check. The fix is the remedy the check quotes — "extract or compact the seam" — so the capture became
+  a shared function and the seam gained one call; the remaining four functional lines (two includes,
+  two calls) were offset by removing six blank lines, and the file is back at exactly 3728. The
+  behaviour and its explanation live in the owner, not in the seam.
+* **`PlayState` has no `sceneNum` in MM** — it is `sceneId` (`z64play.h:40`). The two games also spell
+  the camera target differently: SoH's `View` has `lookAt` where MM's has `at`, both at offset 0x34.
+  Two cross-game vocabulary differences that make a copied line fail to compile, which is the good
+  outcome.
+* **`gZelda3dEnvBlend` is now DEFINED in the shared owner**, and SoH's `zelda3d_lighting.c` no longer
+  defines it. Moving a declaration without moving every *definition* is a link-time multiple
+  definition, and it only appeared at the final `libsoh_core.so` link — after `soh_lib` had built
+  clean twice.
+
+The new shared rule is gated by 8 tests in `zelda3d_env_blend_tests.cpp`, where the refusal cases carry
+as much weight as the arithmetic: no captured schedule, an index past the palette, a window whose far
+is at or before its near, and a non-positive far plane all end with the fog OFF rather than a
+plausible ramp. One test pins `z2_lost_woods` slot 2's window — the one the MM3D fog validation actually
+used — so a change to the rule fails a test rather than quietly changing fog in the product. Two of the
+eight were wrong on their first run and both are worth naming: the test palette held `vector::data()`
+from a temporary that had already been destroyed, so the function read freed memory and returned 20241
+and 3e24 instead of 25 and 125; and a second test used `fogFar = 0` as a placeholder and was correctly
+REFUSED for a degenerate window. Both are the project's recurring shape — a plausible wrong number
+instead of an error.
 
 **MM's submission has ONE substitution point, and it is not in the zelda3d layer at all.** MM's own
 N64 code already computes the whole blend, including the additive term, from a single list pointer:

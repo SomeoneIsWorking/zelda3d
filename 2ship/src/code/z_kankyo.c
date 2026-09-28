@@ -22,6 +22,8 @@ typedef struct {
 
 // Variables are put before most headers as a hacky way to bypass bss reordering
 #include "z64environment.h"
+#include "lighting/zelda3d_env_blend.h"
+#include "2s2h/zelda3d/mm3d_fog_window.h"
 #include "global.h"
 #include "sys_cfb.h"
 #include "BenPort.h"
@@ -1466,6 +1468,8 @@ void Environment_UpdateLights(PlayState* play, EnvironmentContext* envCtx, Light
                         S16_LERP(lightSettingsList[(s32)sp96].zFar, lightSettingsList[(s32)sp94].zFar, temp_fv0);
                     envCtx->lightSettings.zFar = LERPIMP_ALT(blend16[0], blend16[1], var_fs3);
 
+                    Zelda3D_EnvBlendCapture(sp95, sp97, sp94, sp96, temp_fv0, var_fs3);
+
                     break;
                 }
             }
@@ -1546,6 +1550,7 @@ void Environment_UpdateLights(PlayState* play, EnvironmentContext* envCtx, Light
     }
 
     envCtx->lightBlendEnabled = true;
+
 
     for (i = 0; i < 3; i++) {
         if ((s16)(envCtx->lightSettings.ambientColor[i] + envCtx->adjLightSettings.ambientColor[i]) > 255) {
@@ -1795,6 +1800,7 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
         Environment_UpdateTime(play, envCtx, pauseCtx, msgCtx, gameOverCtx);
         Environment_UpdateSun(play);
         Environment_UpdateLights(play, envCtx, lightCtx);
+        Mm3d_UpdateFogWindow(play);
         Environment_UpdatePostmanEvents(play);
     }
 }
@@ -3673,7 +3679,6 @@ void Environment_NewDay(EnvironmentContext* envCtx) {
 
     envCtx->skyboxConfig = dayOffset + (sInitSkyboxConfig * 3);
     envCtx->changeSkyboxNextConfig = envCtx->skyboxConfig;
-
     if (sInitSkyboxConfig == SKYBOX_CONFIG_4) {
         envCtx->skyboxConfig = SKYBOX_CONFIG_14;
         envCtx->changeSkyboxNextConfig = envCtx->skyboxConfig;
@@ -3696,17 +3701,14 @@ void Environment_NewDay(EnvironmentContext* envCtx) {
         envCtx->skyboxConfig = SKYBOX_CONFIG_25 + dayOffset;
         envCtx->changeSkyboxNextConfig = envCtx->skyboxConfig;
     }
-
     if (dayOffset >= 3) {
         envCtx->skyboxConfig = SKYBOX_CONFIG_13;
         envCtx->changeSkyboxNextConfig = SKYBOX_CONFIG_13;
     }
-
     if (envCtx->skyboxConfig >= SKYBOX_CONFIG_MAX) {
         envCtx->skyboxConfig = SKYBOX_CONFIG_0;
         envCtx->changeSkyboxNextConfig = SKYBOX_CONFIG_0;
     }
-
     switch (((void)0, gSaveContext.save.day)) {
         default:
         case 0:
@@ -3714,12 +3716,10 @@ void Environment_NewDay(EnvironmentContext* envCtx) {
             envCtx->lightConfig = 0;
             envCtx->changeLightNextConfig = 0;
             break;
-
         case 2:
             envCtx->lightConfig = 3;
             envCtx->changeLightNextConfig = 3;
             break;
-
         case 3:
             envCtx->lightConfig = 4;
             envCtx->changeLightNextConfig = 4;
