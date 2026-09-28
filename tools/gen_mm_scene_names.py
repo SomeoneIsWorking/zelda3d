@@ -17,6 +17,7 @@ Run: ZELDA3D_MM3D_ROM=<path.3ds> python3 tools/gen_mm_scene_names.py
 import os
 import re
 import sys
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -45,7 +46,8 @@ def n64_scenes():
     third). DEFINE_SCENE_UNSET(_enumValue) marks an empty slot from the original game; it still
     CONSUMES a sceneNum, so it must be emitted as NULL or every later index shifts."""
     out = []
-    for line in open(SCENE_TABLE):
+    table = Path(SCENE_TABLE).read_text(encoding="utf-8")
+    for line in table.splitlines():
         m = re.search(r"DEFINE_SCENE\(\s*([A-Za-z0-9_]+)\s*,\s*(SCENE_[A-Z0-9_]+)", line)
         if m:
             out.append((len(out), m.group(1), m.group(2)))
