@@ -6,6 +6,21 @@
 #define BTN_CUSTOM_MODIFIER1 0x0040
 #define BTN_CUSTOM_MODIFIER2 0x0080
 
+// WHERE THE mm.o2r ARCHIVE IS DECIDED -- read before touching the boot-time extraction prompt in
+// BenPort.cpp's OTRGlobals::RunExtract.
+//
+// "Is the archive present?" is Ship::Context::LocateFileAcrossAppDirs' question, and this header
+// records why it must stay that one question. The prompt used to ask a DIFFERENT one --
+// GetAppDirectoryPath(appShortName) + "/mm.o2r" -- which only ever looks in the user config dir.
+// OTRGlobals::Initialize loads the archive through the shared locator, which also searches the core's
+// asset dir and the cwd, so on any developer build tree (which already holds a valid 36 MB mm.o2r)
+// the check reported "absent" while the loader would have found it. The consequence was not a wrong
+// prompt but a full 660-asset ZAPD re-extraction on EVERY launch, which under software rendering
+// never finished -- so MM never reached gameplay at all. Two rules, one owner: the shared locator.
+//
+// ZELDA3D_MM_NO_REEXTRACT then answers the prompt itself for headless runs. It is opt-in, because
+// skipping extraction is the wrong default for someone who just pointed the port at a different ROM:
+// `tools/mm_runtime_launch.py` sets it for automated sessions, which have nobody to click "Yes".
 // Ocarina custom controls (using bits beyond standard 16-bit N64 buttons)
 #define BTN_CUSTOM_OCARINA_NOTE_D4 ((CONTROLLERBUTTONS_T)0x00010000)
 #define BTN_CUSTOM_OCARINA_NOTE_F4 ((CONTROLLERBUTTONS_T)0x00020000)
@@ -130,7 +145,6 @@ SequenceData* ResourceMgr_LoadSeqPtrByName(const char* path);
 Mtx* ResourceMgr_LoadMtxByName(char* path);
 KeyFrameSkeleton* ResourceMgr_LoadKeyFrameSkelByName(const char* path);
 KeyFrameAnimation* ResourceMgr_LoadKeyFrameAnimByName(const char* path);
-
 
 bool ResourceMgr_IsAltAssetsEnabled();
 struct SkeletonHeader* ResourceMgr_LoadSkeletonByName(const char* path, SkelAnime* skelAnime);

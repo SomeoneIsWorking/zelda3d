@@ -65,6 +65,21 @@ void Mm3d_UpdateFogWindow(PlayState* play) {
     sZFar = zFar;
 }
 
+/// The recovered 3DS fog distances for one slot of one scene, read straight from the generated table.
+///
+/// This is the cross-check path. `Mm3d_QueryFogWindow` reports what the RENDERER was handed, which has
+/// travelled through the capture, the blend and the feed; this reports what the TABLE says, without
+/// any of that. Comparing the two is what turns "fog is on" into evidence: the recurring failure in
+/// this project is a value with exactly the right shape and the wrong number, which a single readout
+/// cannot distinguish from a correct one.
+const Zelda3dLightSlot* Mm3d_SceneFogSlot(s16 sceneId, u8 slot) {
+    const Zelda3dSceneLight* palette = Mm3d_ScenePalette(sceneId);
+    if (palette == NULL || slot >= palette->numSlots) {
+        return NULL;
+    }
+    return &palette->slots[slot];
+}
+
 bool Mm3d_QueryFogWindow(float* outFogNear, float* outFogFar, float* outZFar, float* outCameraNear) {
     if (outFogNear != NULL) {
         *outFogNear = sFogNear;

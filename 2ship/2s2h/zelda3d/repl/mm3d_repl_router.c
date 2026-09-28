@@ -1,5 +1,6 @@
 #include "2s2h/zelda3d/repl/mm3d_repl_router.h"
 
+#include "2s2h/zelda3d/repl/mm3d_fog_repl.h"
 #include "2s2h/zelda3d/repl/mm3d_framing_repl.h"
 #include "2s2h/zelda3d/repl/mm3d_lifecycle_repl.h"
 #include "2s2h/zelda3d/repl/mm3d_link_repl.h"
@@ -9,6 +10,7 @@
 
 void Zelda3D_MmReplRouterDispatch(PlayState* play, const char* command, Zelda3DMmReplReply reply, void* user) {
     if (Zelda3D_MmLinkReplDispatch(play, command, reply, user) ||
+        Zelda3D_MmFogReplDispatch(play, command, reply, user) ||
         Zelda3D_MmWorldReplDispatch(play, command, reply, user) ||
         Zelda3D_MmSceneReplDispatch(play, command, reply, user) ||
         Zelda3D_MmFramingReplDispatch(play, command, reply, user) ||

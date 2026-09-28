@@ -194,6 +194,21 @@ void Ship_ScriptedInputFifo_StartFromEnv(void) {
     }
     gRunning.store(true, std::memory_order_relaxed);
     gThread = std::thread(pollerThread, std::string(path));
+    // Join the poller on EVERY process-exit path, not only on the one where a Context happens to be
+    // destroyed. gThread is a static, so its own destructor runs from libultraship's _dl_fini pass
+    // and calls std::terminate if it is still joinable; and a core may exit() long before any
+    // Context exists -- MM's OTRGlobals::RunExtract does exactly that, from inside the boot-time
+    // extraction prompt, which killed the process with "terminate called without an active
+    // exception" before the game ever reached gameplay.
+    //
+    // std::atexit is what makes that safe, and the ordering is not incidental: _dl_fini registers
+    // itself in the exit-handler list when the library is loaded, i.e. before main, so a handler
+    // registered here is later in the list and therefore runs EARLIER in the LIFO walk. The join
+    // thus happens strictly before ~gThread. Only a hard _exit()/abort() skips it, and on those the
+    // process is already gone.
+    //
+    // Registering repeatedly is harmless: Stop() is idempotent, and the poller only starts once.
+    std::atexit(&Ship_ScriptedInputFifo_Stop);
 #endif
 }
 
