@@ -4,26 +4,15 @@
 
 #include "global.h"
 
+// The record types are game-agnostic and live with the shared port, because both games' 3DS records
+// are the N64 EnvLightSettings under different bases -- so the TYPE is shared and the OFFSETS are
+// per-game. Duplicating the struct here would let the two copies drift, which is precisely the
+// failure that reads MM3D's fogColor as its second light colour.
+#include "lighting/zelda3d_env_record.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct {
-    unsigned char amb[3];
-    signed char l0dir[3];
-    unsigned char l0col[3];
-    signed char l1dir[3];
-    unsigned char l1col[3];
-    unsigned char fogCol[3];
-    unsigned short fogNear;
-    float fogFar;
-    float zFar;
-} Zelda3dLightSlot;
-
-typedef struct {
-    unsigned char numSlots;
-    const Zelda3dLightSlot* slots;
-} Zelda3dSceneLight;
 
 typedef struct {
     unsigned char valid;
