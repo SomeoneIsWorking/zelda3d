@@ -48,10 +48,94 @@ std::string MatchAgainstTable(s16 sceneId, const Zelda3dEnvBlend& blend, f32 fog
     return " | no recovered slot matches (expected mid-blend)";
 }
 
+/// MM's own convex combination of the four recovered slot colours, using the SAME rule the window
+/// uses: Lerp(Lerp(s0,s1,wTime), Lerp(s2,s3,wTime), wConfig).
+///
+/// This is a MEASUREMENT baseline, not a second blend. MM's real colour additionally adds
+/// `adjLightSettings` per source, which is exactly what the residual below is for; reporting the
+/// convex combination AS MM's colour is the mistake this diagnostic exists to avoid.
+std::string TableColourAt(s16 sceneId, const Zelda3dEnvBlend& blend) {
+    const Zelda3dLightSlot* slots[4] = { Mm3d_SceneFogSlot(sceneId, blend.idx[0]),
+                                         Mm3d_SceneFogSlot(sceneId, blend.idx[1]),
+                                         Mm3d_SceneFogSlot(sceneId, blend.idx[2]),
+                                         Mm3d_SceneFogSlot(sceneId, blend.idx[3]) };
+    for (const Zelda3dLightSlot* slot : slots) {
+        if (slot == nullptr) {
+            return "unavailable (a captured index is outside the recovered palette)";
+        }
+    }
+    const float wTime = std::clamp(blend.wTime, 0.0f, 1.0f);
+    const float wConfig = std::clamp(blend.wConfig, 0.0f, 1.0f);
+    float channels[3] = {};
+    for (int c = 0; c < 3; c++) {
+        const auto lerp = [c](const Zelda3dLightSlot* a, const Zelda3dLightSlot* b, float w) {
+            const float lo = static_cast<float>(a->fogCol[c]);
+            const float hi = static_cast<float>(b->fogCol[c]);
+            return lo + (hi - lo) * w;
+        };
+        const float first = lerp(slots[0], slots[1], wTime);
+        const float second = lerp(slots[2], slots[3], wTime);
+        channels[c] = first + (second - first) * wConfig;
+    }
+    return fmt::format("({:.0f},{:.0f},{:.0f})", channels[0], channels[1], channels[2]);
+}
+
 } // namespace
+
+/// Report MM's LIVE blended fog colour beside what the recovered table alone predicts.
+///
+/// The gap between them is not something to tune away: it is MM's additive `adjLightSettings` term,
+/// which the 3DS table does not contain and which no interpolation of the table can produce. While MM
+/// could not be run this was an argument; here it is a measurement.
+static void ReplyFogColour(PlayState* play, Zelda3DMmReplReply reply, void* user) {
+    const Zelda3dEnvBlend& blend = gZelda3dEnvBlend;
+    const CurrentEnvLightSettings& live = play->envCtx.lightSettings;
+    std::string line = fmt::format("fogcolour scene={} live=({},{},{})", play->sceneId, live.fogColor[0],
+                                   live.fogColor[1], live.fogColor[2]);
+    const std::string predicted = blend.valid ? TableColourAt(play->sceneId, blend) : std::string("unavailable");
+    line +=
+        fmt::format(" table={} idx={},{},{},{} w=({:.3f},{:.3f})", predicted, blend.idx[0], blend.idx[1], blend.idx[2],
+                    blend.idx[3], static_cast<double>(blend.wTime), static_cast<double>(blend.wConfig));
+    if (predicted.rfind("unavailable", 0) == 0) {
+        reply(line.c_str(), user);
+        return;
+    }
+    // The per-channel residual IS the additive term's contribution to this frame. Reported, not
+    // subtracted: the host still hazes toward the N64 colour, so that gap is still open.
+    const int live0 = live.fogColor[0];
+    const int live1 = live.fogColor[1];
+    const int live2 = live.fogColor[2];
+    const auto channel = [](const std::string& text, int index) {
+        return std::stoi(text.substr(2 + static_cast<std::size_t>(index) * 3, 3));
+    };
+    const int worst = std::max({ std::abs(live0 - channel(predicted, 0)), std::abs(live1 - channel(predicted, 1)),
+                                 std::abs(live2 - channel(predicted, 2)) });
+    line += fmt::format(" | max |residual| = {}", worst);
+    // Which list MM is actually blending. Without this the residual is UNINTERPRETABLE: it could be
+    // the additive `adjLightSettings` term (the expected reading, if the 3DS records are installed),
+    // or simply the difference between the N64 and 3DS palettes (if the substitution never happened).
+    // Those two demand opposite responses, so the pointer identity decides, not a guess.
+    u8 slotCount = 0;
+    const Mm3dEnvLightSettings* recovered = Mm3d_SceneEnvList(play->sceneId, &slotCount);
+    const bool substituted =
+        recovered != nullptr && play->envCtx.lightSettingsList == reinterpret_cast<const EnvLightSettings*>(recovered);
+    line += substituted ? " | list=SUBSTITUTED (MM is blending the recovered 3DS records)"
+                        : " | list=N64 (the 3DS records are NOT installed for this scene)";
+    reply(line.c_str(), user);
+}
 
 extern "C" s32 Zelda3D_MmFogReplDispatch(PlayState* play, const char* command, Zelda3DMmReplReply reply, void* user) {
     Zelda3DMmReplArgs args;
+    if (Zelda3D_MmReplMatch(command, "fogcolour", &args)) {
+        if (!Zelda3D_MmReplArgsEnd(&args)) {
+            reply("usage: fogcolour", user);
+        } else if (play == nullptr) {
+            reply("fogcolour err (no PlayState)", user);
+        } else {
+            ReplyFogColour(play, reply, user);
+        }
+        return 1;
+    }
     if (!Zelda3D_MmReplMatch(command, "fog", &args)) {
         return 0;
     }

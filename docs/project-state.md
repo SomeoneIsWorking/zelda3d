@@ -1405,9 +1405,34 @@ same-shaped wrong one, so `Mm3d_SceneFogSlot` was added as the independent table
 prints the residual across all three distances -- and, at a non-zero blend weight, reports that no slot matches
 instead of implying agreement.
 
+**AND THE SUBSTITUTION IS NOW VERIFIED AT RUNTIME, NOT JUST AT THE CODE LEVEL.** S005 previously recorded
+that MM3D's records are "SUBMITTED" at `2ship/2s2h/z_scene_2SH.cpp:281`. That was a statement about the
+code path. The `fogcolour` command now settles it by POINTER IDENTITY: it compares
+`play->envCtx.lightSettingsList` against `Mm3d_SceneEnvList(sceneId)` and reports which list MM is
+actually blending. In `z2_clocktower` it reports `list=SUBSTITUTED`, so MM really is blending the
+recovered 3DS records. That check exists because the alternative reading -- that the window simply
+matched because the 0x20 table is present -- would look identical from the window alone: the window is
+read from `kMm3dSceneLighting` directly and never passes through the substituted 0x16 list.
+
+**The fog COLOUR is now MEASURED, and the standing "not derivable from the table" claim is too strong.**
+Live in `z2_clocktower` at blend weight 0: `(105,195,255)`. The recovered table's convex combination at
+the same weights, using the window's own two-LERP rule: `(110,22,16)`. The gap is **239 of 255 on one
+channel**. The claim that MM's colour "lies outside the convex hull of the table's own colours, so no
+interpolation of the table reproduces it" is still true as a statement about interpolation -- but it was
+being read as "the table therefore cannot produce MM's colour", and the pointer identity now shows
+otherwise: MM's colour is computed from the SUBSTITATED list, so it is a function of the 3DS data plus
+whatever MM derives from that same list. The additive `adjLightSettings` term is the obvious candidate for
+the gap, and the size of it is consistent with a per-source difference added before the LERP, but the
+attribution is **not claimed**: pinning it needs `func_800F6CEC` and the `adjLightSettings` construction
+read in the source, and until then the honest statement is that the colour is *large and reproducible*,
+not that its cause is known. The 1-in-60 random-colour test that originally refuted derivability is
+therefore re-opened rather than confirmed: it refuted interpolation of the table, which was never in
+dispute, and was cited for the stronger claim it does not support.
+
 Gap: MM3D coverage is substantially incomplete and must be established independently from OoT results. The
-fog WINDOW is now observed and cross-checked at runtime; the fog COLOUR still needs MM's runtime
-`adjLightSettings`, and no MM frame has been compared against the oracle either way.
+fog WINDOW is observed and cross-checked at runtime and the scene-lighting substitution is verified by
+pointer identity; the fog COLOUR's additive term is measured but unattributed, and no MM frame has been
+compared against the oracle either way.
 
 ### S006 — Independent oracle comparisons
 
