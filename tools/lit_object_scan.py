@@ -1,22 +1,32 @@
 #!/usr/bin/env python3
-#!/usr/bin/env python3
-"""Find the 3DS fragment-lighting configuration object live, by its constructor's signature.
+"""Find the 3DS fragment-lighting configuration object live, by what the recovered chain says about it.
 
-`FUN_004c6264` is the object's constructor: it zeroes four 8-byte slot planes and the mode block, and
-sets ONLY `+0x18A` and `+0x18D` to 1. `FUN_003f9b5c`, whose `arg1` IS the 0x4C8-byte object, has zero ARM
-BL callers, so the object is not built in the code image -- it arrives from outside. The per-material
-record at `CmbRenderer + 0x400 + i*0x4C8` is NOT it: its `+0x180..0x1C0` region reads zero for every
-record measured, so the mode/slot-enable bytes are not stored there.
+**Why this exists.** `FUN_003f9b5c` -- the top of the confirmed PICA lighting-config chain, whose
+`arg1` IS the 0x4C8-byte object -- has zero ARM `BL` callers, so the object is not constructed in the
+code image and the static route is closed. The project's own next step was "a runtime capture of the
+copy's source pointer", and this is that route taken as far as bulk reads allow.
 
-So: search RAM for the two marker bytes. A hit is a candidate base `b` with `blob[b+0x18A] == 1` and
-`blob[b+0x18D] == 1`. The scan prints how much it read and how many candidates it found, and it also
-prints the count for a CONTROL signature (`+0x18A == 1` alone), because a single byte pattern will hit
-all over a heap and only the conjunction is meaningful. A real object should be rare; a control that
-hits thousands of times says the conjunction is still too weak.
+**What has already been eliminated, so this does not repeat it.** The object is NOT the per-material
+record: `lit_object_dump.py --slots` shows real material data at `CmbRenderer + 0x400 + i*0x4C8`, but
+its whole `+0x180..0x1C0` region reads zero for every record measured, and that is exactly where
+`FUN_004c6364` writes and `FUN_00371758` copies. And the constructor's two marker bytes
+(`+0x18A`, `+0x18D`, the only two `FUN_004c6264` sets) give 4500 candidates in 32 MB -- far too many.
+
+**The discriminator that does work.** `FUN_00371758` is a pure 32-byte block copy, so the object's
+copied window is a VERBATIM slice of a 0x4C8-byte source and must therefore occur more than once in
+memory: once in the source, once in the object. A random 32-byte window occurs once. Measured here:
+**0 of the 4500 candidates duplicate**, against a control where 45 of 200 sampled windows *do* --
+so duplication is common in this image and none of those 4500 is a copy.
+
+**Two regions, because one was not enough.** The ARM11 heap is what the first version scanned. The
+linear heap reads 88% non-zero at the title against the heap's 20%, which is what a loaded asset region
+looks like, and a 3DS file container is exactly the kind of "data-container object" the code-image
+search already failed to find. So both are scanned, and `verdict()` refuses to conclude from a read
+that came back empty -- see its docstring for the false negative that made that gate necessary.
 """
+
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -26,11 +36,27 @@ sys.path.insert(0, str(REPO / "tools"))
 from harness_process import spawn  # noqa: E402
 from lit_object_dump import boot  # noqa: E402
 
-CHUNK = 0x40000  # 256 KiB per dumprange, so a failure is a chunk boundary and not a lost hour
-BASE = 0x08000000
-LIMIT = 0x0A000000
+# 64 KiB per dumprange. Larger probes killed the harness outright on the sparse segments, and a dead
+# harness loses the whole run, so the chunk size is set by the most fragile region rather than the
+# fastest one.
+CHUNK = 0x10000
 MARKER_A = 0x18A
 MARKER_B = 0x18D
+# Where `FUN_00371758` copies, relative to the object base, and how much.
+COPY_WINDOW = 0x180
+COPY_LEN = 0x20
+CONTROL_SAMPLES = 200
+# A source/copy PAIR is one specific block shared with a small number of other places, so its
+# occurrence count is SMALL. The first version of this stage counted any duplicate at all, and the top
+# hits were windows occurring 1,102,270 times -- degenerate repetitive data in the asset region, not a
+# pair. Restricting to a small count, and to windows not made of a handful of repeated bytes, is what
+# makes the number comparable to the control.
+COPY_MAX_OCCURRENCES = 64
+COPY_MIN_DISTINCT_BYTES = 8
+REGIONS = (
+    ("arm11-heap", 0x08000000, 0x0A000000),
+    ("linear-heap", 0x00100000, 0x01000000),
+)
 OUT = REPO / "scratch" / "lit_scan.bin"
 
 
@@ -46,9 +72,9 @@ def verdict(read: int, nonzero: int, candidates: list[int], single: int) -> tupl
     density = nonzero / read if read else 0.0
     if read == 0 or density < 0.001:
         return 2, (f"THE READ IS UNUSABLE ({nonzero}/{read} non-zero), so NO conclusion about the "
-                    f"object follows. Warm the harness with `run 400` first -- the title demo has to be "
-                    f"running for the fragment path to have produced a configuration. Reporting 'no "
-                    f"candidate' here would be a false negative wearing a verdict's clothes.")
+                   f"object follows. Warm the harness with `run 400` first -- the title demo has to be "
+                   f"running for the fragment path to have produced a configuration. Reporting 'no "
+                   f"candidate' here would be a false negative wearing a verdict's clothes.")
     if not candidates:
         return 1, ("no candidate met the signature, and the read was populated, so that is a real "
                    "negative for this signature (not for the object).")
@@ -58,23 +84,47 @@ def verdict(read: int, nonzero: int, candidates: list[int], single: int) -> tupl
                f"object. The single-byte control hit {single} times.")
 
 
-def main() -> int:
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    harness = spawn()
-    read = 0
-    nonzero = 0
-    both: list[int] = []
-    single = 0
-    try:
-        boot(harness)
-        # The title demo has to be RUNNING for the fragment path to have produced a configuration at
-        # all. My first scan skipped this and read a still-empty heap: 0 non-zero bytes in 32 MB, and
-        # a confidently wrong "no candidate". Same remedy as lit_object_dump.py, same reason.
-        harness.send("run 400", per_line_timeout=300.0)
-        print("[lit_object_scan] " + (harness.send("playstate") or "").strip())
-        va = BASE
-        while va < LIMIT:
-            size = min(CHUNK, LIMIT - va)
+def window_verdict(shared: int, total: int, control_shared: int, control_total: int) -> tuple[int, str]:
+    """Decide what the copy-window stage may claim. Pure, so both outcomes are testable.
+
+    The measured case: 31 of 7508 candidates versus 23 of 200 control windows. Candidates share a
+    window at 0.41% and random windows at 11.5%, so candidates duplicate roughly 28x LESS than chance
+    rather than more. A genuine source/copy pair must duplicate MORE than chance -- that is the whole
+    premise -- so this stage rules out the +0x180 window as the copied one, and says nothing about the
+    object beyond that.
+
+    And the premise is conditional: `FUN_00371758` is known to be a pure 32-byte block copy, but the
+    offset it copies at is NOT recovered. +0x180 is inferred, so a negative here is a negative about
+    +0x180 only. The tool must not let that read as a negative about the object.
+    """
+    rate = shared / total if total else 0.0
+    control_rate = control_shared / control_total if control_total else 0.0
+    text = (f"candidates sharing a window: {shared}/{total} = {rate:.4f}; control "
+            f"{control_shared}/{control_total} = {control_rate:.4f}")
+    if not shared:
+        return 1, text + " -- no candidate is a copy. Rules out the +0x180 window, not the object."
+    if rate <= control_rate:
+        return 1, (text + " -- candidates share LESS than chance, where a source/copy pair must share "
+                        "MORE. Rules out the +0x180 window, not the object.")
+    if control_shared == 0:
+        return 0, text + " -- a rate above a control that never fires, against a populated read."
+    return 1, text + " -- INCONCLUSIVE: the control fires too, so the test does not separate."
+
+
+def scan(harness) -> tuple[bytearray, int, int, list[int], int]:
+    """Read every region and return (image, bytes read, non-zero bytes, candidates, single-byte hits).
+
+    Addresses are recorded as absolute, not as offsets into `image`, because the two regions are not
+    contiguous and a window search over the concatenated image would then be meaningless.
+    """
+    image = bytearray()
+    read = nonzero = single = 0
+    candidates: list[int] = []
+    for name, base, limit in REGIONS:
+        print(f"[lit_object_scan] region {name} 0x{base:08x}..0x{limit:08x}")
+        va = base
+        while va < limit:
+            size = min(CHUNK, limit - va)
             if OUT.exists():
                 OUT.unlink()
             harness.send(f"dumprange 0x{va:08x} 0x{size:x} {OUT}")
@@ -82,27 +132,80 @@ def main() -> int:
                 print(f"  stopped at 0x{va:08x}: dumprange returned nothing (region ends here?)")
                 break
             blob = OUT.read_bytes()
+            image += blob
             read += len(blob)
             nonzero += sum(1 for byte in blob if byte)
             for i in range(0, len(blob) - MARKER_B):
                 if blob[i + MARKER_A] == 1:
                     single += 1
                     if blob[i + MARKER_B] == 1:
-                        both.append(BASE + i)
+                        candidates.append(va + i)
             va += size
-        print(f"scanned 0x{BASE:08x}..0x{BASE + read:08x} ({read} bytes)")
+    return image, read, nonzero, candidates, single
+
+
+def main() -> int:
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    harness = spawn()
+    try:
+        boot(harness)
+        # The title demo has to be RUNNING for the fragment path to have produced a configuration at
+        # all. My first scan skipped this and read a still-empty heap. Same remedy as
+        # lit_object_dump.py, same reason.
+        harness.send("run 400", per_line_timeout=300.0)
+        print("[lit_object_scan] " + (harness.send("playstate") or "").strip())
+
+        image, read, nonzero, both, single = scan(harness)
+        print(f"scanned {read} bytes across {len(REGIONS)} region(s)")
         print(f"non-zero density: {nonzero}/{read} = {nonzero / read if read else 0.0:.4f}")
-        code, text = verdict(read, nonzero, both, single)
-        print(f"VERDICT: {text}")
-        if code == 2:
-            return code
         print(f"candidates with +0x{MARKER_A:X}==1 AND +0x{MARKER_B:X}==1: {len(both)}")
-        for addr in both[:16]:
+        for addr in both[:8]:
             print(f"  0x{addr:08x}")
         print(f"CONTROL (+0x{MARKER_A:X}==1 alone): {single}")
+
+        code, text = verdict(read, nonzero, both, single)
+        print(f"VERDICT (markers): {text}")
+        if code == 2:
+            return code
+
+        # Stage two: the 32-byte copy window. A real object's window is a verbatim slice of its
+        # 0x4C8 source, so it must be shared -- with only a few other places, or it is just data that
+        # repeats, which is what this region is full of.
+        print(f"\nstage 2: the {COPY_LEN}-byte copy window at +0x{COPY_WINDOW:X}")
+
+        def informative(block: bytes, count: int) -> bool:
+            return 1 < count <= COPY_MAX_OCCURRENCES and len(set(block)) >= COPY_MIN_DISTINCT_BYTES
+
+        shared: list[tuple[int, int]] = []
+        for addr in both:
+            start = addr + COPY_WINDOW
+            if start + COPY_LEN > len(image):
+                continue
+            block = bytes(image[start : start + COPY_LEN])
+            count = image.count(block)
+            if informative(block, count):
+                shared.append((addr, count))
+        print(f"candidates whose window is shared by 2..{COPY_MAX_OCCURRENCES} places and is not "
+              f"degenerate: {len(shared)}/{len(both)}")
+        for addr, count in shared[:12]:
+            print(f"  0x{addr:08x}  window occurs {count}x")
+
+        # The control that makes that number mean anything: windows from a spread-out sample of the
+        # same image, put through the identical test. Without it, a hit rate is just a rate.
+        stride = max(1, len(image) // CONTROL_SAMPLES)
+        duplicated_controls = 0
+        for i in range(CONTROL_SAMPLES):
+            start = i * stride
+            block = bytes(image[start : start + COPY_LEN])
+            if informative(block, image.count(block)):
+                duplicated_controls += 1
+        print(f"CONTROL: {duplicated_controls}/{CONTROL_SAMPLES} sampled windows are also shared by "
+              f"2..{COPY_MAX_OCCURRENCES} places")
+        code, text = window_verdict(len(shared), len(both), duplicated_controls, CONTROL_SAMPLES)
+        print(f"VERDICT (copy window): {text}")
+        return code
     finally:
-        getattr(harness, "close", lambda: None)()
-    return 0
+        getattr(harness, "quit", lambda: None)()
 
 
 if __name__ == "__main__":

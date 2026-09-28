@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from lit_object_scan import verdict  # noqa: E402
+from lit_object_scan import verdict, window_verdict  # noqa: E402
 
 
 class LitObjectScanVerdictTests(unittest.TestCase):
@@ -58,6 +58,39 @@ class LitObjectScanVerdictTests(unittest.TestCase):
         # 0.1% exactly is the floor; just above it must be allowed to reason.
         self.assertEqual(verdict(read=10_000, nonzero=10, candidates=[], single=0)[0], 1)
         self.assertEqual(verdict(read=10_000, nonzero=9, candidates=[], single=0)[0], 2)
+
+
+class LitObjectWindowVerdictTests(unittest.TestCase):
+    """The copy-window stage must never turn a negative about +0x180 into a negative about the object."""
+
+    def test_measured_case_rules_out_the_window_not_the_object(self) -> None:
+        # 31/7508 candidates vs 23/200 control: candidates share LESS than chance, where a genuine
+        # source/copy pair must share MORE.
+        code, text = window_verdict(31, 7508, 23, 200)
+        self.assertEqual(code, 1)
+        self.assertIn("LESS than chance", text)
+        self.assertIn("+0x180 window, not the object", text)
+
+    def test_no_shared_window_is_still_scoped_to_the_window(self) -> None:
+        code, text = window_verdict(0, 7508, 0, 200)
+        self.assertEqual(code, 1)
+        self.assertIn("not the object", text)
+
+    def test_rate_above_a_silent_control_is_the_only_claim_of_a_match(self) -> None:
+        code, text = window_verdict(30, 7508, 0, 200)
+        self.assertEqual(code, 0)
+        self.assertIn("control that never fires", text)
+
+    def test_rate_above_a_noisy_control_is_inconclusive_not_a_match(self) -> None:
+        # 400/7508 = 5.3% against 5/200 = 2.5%: above the control, but the control also fires, so the
+        # test cannot separate and must not claim a match.
+        code, text = window_verdict(400, 7508, 5, 200)
+        self.assertEqual(code, 1)
+        self.assertIn("INCONCLUSIVE", text)
+
+    def test_zero_denominators_do_not_divide_by_zero(self) -> None:
+        self.assertEqual(window_verdict(0, 0, 0, 0)[0], 1)
+        self.assertEqual(window_verdict(0, 0, 5, 0)[0], 1)
 
 
 if __name__ == "__main__":
