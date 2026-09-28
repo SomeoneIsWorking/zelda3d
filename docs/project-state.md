@@ -1414,20 +1414,40 @@ recovered 3DS records. That check exists because the alternative reading -- that
 matched because the 0x20 table is present -- would look identical from the window alone: the window is
 read from `kMm3dSceneLighting` directly and never passes through the substituted 0x16 list.
 
-**The fog COLOUR is now MEASURED, and the standing "not derivable from the table" claim is too strong.**
-Live in `z2_clocktower` at blend weight 0: `(105,195,255)`. The recovered table's convex combination at
-the same weights, using the window's own two-LERP rule: `(110,22,16)`. The gap is **239 of 255 on one
-channel**. The claim that MM's colour "lies outside the convex hull of the table's own colours, so no
-interpolation of the table reproduces it" is still true as a statement about interpolation -- but it was
-being read as "the table therefore cannot produce MM's colour", and the pointer identity now shows
-otherwise: MM's colour is computed from the SUBSTITATED list, so it is a function of the 3DS data plus
-whatever MM derives from that same list. The additive `adjLightSettings` term is the obvious candidate for
-the gap, and the size of it is consistent with a per-source difference added before the LERP, but the
-attribution is **not claimed**: pinning it needs `func_800F6CEC` and the `adjLightSettings` construction
-read in the source, and until then the honest statement is that the colour is *large and reproducible*,
-not that its cause is known. The 1-in-60 random-colour test that originally refuted derivability is
-therefore re-opened rather than confirmed: it refuted interpolation of the table, which was never in
-dispute, and was cited for the stronger claim it does not support.
+**The fog COLOUR: the standing "not derivable from the table" claim is REFUTED, and an earlier
+measurement of mine was wrong twice over.** Both corrections matter more than the number, so they are
+recorded in full.
+
+*Wrong #1 -- the "additive term" story.* The claim rested on MM's blend being ADDITIVE
+(`list[slot] + spA4[...]`, `z_kankyo.c:1397-1454`), which puts the result outside the convex hull of the
+table. Reading the source refutes the part that mattered: `spA4` is `__osMemset` to 0 at
+`z_kankyo.c:1325` and `func_800F6CEC` writes it ONLY when the index is in [4,8) or it is raining
+(`z_kankyo.c:1263,1279`). MM's live indices in `z2_clocktower` are `1,0,1,0` -- all below 4 -- so **the
+additive term is identically zero this frame**. Any residual attributed to it was not that.
+
+*Wrong #2 -- comparing across two producers.* MM's `Environment_UpdateLights` has THREE writers of
+`envCtx->lightSettings` and they consume different things: the time-based branch blends four slots by
+`skyboxTime` (`:1405-1454`), a plain branch COPIES `lightSettingsList[envCtx->lightSetting]` when
+`!lightBlendEnabled` (`:1484-1492`), and a third LERPs `prevLightSetting` against `lightSetting`
+(`:1520-1535`). A first version of the `fogcolour` diagnostic compared the live colour against a
+two-LERP over the CAPTURED schedule's four indices and reported a 239/255 "residual". The frame was
+produced by neither of those paths, and the two data paths are allowed to disagree: the fog WINDOW is
+read from the 0x20 table through the captured schedule, while the COLOUR comes through the substituted
+0x16 list and whichever branch ran. A plausible number from a cross-branch comparison is the exact
+failure mode this project keeps hitting, and it happened here.
+
+*What is actually true, measured.* The colour is the table's, and provably so: at one moment the live
+colour was `(105,195,255)` and `z2_clocktower` slot 0's `fogCol` is `{105,195,255}` -- bit for bit. The
+substitution is `list=SUBSTITUTED 3DS records`, 29 slots. So the colour is derivable from the table, and
+the host does not need a new blend: it can read the colour MM already computed from the 3DS data.
+
+*Still open, precisely.* The colour is not static. With `lightSetting=0`, `prevLightSetting=0` and
+`blendEnabled=1` -- a LERP of slot 0 against itself, which cannot change a value -- the live colour still
+drifts: `(105,195,255)` -> `(105,193,252)` -> `(105,181,236)`, red pinned while green and blue fall. So
+something modulates it that is not the slot list and not `spA4`. Naming it is the next grounded step;
+until then the honest statement is that MM's fog colour comes from the 3DS table and carries an
+unattributed time-varying modulation. The 1-in-60 random-colour test is withdrawn as support for the
+strong claim: it refuted interpolation of the table, which was never in dispute.
 
 Gap: MM3D coverage is substantially incomplete and must be established independently from OoT results. The
 fog WINDOW is observed and cross-checked at runtime and the scene-lighting substitution is verified by
