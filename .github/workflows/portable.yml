@@ -99,6 +99,7 @@ jobs:
           tools.test_harness_rom_environment
           tools.test_gen_mm3d_scene_lighting
           tools.test_zelda3d_env_record
+          tools.test_mm3d_fog_prediction
           tools.test_gen_scene_names
           tools.test_mm_python_structure
           tools.test_portable_native_contracts

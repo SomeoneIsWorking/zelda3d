@@ -17,7 +17,7 @@ S003 is the current focus.
 | --- | --- | --- | --- | --- |
 | S001 | One launcher provisions, validates, builds, and chooses between the OoT and MM game cores | verified | — | G003 |
 | S002 | 3DS containers, models, animations, scenes, collision, cameras, lighting, and face data are available to both engines | partial | S001 | G001, G002 |
-| S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; **OoT's PICA distance fog: measured and applied on both host routes**, MM's is missing per S005; material/fragment lighting still partial — **the per-light transport contract is now MEASURED on MM3D's registers** (per-slot: `diffuse`, `specular_0` and the light direction; MM3D's two lit slots are both `directional`, exactly antiparallel in x, and NOT the same colour, so neither a negated-direction nor a copied-colour reduction works), and **the two-light configuration counterfactual is now MEASURED in MM3D** (`max_light_index=1`/`slot_mapping=[0,1,...]` 12/12, `config0=0x80000400` 12/12, `config1` `0xff7fffff` 11/12 and `0xff7effff` 1/12 so it is not a constant; the host's slot count of 2 is confirmed with a denominator), and the builder's one open `+0x18A` bit is cross-title) | S002 | G001, G002 |
+| S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; **OoT's PICA distance fog: measured and applied on both host routes**, MM's is missing per S005; scene fog: **OoT closed, MM3D CONFIRMED by prediction** — the recovered MM3D record's window reproduces MM3D's authored PICA LUT to 1.19 byte steps (mean-abs 0.00466, control 0.02117), so the fog port is feasible with the existing host mechanism, and MM3D's camera near plane is ~77 against OoT3D's 7; material/fragment lighting still partial — **the per-light transport contract is now MEASURED on MM3D's registers** (per-slot: `diffuse`, `specular_0` and the light direction; MM3D's two lit slots are both `directional`, exactly antiparallel in x, and NOT the same colour, so neither a negated-direction nor a copied-colour reduction works), and **the two-light configuration counterfactual is now MEASURED in MM3D** (`max_light_index=1`/`slot_mapping=[0,1,...]` 12/12, `config0=0x80000400` 12/12, `config1` `0xff7fffff` 11/12 and `0xff7effff` 1/12 so it is not a constant; the host's slot count of 2 is confirmed with a denominator), and the builder's one open `+0x18A` bit is cross-title) | S002 | G001, G002 |
 | S004 | OoT3D actor animation, facial, camera, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G001 |
 | S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial (**scene-authored fog: data RECOVERED and independently validated** — MM3D's env region is command `0x0F` in its scene ZSI, inflated first (182 of 424 are LzS), base `ptr+0x28` stride `0x20` with the N64 `EnvLightSettings` at `+0x0B`; **MM3D also has an oracle now**; the table is generated with 102/113 scenes populated; the fogged-frame counterfactual EXISTS -- the opening runs PICA fog mode 5 on 75-84% of its draws and its per-draw fog colour matches the frame-level az_fog register exactly, including the transition between frames 3200 and 3800, so an earlier 'the opening is fog mode 0' reading of this project was wrong; the submission is outstanding and is NOT a copy of SoH's -- MM's z_kankyo ADDS a per-slot adjLightSettings offset to each of its four source colours before the time LERP, so the shared contract needs that term; so it renders unfogged but no longer lacks data) | S002, S003 | G002 |
 | S006 | An embedded Azahar oracle and parity tooling can compare the port with independent 3DS execution | partial | S001 | G001, G002 |
@@ -767,44 +767,49 @@ cannot is the useful part.**
   predicting 0.981 at entry 120 against a measured 0.934 and missing the plunge entirely, and it landed
   on the coarse grid's edge (`zFar=1000`, `fogNear`/`fogFar` 60/63), so the search was under-resolved as
   well as under-controlled.
-* **DECISIVE, and it closes off "just tune the window" for MM3D with a number.** The recovered
-  `z2_lost_woods` record has **8 slots**, each with its own `fogNear`/`fogFar`/`zFar`. Run as a
-  *prediction* — no fitting, the window comes from the table and the form from the shipping code
-  (`zelda3d_fog.cpp:23-24,35-38` + `unified_shader.cpp:371-376`, first checked against OoT3D's Zora
-  window where it reproduces the recorded 834 / 0.979 / flat-1.0 exactly) — against MM3D's measured
-  128-entry LUT:
+* **CORRECTION — the "REFUTED" verdict below was an ARTEFACT of a bug in the instrument, and the
+  real answer is the opposite. MM3D's fog window from the recovered record DOES predict MM3D's authored
+  curve.** The prediction is not a fit: the window comes from the table
+  (`tools/gen_mm3d_scene_lighting.py`), and the form from the shipping code
+  (`zelda3d_fog.cpp:23-24,35-38` + `unified_shader.cpp:371-376`), itself first checked against OoT3D's
+  Zora window where it reproduces the recorded `d(127/128) = 834.2` (recorded 834), `LUT(127) = 0.9786`
+  (recorded 0.979) and `LUT(125) = 1.0` flat. `tools/mm3d_fog_prediction.py`:
 
   | prediction | result |
   | --- | --- |
-  | **A** `cameraNear = 7` (OoT3D's measured near plane), all 8 slots | best mean-abs **0.01986** over 8/8 |
-  | **B** `cameraNear` solved from `LUT(0)`, all 8 slots | **0 of 8 admit a usable solution** |
-  | control, shuffled LUT | 0.02117 — **does not separate** from 0.01986 |
+  | **A** `cameraNear = 7` (OoT3D's measured near plane), 8 slots | best mean-abs 0.01986 |
+  | **B** `cameraNear` solved from `LUT(0)`, 8 slots | best mean-abs **0.00466** |
+  | control, shuffled LUT | 0.02117 |
 
-  Prediction B is the informative one. Because `d(0)` is *exactly* `cameraNear`, inverting
-  `LUT(0) = (fogFar - cn)/(fogFar - fogNear)` is exact — but that expression only holds when
-  `cn < fogNear`; at or past `fogNear` the form clamps to 1.0. **For every one of the 8 windows the
-  required `cameraNear` lands at or beyond its own `fogNear`** (197.8 vs 160, 668.5 vs 632, 77.0 vs
-  40, 822.8 vs 788, 652.9 vs 617, 668.1 vs 632, 77.0 vs 40, 547.6 vs 512). So the host's form cannot
-  produce MM3D's `LUT(0) = 0.9971` from **any** recovered window, and prediction A's 0.01986 is not
-  separable from the 0.02117 a shuffled LUT scores.
+  **B separates from the control by 4.5x**, and the winner is **slot 2** — `fogNear=40`,
+  `fogFar=12800`, `zFar=12800`, **`cameraNear=77.0`**. On the LUT's own 1/255 byte grid a mean-abs of
+  0.00466 is **1.19 byte steps**. The predicted curve tracks the measured one (0.997 at entry 0 down to
+  0.915 predicted against 0.934 measured at entry 120); the only real divergence is the final entry,
+  where the game's cliff is steeper than the form predicts (predicted 0.5652, measured 0.4915, error
+  0.0737 — 19 byte steps, at the one entry where the whole remaining drop happens).
 
-  **Verdict: the recovered scene record's window does not predict MM3D's authored curve.** This is
-  *not* a defect in the recovered record — its layout is independently confirmed by MM's own N64
-  `EnvLightSettings` and gated two-sided against OoT3D's data. It means the fog column of the record
-  is not what drives this curve, which is consistent with two things already on record: the curve is
-  **game-authored**, and the Lost Woods is reached through a **cutscene** that may carry its own
-  palette. So the fog port for MM3D needs the curve recovered from `mm3d-decomp/`, and a host that
-  keeps computing the curve from a window can only ever be right for OoT3D. That is now a measured
-  bound rather than an expectation.
+  **So the fog port for MM3D is feasible with the existing host mechanism and the recovered table.**
+  The earlier conclusion — that MM3D "needs its own curve recovered from `mm3d-decomp/`" — was wrong,
+  and it was wrong because of the instrument, not because of the data. The bug: the validity check on
+  a solved `cameraNear` was written as `cn < fogNear`, which is **backwards**. The form returns exactly
+  1.0 whenever `d(0) = cameraNear < fogNear`, so "below fogNear" *is* the clamped case where the
+  inversion is meaningless. With that check all 8 slots were rejected and the verdict came out
+  REFUTED; with the correct condition — `fogNear <= cn <= fogFar`, plus refusing to invert at all when
+  `LUT(0) >= 1.0` — the same data is CONFIRMED. **No MM3D data could have exposed this**, because
+  either verdict looks equally plausible on it; only a synthetic target generated from a known window
+  did, and that is now a standing self-test in the tool (`--selftest`), which also proves the
+  instrument can say NO on an unproducible target.
 
-  **And the instrument itself is part of the finding.** This prediction reported success **twice**
-  before it was correct, both times from the same defect: when no candidate produced a usable
-  prediction, it returned the *worst* error in the "best" slot, so the verdict compared a real worst
-  against a shuffled best — which guarantees separation, and therefore guarantees a positive answer.
-  The first version was worse still: it read "no slot admitted a valid cameraNear" on the *control*
-  as support for the positive conclusion. **An instrument that cannot report `no prediction exists`
-  will always report success**, and the fix was structural — a `Prediction` type whose `best` is
-  `None` when nothing was predicted, and a verdict that treats a missing prediction as refuted.
+  **What survives, and it is still the structural finding:** the fog table is *game-authored*
+  (`pica_core.cpp:644-655` — uploaded, never recomputed). The host *computes* an equivalent curve from
+  the window rather than storing the table, and this result says the two agree for MM3D to ~1 byte
+  step. So the port stands, but on a **measured equivalence** rather than on an assumption that
+  computing beats storing. The one place the equivalence visibly fails is the final LUT entry, which
+  is worth recovering if a per-pixel gate ever complains.
+
+  **And a new measured fact: MM3D's camera near plane is ~77, against OoT3D's measured 7.** That is a
+  per-title constant the host must not assume is shared, and it is invisible in the scene record — it
+  came out of the prediction, which is the only thing here that could see it.
 
 * **A better instrument than a fit: the derivative.** The LUT dump prints each entry as
   `value/diff`, and `diff` is that entry's difference from its neighbour — the authored curve's
