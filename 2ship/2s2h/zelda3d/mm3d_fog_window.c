@@ -55,6 +55,47 @@ static void Mm3d_UpdateFogColour(PlayState* play) {
     gZelda3dFogColor[2] = (float)settings->fogColor[2] / 255.0f;
 }
 
+/// Re-capture the blend schedule on the frames where MM did NOT run its time-based branch.
+///
+/// The capture at `z_kankyo.c:1471` sits INSIDE the time-based branch, and that branch is guarded by
+/// `lightMode == LIGHT_MODE_TIME && lightSettingOverride == LIGHT_SETTING_OVERRIDE_NONE`
+/// (`z_kankyo.c:1339`). So in any scene where the game sets an override -- or does not use time-based
+/// lights -- the branch never runs, `gZelda3dEnvBlend` keeps whatever it last held, and the fog window
+/// the host feeds is built from a STALE schedule.
+///
+/// Measured in `z2_lost_woods`, where the override is set: the window read `near=229.5`
+/// (`lerp(160, 632, 0.147)` of the recovered slots, i.e. exactly the stale capture) while MM's own
+/// `lightSettings.fogNear` was 632 and its `fogColor` was slot 1's `(28,20,0)` outright. Both numbers
+/// were internally consistent, which is why nothing looked wrong.
+///
+/// This reproduces whichever rule actually ran, in the shared schedule's own vocabulary:
+/// * blending  -- MM does `LERPIMP_ALT(list[prevLightSetting], list[lightSetting], lightBlend)`, which
+///   the shared rule turns into `Lerp(Lerp(prev, light, w), Lerp(prev, light, w), 0)`;
+/// * not blending -- MM copies `list[lightSetting]` wholesale, which is `Lerp(light, light, 0)`.
+///
+/// Called from `Environment_UpdateLights` after the light-settings block and BEFORE the
+/// `lightBlendEnabled = true` that follows it, because that line would erase the distinction.
+void Mm3d_CaptureEnvBlendForNonTimePath(PlayState* play) {
+    const EnvironmentContext* env = &play->envCtx;
+    // The exact guard the time-based branch itself is under: if it held, that branch ran and already
+    // captured, with the time-of-day weights this must not overwrite.
+    if (env->lightMode == LIGHT_MODE_TIME && env->lightSettingOverride == LIGHT_SETTING_OVERRIDE_NONE) {
+        return;
+    }
+    // FULL CONTROL means something outside z_kankyo owns lightSettings, so envCtx says nothing about
+    // which slots produced the value the renderer is about to see. Leave the previous capture alone
+    // rather than invent one.
+    if (env->lightSettingOverride == LIGHT_SETTING_OVERRIDE_FULL_CONTROL) {
+        return;
+    }
+    if (env->lightBlendEnabled != 0) {
+        Zelda3D_EnvBlendCapture(env->prevLightSetting, env->lightSetting, env->prevLightSetting, env->lightSetting,
+                                env->lightBlend, 0.0f);
+    } else {
+        Zelda3D_EnvBlendCapture(env->lightSetting, env->lightSetting, env->lightSetting, env->lightSetting, 0.0f, 0.0f);
+    }
+}
+
 void Mm3d_UpdateFogWindow(PlayState* play) {
     sWindowLive = false;
 

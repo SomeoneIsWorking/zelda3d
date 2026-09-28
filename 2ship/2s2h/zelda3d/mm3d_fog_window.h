@@ -49,6 +49,17 @@ extern "C" {
 /// no fog is the honest answer when the window is unknown.
 void Mm3d_UpdateFogWindow(PlayState* play);
 
+/**
+ * Re-capture the blend schedule on frames where MM's time-based branch did NOT run.
+ *
+ * The capture inside `Environment_UpdateLights` lives in the time-based branch, which only runs when
+ * `lightMode == LIGHT_MODE_TIME` and no light-setting override is set. Everywhere else the shared
+ * schedule silently keeps a stale value and the fog window is built from it. Call this from
+ * `Environment_UpdateLights` after the light-settings block and before the `lightBlendEnabled = true`
+ * that follows it.
+ */
+void Mm3d_CaptureEnvBlendForNonTimePath(PlayState* play);
+
 /// Diagnostics: whether the fog window was installed this frame, and the values it used.
 bool Mm3d_QueryFogWindow(float* outFogNear, float* outFogFar, float* outZFar, float* outCameraNear);
 

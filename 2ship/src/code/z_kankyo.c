@@ -1549,8 +1549,8 @@ void Environment_UpdateLights(PlayState* play, EnvironmentContext* envCtx, Light
         }
     }
 
+    Mm3d_CaptureEnvBlendForNonTimePath(play);
     envCtx->lightBlendEnabled = true;
-
 
     for (i = 0; i < 3; i++) {
         if ((s16)(envCtx->lightSettings.ambientColor[i] + envCtx->adjLightSettings.ambientColor[i]) > 255) {
