@@ -31,8 +31,36 @@ static float sFogNear = 0.0f;
 static float sFogFar = 0.0f;
 static float sZFar = 0.0f;
 
+/// Feed the fog COLOUR, which is a separate concern from the window and was the long-open half of
+/// MM3D's fog.
+///
+/// The value is not computed here. `Environment_UpdateLights` has already blended it -- from the
+/// SUBSTITUTED 3DS records -- into `envCtx->lightSettings.fogColor`, and the `fogcolour` command proves
+/// that blend exactly (the time-based two-LERP predicts the live colour to within 0-1 of integer
+/// quantisation, across MM's own time-of-day drift). So the correct thing to send is the number MM
+/// computed, not a second blend here: a second implementation would be a divergent copy of game logic
+/// that demonstrably already works.
+///
+/// This closes what S005 recorded as open. The earlier claim that MM's colour "lies outside the convex
+/// hull of the table and so is not derivable" was refuted by measurement: `func_800F6CEC` only writes
+/// `adjLightSettings` for indices in [4,8) or in rain, and `spA4` is memset to 0, so for ordinary
+/// indices the additive term is identically zero and the colour is a plain two-LERP over the table.
+static void Mm3d_UpdateFogColour(PlayState* play) {
+    if (gZelda3dFogOverride) {
+        return;
+    }
+    const CurrentEnvLightSettings* settings = &play->envCtx.lightSettings;
+    gZelda3dFogColor[0] = (float)settings->fogColor[0] / 255.0f;
+    gZelda3dFogColor[1] = (float)settings->fogColor[1] / 255.0f;
+    gZelda3dFogColor[2] = (float)settings->fogColor[2] / 255.0f;
+}
+
 void Mm3d_UpdateFogWindow(PlayState* play) {
     sWindowLive = false;
+
+    // Unconditional, and deliberately before the window's early returns: the colour is valid whether
+    // or not the 3DS window could be built, exactly as OoT's Zelda3D_UpdateFog feeds it.
+    Mm3d_UpdateFogColour(play);
 
     const Zelda3dSceneLight* palette = Mm3d_ScenePalette(play->sceneId);
     if (palette == NULL) {
