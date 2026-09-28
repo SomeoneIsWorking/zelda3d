@@ -622,6 +622,27 @@ The general lesson is the one this project keeps re-learning and it is now cost 
 session: a wrong element in a tuple does not raise, it produces a clean-looking histogram. Both wrong
 answers above would have been committed as evidence.
 
+**But MM3D's opening is NOT a usable fog parity surface, and the counterfactual must be qualified
+accordingly.** Reading all 128 `az_fog` LUT entries rather than the per-draw log's four samples:
+
+| frame | entries below 0.999 | first | value at 96 | value at 127 | non-zero slope spans |
+| --- | --- | --- | --- | --- | --- |
+| 2600 | 2 of 128 | 126 | 1.0000 | 0.9844 | 124..126 |
+| 3200 | 2 of 128 | 126 | 1.0000 | 0.9844 | 124..126 |
+| 3800 | 14 of 128 | 114 | 1.0000 | 0.8232 | 112..126 |
+
+MM3D's opening fog LUT is **1.0000 flat through entry 125**, with a total attenuation of 1.6% at the far
+plane in two of the three frames. So the registers are real and the per-draw colour joins the
+frame-level register — the counterfactual genuinely exists — but the **curve it produces has almost no
+dynamic range**, and that has a hard consequence: a host with the wrong fog window, or with PICA fog
+disabled outright, would still match MM3D's opening. **Any MM3D fog-parity number taken from the opening
+is therefore vacuous**, and this file will not record one. A discriminating comparison needs a scene
+whose recovered palette has a meaningful window, which needs a gameplay state.
+
+The same reading shows `depthScale=-1` on all three frames — `viewport_depth_range` unset in the
+between-draw snapshot, the same "sample it between draws and it tells you about nothing" trap as
+`az_fog`'s `mode=0`.
+
 **A census that was discarded, not reported.** MM3D's per-draw log carries a field named
 `texMappingMethod`, and reading its first component as an integer yields a tidy-looking distribution
 (`1`: 638, `0`: 20, `3`: 9 on unit 0) that reads exactly like the mapping-method population the
