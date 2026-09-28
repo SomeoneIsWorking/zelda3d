@@ -1510,20 +1510,40 @@ of the same scene load fine, so it is a bad spawn argument reaching a room the e
 not a lighting or warp-path fault. The 1-in-60 random-colour test is withdrawn as support for the
 strong claim: it refuted interpolation of the table, which was never in dispute.
 
-**MM3D's fog COLOUR is now CLOSED as a port, on the host side.** `Mm3d_UpdateFogWindow` now feeds
-`gZelda3dFogColor` from `envCtx->lightSettings.fogColor` -- the value MM itself blended from the
-substituted 3DS records -- in the same pattern OoT's `Zelda3D_UpdateFog` already used, so the host
-hazes toward the 3DS colour instead of the N64 one. Verified live: `live=(105,195,255)` reaches the
-renderer as `uFog=(0.412,0.765,1.000)`, and the `fogcolour` command now reports that value so the feed
-is observable rather than asserted. **No blend is reimplemented here**: the arithmetic is MM's, and the
-`fogcolour` check proves it -- the time-based two-LERP over the 3DS table predicts MM's live colour to
-within 0-1 (integer quantisation) across its time-of-day drift, so the value the renderer gets is the
-3DS one. Both halves of MM3D's scene fog are therefore now on 3DS data.
+**WITHDRAWN: "MM3D's fog COLOUR is closed on the host side" was MY OVERREACH, and it is wrong.**
+`Mm3d_UpdateFogWindow` does now feed `gZelda3dFogColor` from `envCtx->lightSettings.fogColor` -- the
+value MM itself blended from the substituted records -- in the same pattern OoT's `Zelda3D_UpdateFog`
+uses, and that feed is verified live (`live=(105,195,255)` in `z2_clocktower` reaches the renderer as
+`uFog=(0.412,0.765,1.000)`; `live=(90,133,180)` in `z2_lost_woods` as `uFog=(0.353,0.522,0.706)`). What
+that feed is NOT is MM3D's fog colour, and calling it "closed" asserted a parity that does not exist.
+
+The reason is in the recovered record's own shape, and the project had already measured it: the 3DS
+record's colour block is a **byte-for-byte copy of the N64 `EnvLightSettings`**, so `fogCol` is MM's N64
+fog colour carried inside the 3DS file -- it is not MM3D's authored PICA fog colour. MM3D's live PICA
+fog colour for the Lost Woods frame is `(40,140,220)`, and the recovered `z2_lost_woods` `fogCol` values
+are `(90,133,180) (28,20,0) (0,0,30) (5,55,75) (130,180,180) (28,20,0) (0,0,30) (114,115,101)` -- the
+project already showed `(40,140,220)` is not a table value and not a convex combination of any four of
+them (only 1 of 60 random colours lands in such a hull).
+
+**Measured this turn, host against the recorded oracle value in the same scene:**
+`host (90,133,180)` vs `oracle (40,140,220)` -- per-channel `(50, 7, 40)`, **mean-abs 32.3 of 255**. So
+the two disagree by a third of the range, and no blend of the recovered table can close it because the
+quantity is not in the table. One more measured wrinkle: the host's colour is TRANSIENT in this scene,
+because MM's water-lights override toggles -- two runs gave slot 1's `(28,20,0)` and slot 0's
+`(90,133,180)`. A single-sample colour A/B would not even be stable.
+
+So the honest state is: the feed is real plumbing and makes the divergence measurable, and the 1-in-60
+"not derivable" test stands for the colour exactly where it always did. **MM3D's PICA fog colour is a
+separately authored quantity that the recovered scene record does not contain**, and recovering it is a
+`mm3d-decomp` RE step -- the PICA fog-colour producer, not more interpolation. The window is unaffected:
+`fogNear`/`fogFar`/`zFar` are genuinely 3DS fields, and that half remains verified.
 
 Gap: MM3D coverage is substantially incomplete and must be established independently from OoT results.
-The fog WINDOW and COLOUR are both observed, cross-checked and fed, and the scene-lighting substitution
-is verified by pointer identity -- but **no MM frame has yet been compared against the oracle**, so this
-is a correct port, not recorded parity: `lighting.pica-fog` stays open for MM until an A/B exists.
+The fog WINDOW is observed, cross-checked against MM's own blend on three scenes and fed; the
+scene-lighting substitution is verified by pointer identity. The fog COLOUR is **not** closed -- it is
+present, fed, and measured to diverge from MM3D by mean-abs 32.3 of 255, because MM3D's PICA fog colour
+is authored separately from the N64 `fogColor` the 3DS record carries. And **no MM frame has been
+compared against the oracle**, so `lighting.pica-fog` stays open for MM until an A/B exists.
 
 ### S006 — Independent oracle comparisons
 
