@@ -231,9 +231,14 @@ So MM3D's *remaining* gap is the same one OoT3D has, plus one thing OoT3D does n
 
 1. **No gameplay state**, same reason -- `docs/issues/0023` applies to it verbatim. A gameplay
    `PlayState` is what a fresh MM3D checkpoint would be written from.
-2. **Its opening is fog mode 0** throughout frames 600-4000, so the *fogged-frame* counterfactual is
-   not reachable from the title even though the fog colour register is being written. The colours
-   observed there are the opening's own, not a scene table's.
+2. **Its opening reaches NO gameplay state**, and the fogged-frame counterfactual no longer depends on
+   that. An earlier note in this file said the opening is `fog mode 0` throughout frames 600-4000; that
+   was wrong, and it came from reading only the frame-level `az_fog` register. MM3D's per-draw log --
+   the field the host's `fogEnabled` models -- shows PICA fog mode 5 on **75-84% of the opening's draws**
+   (135 of 161 at frame 2000), and the per-draw colour matches `az_fog` exactly including the
+   `(187,110,110)` -> `(90,110,0)` transition between frames 3200 and 3800. So the fogged-frame
+   counterfactual is available in MM3D's opening with no gameplay state at all. What the opening does
+   not give is a *scene* palette: its colours are the opening's own, not a scene ZSI's.
 3. **MM3D needs its own recovered addresses for the high-level commands.** `playstate`, `scene`,
    `actors`, `warp` and `az_daytime` all resolve through OoT3D's `oracle_layout.h`, so on MM3D they
    either do not resolve or resolve wrongly. This is extra work MM3D has and OoT3D does not, and it
