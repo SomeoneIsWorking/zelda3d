@@ -544,9 +544,9 @@ image was refused for one reason only: its content is decrypted but its NCCH `fl
 `no_crypto` clear, and `ncch_container.cpp:281` rejects encrypted NCCH. `tools/ctr_oracle_rom.py` sets
 that bit **in a copy** — one byte, at a derived offset, refusing any image whose partition 0 has no NCCH
 header. MM3D then boots and renders, and its PICA fog register is **scene-driven**: `(0,0,0)` to frame
-1600, **`(187,110,110)` from 1800**, **`(90,110,0)` from 3600**. Those are the opening's colours rather
-than a scene table's, so the colour join to the recovered table is still open — but the layout is now
-confirmed by MM's own struct, which is a stronger check than a colour match would have been.
+1600, **`(187,110,110)` from 1800**, **`(90,110,0)` from 3600**. Those frame-level readings are NOT the whole fog state, and reading only them produced a wrong conclusion recorded in three authorities. MM3D's PER-DRAW log -- the field the host's `fogEnabled` models -- shows PICA fog mode 5 on **75-84% of the opening's draws** (135/161 at frame 2000, 98/131 at 3800), and the per-draw colour matches `az_fog` exactly including the `(187,110,110)` -> `(90,110,0)` transition between frames 3200 and 3800. So **MM3D's fogged-frame counterfactual EXISTS in its opening with no gameplay state**, and the colour join between the two registers is closed -- the "still open" claim is withdrawn. Open, and not asserted away: why the frame-level register reads `mode=0` while the per-draw field reads `mode=5` on the same frames, and which scene's record the opening's colours come from (the opening is not a scene ZSI).
+The layout is confirmed by MM's own struct, which is a stronger check than a colour match
+would have been.
 
 **So MM's fog moves from "missing" to "data recovered and independently validated; submission and a
 fogged-frame counterfactual outstanding."** That is the opposite of what this file said a few hours
