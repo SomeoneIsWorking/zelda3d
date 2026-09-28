@@ -6,7 +6,7 @@ symptom: The cold title-to-gameplay route does not reach a gameplay PlayState (m
 state_items: S006
 tags: oracle,harness,savestate,render-contract,title-route
 created: 2026-09-12
-updated: 2026-09-27
+updated: 2026-09-28
 ---
 
 ## Root cause
@@ -201,3 +201,47 @@ enabled by the harness configuration owner rather than by `FetchVariable` fallba
 The existing `diag` command now reports pointer poll counts and IDs alongside joypad polling. This
 distinguishes a control that was merely accepted by the REPL from one consumed by the fork's input
 path before any title transition conclusion is drawn.
+
+### Scope widened 2026-09-28: this is now a TWO-GAME issue, with different missing pieces
+
+The title-to-gameplay route problem is per-game, and the two titles are missing *different* things, so
+they must not be filed as one. Recording that here because the "no MM3D oracle at all" reason that used
+to sit under MM3D was refuted (see `docs/project-state.md` S003/S005) and this file is what the
+remaining truth belongs in.
+
+**OoT3D** is blocked exactly as above: a cold run needs a `0004000e` system-title app or a valid
+`system.dat` to reach a gameplay `PlayState`, and without one no fresh gameplay checkpoint can be
+written. Its gameplay oracle route (`boot_to_gameplay` over a cached state) is sound.
+
+**MM3D** used to be filed as worse -- no oracle capture of any kind. That was wrong, twice over:
+
+* MM3D **boots and renders in the Azahar oracle.** The harness core is game-agnostic (it takes a ROM
+  path and hands it to `retro_load_game` with no identity check, and all 18 patches in
+  `AZAHAR_PATCH.md` are observation hooks -- no OoT3D addresses, no HLE overrides). MM3D's image
+  needed its NCCH `no_crypto` header bit set in a copy before the emulator would load it
+  (`tools/ctr_oracle_rom.py`, 13 tests; provisioned automatically by
+  `provision_mm3d_oracle_rom`, exported as `$ZELDA3D_MM3D_ORACLE_ROM`). Its own ROM filename
+  corroborates the diagnosis -- the dump is literally named "Decrypted".
+* Frames, `run`, `mem`, `az_fog`, `lighting_capture` and the PICA draw logs all work on MM3D today
+  with no further work. Measured: PICA fog is scene-driven (`(0,0,0)` to frame 1600, `(187,110,110)`
+  from 1800, `(90,110,0)` from 3600) and fragment lighting is on for 116-143 of 131-161 draws per
+  frame.
+
+So MM3D's *remaining* gap is the same one OoT3D has, plus one thing OoT3D does not:
+
+1. **No gameplay state**, same reason -- `docs/issues/0023` applies to it verbatim. A gameplay
+   `PlayState` is what a fresh MM3D checkpoint would be written from.
+2. **Its opening is fog mode 0** throughout frames 600-4000, so the *fogged-frame* counterfactual is
+   not reachable from the title even though the fog colour register is being written. The colours
+   observed there are the opening's own, not a scene table's.
+3. **MM3D needs its own recovered addresses for the high-level commands.** `playstate`, `scene`,
+   `actors`, `warp` and `az_daytime` all resolve through OoT3D's `oracle_layout.h`, so on MM3D they
+   either do not resolve or resolve wrongly. This is extra work MM3D has and OoT3D does not, and it
+   is a RE task, not a state task.
+4. **An OoT3D savestate cannot be dropped into MM3D.** A savestate is a whole-`System` boost archive
+   carrying a `program_id` that `LoadStateBuffer` checks (`Azahar/src/core/savestate.cpp:266`). The
+   measured program IDs are OoT3D `0x0004000000033500` and MM3D `0x0004000000125500`, so each title
+   needs its own.
+
+The practical consequence: reaching gameplay for EITHER title is the single highest-value unblock in
+this campaign, and it is one task, not two.
