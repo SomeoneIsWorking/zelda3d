@@ -773,6 +773,30 @@ cannot is the useful part.**
   `adjLightSettings` term, plus a cutscene-specific palette). So the deciding input is MM3D's runtime
   env values for that state, which is the same missing input as the submission.
 
+**The structural finding that reframes all of it: PICA's distance fog is a game-AUTHORED 128-entry
+table, not hardware-computed.** `fog.lut[]` is filled only by register writes to
+`texturing.fog_lut_data[0..7]` (`pica_core.cpp:644-655`), and `fog.lut_dirty` is only ever *set* — a
+flag recording that the table changed — never used to recompute anything. So the emulator faithfully
+stores what the game computed, and the 128 values are **authored data**.
+
+That matters for the port because the host does the opposite: `unified_shader.cpp:519-520` *computes*
+the table in the shader, `fog3dNode(i/128)` for i in 0..128, from a window
+(`zFar`, `scale`, `fogNear`, `fogFar`). For OoT3D that is exact — the node reproduced OoT3D's measured
+LUT byte-for-byte at the Zora window, which is a measurement that OoT3D's own game-side formula *is* the
+eye-linear window. For MM3D it is an **approximation of an authored table**, and the knee MM3D's table
+has is precisely where an approximation would show. So the honest statement of where this stands is:
+
+* OoT3D fog: the host's computed curve is byte-identical to the game's authored table. Closed.
+* MM3D fog: the host's computed curve is compared against an authored table of known different shape,
+  and the comparison is **open** — not because the host is known wrong, but because a fitting test
+  cannot decide it and the window is not yet known.
+
+The longer-term correct answer is to reproduce the game's own LUT computation rather than approximate
+it, which means recovering what MM3D computes. That is an RE step in `mm3d-decomp/`, and it is now
+worth naming as one: the fog row's remaining work is not "tune the host's window", it is "recover the
+curve MM3D authors". A host that keeps computing the curve from a window can only ever be right where
+the game's formula coincides with that window, which OoT3D is and MM3D demonstrably is not.
+
 So: **MM3D fog is comparable (the dynamic range is real) and the mechanism is unverified for MM3D.**
 Both halves are recorded together, because "comparable" and "verified" are different claims and
 conflating them is how a wrong port gets declared done.
