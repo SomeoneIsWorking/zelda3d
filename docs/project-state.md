@@ -1532,8 +1532,21 @@ quantity is not in the table. One more measured wrinkle: the host's colour is TR
 because MM's water-lights override toggles -- two runs gave slot 1's `(28,20,0)` and slot 0's
 `(90,133,180)`. A single-sample colour A/B would not even be stable.
 
-So the honest state is: the feed is real plumbing and makes the divergence measurable, and the 1-in-60
-"not derivable" test stands for the colour exactly where it always did. **MM3D's PICA fog colour is a
+**And the cheap route to recovering it is now closed, with evidence.** The obvious question -- is the
+authored colour in the scene data we can already read? -- is answered **no**.
+`tools/mm3d_fogcolour_hunt.py` finds `(40,140,220)` twice in `z2_lost_woods`'s inflated ZSI, `0x20`
+apart, and the first version of that tool called it a real candidate. It was a coincidence: the hits
+land at **+12008 and +12040 from a known env `fogCol`, both `8 (mod 0x20)`**, their containing data is
+referenced nowhere in the file, its float fields are garbage, and the plausible-colour run around them
+degenerates into noise after four entries. The never-reported-triple control came back clean and still
+missed it, which is the lesson: a control is only as strong as the failure it can catch. Alignment
+against a known field is the test that discriminates, and it is now pinned both ways in
+`tools/test_mm3d_fogcolour_hunt.py` (6 tests, no ROM required).
+
+So the honest state is: the feed is real plumbing and makes the divergence measurable, the 1-in-60
+"not derivable" test stands for the colour exactly where it always did, and the colour is in neither
+the env record nor the scene ZSI -- which makes the `mm3d-decomp` recovery mandatory rather than
+optional. **MM3D's PICA fog colour is a
 separately authored quantity that the recovered scene record does not contain**, and recovering it is a
 `mm3d-decomp` RE step -- the PICA fog-colour producer, not more interpolation. The window is unaffected:
 `fogNear`/`fogFar`/`zFar` are genuinely 3DS fields, and that half remains verified.
