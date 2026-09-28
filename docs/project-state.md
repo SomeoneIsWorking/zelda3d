@@ -914,6 +914,42 @@ vertex-shader uniforms at index 92** (`Azahar/src/video_core/pica/pica_core.cpp:
 `0.3125` and `-2.51715e+16` — float bits, not enum values. The census was deleted rather than written
 down, and the field's name is a trap: a plausible integer histogram from a float tuple.
 
+**MM's submission has ONE substitution point, and it is not in the zelda3d layer at all.** MM's own
+N64 code already computes the whole blend, including the additive term, from a single list pointer:
+
+    2ship/src/code/z_scene.c:372-376   Scene_CommandEnvLightSettings
+        play->envCtx.numLightSettings  = cmd->lightSettingList.num;
+        play->envCtx.lightSettingsList = Lib_SegmentedToVirtual(cmd->lightSettingList.segment);
+
+    2ship/src/code/z_kankyo.c:1324     lightSettingsList = play->envCtx.lightSettingsList;
+    2ship/src/code/z_kankyo.c:1361-62  func_800F6CEC(play, sp97, &spA4[0], lightSettingsList);
+                                       func_800F6CEC(play, sp95, &spA4[1], lightSettingsList);
+
+`func_800F6CEC` — which produces the `spA4` additive term — **takes the list as a parameter**, so it
+derives from whatever list is installed. That means the MM3D port is a **data substitution, not a
+reimplementation of MM's blend**: install the 3DS records as the list and the N64 blend, the additive
+`adjLightSettings` term, the time LERP and the config LERP all operate on 3DS data for free. This is
+also why the additive term is not the obstacle it looked like: it never has to be reproduced, only fed.
+
+That is the right shape for this codebase for a second reason — it keeps the N64 blend in exactly one
+place, which is the "one implementation of each rule" rule, and it leaves the N64 game logic untouched
+except at a single scene-command handler that is *already* the scene-lighting entry point.
+
+**And there is a stride trap that would make the substitution silently wrong.** `EnvLightSettings` is
+**0x16** bytes (`2ship/include/z64environment.h:214`) and the N64 code indexes `lightSettingsList[i]`, so
+it steps by 0x16. The 3DS record is **0x20** bytes. A naive pointer swap therefore walks a 0x20-stride
+array in 0x16 steps, and **slot 0 looks right while every later slot reads the wrong bytes** — the exact
+failure this campaign has produced repeatedly, in a new place. So the generated table must present the
+N64 struct at **0x16 stride** (the colour block, the packed `blendRateAndFogNear` and the s16 `zFar`
+filled from the 3DS record), with the 3DS-only `f32 zFar`/`f32 fogFar` carried in a parallel array for
+the PICA window. The generator's current output is 0x20-stride and is correct *as data*; it needs a
+0x16-stride projection before it can be installed as a list.
+
+With that, the submission is: substitute the list and the count at `Scene_CommandEnvLightSettings`,
+then feed the PICA window (`zFar`, `fogFar`, `fogNear`, and the **camera near plane ~77** that the
+prediction recovered) to `Zelda3D_Fog3dSet`. The window half is validated against live hardware; the
+colour comes out of the same substitution rather than needing separate work.
+
 **The submission is NOT a copy of SoH's, and the reason is in MM's own N64 source.** SoH's
 `Zelda3D_SceneLightSettingsOverride` re-runs one rule: LERP the 3DS palette's two time-slot indices by
 `wTime`, LERP that pair by `wConfig`. MM's `z_kankyo.c` has the same *shape* — four source indices, a
