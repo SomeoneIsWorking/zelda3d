@@ -14,6 +14,8 @@ file(GLOB_RECURSE zelda3d_shared_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/object/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/object/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/audio/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/lighting/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/lighting/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/platform/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/platform/*.h")
 
