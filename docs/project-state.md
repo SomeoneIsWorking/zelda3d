@@ -643,6 +643,50 @@ The same reading shows `depthScale=-1` on all three frames — `viewport_depth_r
 between-draw snapshot, the same "sample it between draws and it tells you about nothing" trap as
 `az_fog`'s `mode=0`.
 
+**MM3D IS DRIVABLE PAST ITS OPENING, and it reaches real 3D game content — no gameplay state needed.**
+This is the largest change to what MM3D can be measured on, and it was found by pressing confirm
+rather than by more analysis. The harness's `input <mask>` writes the real libretro joypad mask
+(`SetInputMask`, routed through the fork's `RETRO_DEVICE_ID_JOYPAD` callback), and MM3D's opening
+responds to it. The sequence, each step confirmed by a captured frame rather than a draw count:
+
+1. `run 900`, then press confirm. The opening cutscene plays (its PICA fog palette steps
+   `(0,0,0)` -> `(187,110,110)` -> `(90,110,0)` as scenes change, at 6,600-11,500 draws per 150
+   frames, up to 63,451 distinct colours in a frame).
+2. Pressing confirm pages through a **story crawl** — static white text on black, 96.6% black and
+   exactly 15 distinct colours, byte-identical across two consecutive 60-frame windows, one confirm
+   per page. The text is the shared Ocarina of Time prologue: *"In the land of Hyrule, there echoes a
+   legend. A legend held dearly by the Royal Family that tells of a boy..."* (the crawl also runs
+   against OoT3D's font, which is the `textures/font` material both games use).
+3. After the last crawl page, a long **unpressed** stretch (900 frames) is required: the exit is an
+   animated dark-blue transition that does not advance on its own. Pressing into it skips a state
+   that was never observed.
+4. The landing state is **full 3D MM3D game content** — the opening's Lost Woods sequence, Link riding
+   Epona between trunks with foliage, fogged in a blue haze under PICA fog palette **`(40,140,220)`**.
+   It animates continuously and does not settle in 8 x 120-frame windows.
+
+What this opens, in the objective's own terms: MM3D now has reachable frames that exercise the
+families the campaign cares about — scene fog with a real palette, a skinned character model, alpha
+foliage, multiple texture units, and depth — **without a gameplay `PlayState`**. It does *not* open
+the gameplay route: this is a cutscene, so the high-level `playstate`/`scene`/`actors`/`warp` commands
+still need MM3D's own recovered addresses, and `docs/issues/0023` still applies to reaching a gameplay
+state. But "MM has zero visual evidence" and "MM has no oracle capture" are both now false, and
+`render.mm-scene-coverage` has a reachable surface.
+
+**The fog-colour join to the recovered table FAILS, and the failure has a cause that is already
+recorded.** The Lost Woods frame's `(40,140,220)` is not a table value (495 distinct `fogCol` values
+across 1509 slots, 0 matches), and it is not a convex combination of **any pair** of them either, at a
+2-per-channel tolerance. The control says the test could have detected a hit: **35% of random colours
+are also reachable from some pair**, so the colour space is dense enough that a match would mean
+something, and the absence of one is informative rather than merely inconclusive.
+
+The cause is the term this file already records as the reason MM's submission cannot be a copy of
+SoH's: MM blends `list[slot] + spA4[...]` for **four** sources, then time-LERPs the two pairs, then
+config-LERPs. So a two-slot convex blend is the wrong *model* for MM, not merely the wrong window —
+the additive `adjLightSettings` offsets are runtime-computed differences between adjacent light
+settings and are not table values at all. A second cause cannot be separated with what is measured
+here: an opening **cutscene** may use a cutscene-specific palette rather than the scene's env palette.
+Both are recorded; neither is guessed away.
+
 **A census that was discarded, not reported.** MM3D's per-draw log carries a field named
 `texMappingMethod`, and reading its first component as an integer yields a tidy-looking distribution
 (`1`: 638, `0`: 20, `3`: 9 on unit 0) that reads exactly like the mapping-method population the
