@@ -19,7 +19,7 @@ S003 is the current focus.
 | S002 | 3DS containers, models, animations, scenes, collision, cameras, lighting, and face data are available to both engines | partial | S001 | G001, G002 |
 | S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; **OoT's PICA distance fog: measured and applied on both host routes**, MM's is missing per S005; material/fragment lighting still partial — **the two-light configuration counterfactual is now MEASURED in MM3D** (`max_light_index=1`/`slot_mapping=[0,1,...]` 12/12, `config0=0x80000400` 12/12, `config1` `0xff7fffff` 11/12 and `0xff7effff` 1/12 so it is not a constant; the host's slot count of 2 is confirmed with a denominator), and the builder's one open `+0x18A` bit is cross-title) | S002 | G001, G002 |
 | S004 | OoT3D actor animation, facial, camera, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G001 |
-| S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial (**scene-authored fog: data RECOVERED and independently validated** — MM3D's env region is command `0x0F` in its scene ZSI, inflated first (182 of 424 are LzS), base `ptr+0x28` stride `0x20` with the N64 `EnvLightSettings` at `+0x0B`; **MM3D also has an oracle now**; the table is generated with 102/113 scenes populated; the submission is outstanding and is NOT a copy of SoH's -- MM's z_kankyo ADDS a per-slot adjLightSettings offset to each of its four source colours before the time LERP, so the shared contract needs that term; so it renders unfogged but no longer lacks data) | S002, S003 | G002 |
+| S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial (**scene-authored fog: data RECOVERED and independently validated** — MM3D's env region is command `0x0F` in its scene ZSI, inflated first (182 of 424 are LzS), base `ptr+0x28` stride `0x20` with the N64 `EnvLightSettings` at `+0x0B`; **MM3D also has an oracle now**; the table is generated with 102/113 scenes populated; the fogged-frame counterfactual EXISTS -- the opening runs PICA fog mode 5 on 75-84% of its draws and its per-draw fog colour matches the frame-level az_fog register exactly, including the transition between frames 3200 and 3800, so an earlier 'the opening is fog mode 0' reading of this project was wrong; the submission is outstanding and is NOT a copy of SoH's -- MM's z_kankyo ADDS a per-slot adjLightSettings offset to each of its four source colours before the time LERP, so the shared contract needs that term; so it renders unfogged but no longer lacks data) | S002, S003 | G002 |
 | S006 | An embedded Azahar oracle and parity tooling can compare the port with independent 3DS execution | partial | S001 | G001, G002 |
 | S007 | The AppImage accepts four direct ROMs or bounded ZIPs and persists validated choices without shipping game content | partial | S001 | G003 |
 | S008 | Linux CI builds the complete app and both cores and executes asset-free native contracts | partial | — | G003 |
@@ -552,6 +552,47 @@ confirmed by MM's own struct, which is a stronger check than a colour match woul
 fogged-frame counterfactual outstanding."** That is the opposite of what this file said a few hours
 ago, and the specific reason it was wrong — compressed bytes parsed as plain — is the same class of
 error this project has now hit twice in this campaign, so it is worth naming as a standing trap.
+
+**CORRECTED, and it is my own statement from a few hours ago that was wrong: MM3D's opening IS fogged,
+and its fogged-frame counterfactual exists without gameplay.** I recorded "the opening is `mode=0`
+throughout frames 600–4000, so the fogged-frame counterfactual is out of reach", and that conclusion
+came from reading **one** field — the frame-level `az_fog` register. MM3D's per-draw log says otherwise,
+and the per-draw field is the one the host's `fogEnabled` boolean actually models (it is the same field
+OoT3D's own reading used):
+
+| frame | draws | per-draw `fog=5` | per-draw `fog=0` | per-draw fog colour |
+| --- | --- | --- | --- | --- |
+| 1200 | 92 | 51 | 41 | `(0,0,0)` |
+| 2000 | 161 | **135** | 26 | `(187,110,110)` |
+| 2600 | 144 | 118 | 26 | `(187,110,110)` |
+| 3200 | 139 | 112 | 27 | `(187,110,110)` |
+| 3800 | 131 | 98 | 33 | `(90,110,0)` |
+
+So PICA fog mode 5 is active on **75–84% of the opening's draws**, and "not this material" is a real
+per-draw mode 0 — the same shape OoT3D's title shows (59 of 102 at mode 5, 43 at mode 0). The
+counterfactual I called blocked is therefore **available in MM3D's opening today**.
+
+**The fog-colour join is also closed, and it is the join I said was open.** I could not match the
+oracle's live fog colour `(187,110,110)` to the recovered table and concluded the sampled frame had fog
+off. Both halves were wrong: the per-draw colour and the frame-level `az_fog` register **agree exactly**,
+including the transition — `(187,110,110)` through frame 3200, `(90,110,0)` at 3800, and `az_fog`
+switched between the same two frames (3600). Two independent fields, one transition, same values. The
+remaining open question is only *which* scene's record the opening's colours come from, since the
+opening is not a scene ZSI at all.
+
+One open discrepancy is recorded rather than resolved by assertion: the frame-level `az_fog` register
+reads `mode=0` while the per-draw field reads `mode=5` on most draws of the same frames. That is a real
+difference between two registers and this file does not claim to know why. It does not affect the
+counterfactual, because the per-draw field is the one the host models.
+
+**A census that was discarded, not reported.** MM3D's per-draw log carries a field named
+`texMappingMethod`, and reading its first component as an integer yields a tidy-looking distribution
+(`1`: 638, `0`: 20, `3`: 9 on unit 0) that reads exactly like the mapping-method population the
+ProjectionMap row cares about. It is noise: the harness writes that field as **four consecutive f32
+vertex-shader uniforms at index 92** (`Azahar/src/video_core/pica/pica_core.cpp:411`,
+`log_v4("texMappingMethod", 92)`), not as a texmap register. Components come out as `0.640625`,
+`0.3125` and `-2.51715e+16` — float bits, not enum values. The census was deleted rather than written
+down, and the field's name is a trap: a plausible integer histogram from a float tuple.
 
 **The submission is NOT a copy of SoH's, and the reason is in MM's own N64 source.** SoH's
 `Zelda3D_SceneLightSettingsOverride` re-runs one rule: LERP the 3DS palette's two time-slot indices by
