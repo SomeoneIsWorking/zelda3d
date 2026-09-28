@@ -28,11 +28,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pica_lighting_registers import (  # noqa: E402
     CONFIG_ENUM,
     LIGHTING_CONFIG_NAMES,
+    MM3D_CAPTURED_SLOTS,
     REGS_LIGHTING_H,
     SAMPLER_NAMES,
     LightingRegisterMapError,
     diff_config_words,
     load_register_map,
+    predict_fragment_lighting,
     reduce_lighting,
 )
 
@@ -164,6 +166,83 @@ class ReductionTests(unittest.TestCase):
                          "lut:ReflectRed", "lut:ReflectGreen", "lut:ReflectBlue"):
             self.assertIn(expected, terms)
         self.assertGreaterEqual(len(terms), 14)
+
+
+class ReducedFormPredictionTests(unittest.TestCase):
+    """Golden predictions for the reduced form, so a port has a number to check against.
+
+    These come from MM3D's two CAPTURED lit slots (`oot3d-decomp/docs/fragment_lighting.md`,
+    "What the two lit slots actually contain"), 10-bit channels over 255 per
+    `LightColor::ToVec3f`. The reduction says the captured config needs no optional term, so the
+    closed form is the whole answer for these draws.
+    """
+
+    def _close(self, got, want, tol=5e-4):
+        for a, b in zip(got, want):
+            self.assertAlmostEqual(a, b, delta=tol, msg=f"{got} != {want}")
+
+    def test_secondary_is_FLAT_in_the_normal(self) -> None:
+        """The load-bearing consequence of `disable_lut_d0 = 1`: no half-vector term at all.
+
+        A Blinn-Phong port would make this normal-dependent. It must not be.
+        """
+        seen = set()
+        for n in [(1, 0, 0), (-1, 0, 0), (0, 0, 1), (0.5, 0, 0.866), (0, 0.707, 0.707)]:
+            seen.add(predict_fragment_lighting(MM3D_CAPTURED_SLOTS, normal=n)["secondary"])
+        self.assertEqual(len(seen), 1, f"secondary varied with the normal: {seen}")
+        self._close(next(iter(seen)), (1.0, 0.8941, 0.7804))
+
+    def test_secondary_red_clamps_at_one(self) -> None:
+        """sum(specular_0) = 0.3255 + 0.7569 = 1.082 > 1, so red is CLAMPED, not summed through."""
+        out = predict_fragment_lighting(MM3D_CAPTURED_SLOTS, normal=(0, 0, 1))
+        self.assertEqual(out["secondary"][0], 1.0)
+
+    def test_primary_tracks_facing(self) -> None:
+        self._close(predict_fragment_lighting(MM3D_CAPTURED_SLOTS, normal=(1, 0, 0))["primary"],
+                    (96 / 255, 82 / 255, 72 / 255))
+        self._close(predict_fragment_lighting(MM3D_CAPTURED_SLOTS, normal=(-1, 0, 0))["primary"],
+                    (41 / 255, 31 / 255, 26 / 255))
+
+    def test_perpendicular_normal_gets_no_diffuse(self) -> None:
+        """Both captured slots are exactly antiparallel in x, so a +Z normal sees neither.
+
+        A real and checkable prediction, and one a sign error in the direction transport would
+        break loudly rather than subtly.
+        """
+        self.assertEqual(
+            predict_fragment_lighting(MM3D_CAPTURED_SLOTS, normal=(0, 0, 1))["primary"],
+            (0.0, 0.0, 0.0))
+
+    def test_global_ambient_offsets_primary_only(self) -> None:
+        """`global_ambient` is added to the DIFFUSE sum only.
+
+        The second half of this -- that the SECONDARY is untouched -- is the half that was
+        missing, and the mutation check is what found it: a build that leaked `global_ambient`
+        into the specular survived every test, because every caller so far passed the default
+        (0,0,0) and adding zero is invisible.
+        """
+        base = predict_fragment_lighting(MM3D_CAPTURED_SLOTS, normal=(1, 0, 0))
+        withamb = predict_fragment_lighting(
+            MM3D_CAPTURED_SLOTS, global_ambient=(0.1, 0.1, 0.1), normal=(1, 0, 0))
+        for a, b in zip(base["primary"], withamb["primary"]):
+            self.assertAlmostEqual(b - a, 0.1, delta=5e-4)
+        self.assertEqual(base["secondary"], withamb["secondary"])
+
+    def test_primary_clamps_at_one(self) -> None:
+        """A global_ambient above 1 must clamp, not run away."""
+        out = predict_fragment_lighting(
+            MM3D_CAPTURED_SLOTS, global_ambient=(2.0, 2.0, 2.0), normal=(1, 0, 0))["primary"]
+        self.assertEqual(out, (1.0, 1.0, 1.0))
+
+    def test_zero_length_light_vector_is_refused(self) -> None:
+        with self.assertRaises(ValueError):
+            predict_fragment_lighting([{"position": (0.0, 0.0, 0.0), "diffuse": (1, 1, 1)}])
+
+    def test_colours_use_the_10bit_over_255_scale(self) -> None:
+        """Guards the 4-bit/1023 misread: a wrong divisor still yields a clean-looking colour."""
+        slot = [{"position": (1.0, 0, 0), "diffuse": (255 / 255, 0, 0)}]
+        out = predict_fragment_lighting(slot, normal=(1, 0, 0))["primary"]
+        self.assertAlmostEqual(out[0], 1.0, delta=1e-6)
 
 
 class RefusalTests(unittest.TestCase):
