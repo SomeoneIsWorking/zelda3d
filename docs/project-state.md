@@ -19,7 +19,7 @@ S003 is the current focus.
 | S002 | 3DS containers, models, animations, scenes, collision, cameras, lighting, and face data are available to both engines | partial | S001 | G001, G002 |
 | S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; **OoT's PICA distance fog: measured and applied on both host routes**, MM's is missing per S005; material/fragment lighting still partial — **the two-light configuration counterfactual is now MEASURED in MM3D** (`max_light_index=1`/`slot_mapping=[0,1,...]` 12/12, `config0=0x80000400` 12/12, `config1` `0xff7fffff` 11/12 and `0xff7effff` 1/12 so it is not a constant; the host's slot count of 2 is confirmed with a denominator), and the builder's one open `+0x18A` bit is cross-title) | S002 | G001, G002 |
 | S004 | OoT3D actor animation, facial, camera, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G001 |
-| S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial (**scene-authored fog: data RECOVERED and independently validated** — MM3D's env region is command `0x0F` in its scene ZSI, inflated first (182 of 424 are LzS), base `ptr+0x28` stride `0x20` with the N64 `EnvLightSettings` at `+0x0B`; **MM3D also has an oracle now**; the submission and a fogged-frame counterfactual are outstanding, so it renders unfogged but no longer lacks data) | S002, S003 | G002 |
+| S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial (**scene-authored fog: data RECOVERED and independently validated** — MM3D's env region is command `0x0F` in its scene ZSI, inflated first (182 of 424 are LzS), base `ptr+0x28` stride `0x20` with the N64 `EnvLightSettings` at `+0x0B`; **MM3D also has an oracle now**; the table is generated with 102/113 scenes populated; the submission is outstanding and is NOT a copy of SoH's -- MM's z_kankyo ADDS a per-slot adjLightSettings offset to each of its four source colours before the time LERP, so the shared contract needs that term; so it renders unfogged but no longer lacks data) | S002, S003 | G002 |
 | S006 | An embedded Azahar oracle and parity tooling can compare the port with independent 3DS execution | partial | S001 | G001, G002 |
 | S007 | The AppImage accepts four direct ROMs or bounded ZIPs and persists validated choices without shipping game content | partial | S001 | G003 |
 | S008 | Linux CI builds the complete app and both cores and executes asset-free native contracts | partial | — | G003 |
@@ -552,6 +552,24 @@ confirmed by MM's own struct, which is a stronger check than a colour match woul
 fogged-frame counterfactual outstanding."** That is the opposite of what this file said a few hours
 ago, and the specific reason it was wrong — compressed bytes parsed as plain — is the same class of
 error this project has now hit twice in this campaign, so it is worth naming as a standing trap.
+
+**The submission is NOT a copy of SoH's, and the reason is in MM's own N64 source.** SoH's
+`Zelda3D_SceneLightSettingsOverride` re-runs one rule: LERP the 3DS palette's two time-slot indices by
+`wTime`, LERP that pair by `wConfig`. MM's `z_kankyo.c` has the same *shape* — four source indices, a
+time weight, a config weight — but each of the four source colours is **first added to a per-slot
+`spA4[]` offset** before the time LERP:
+
+    A = lerpColor(lightSettingsList[sp95] + spA4[1], lightSettingsList[sp97] + spA4[0], timeW)
+    B = lerpColor(lightSettingsList[sp94] + spA4[3], lightSettingsList[sp96] + spA4[2], timeW)
+    result = LERPIMP_ALT(A, B, configW)                        // 2ship/src/code/z_kankyo.c:1394
+
+`spA4` is `adjLightSettings`, built as the *difference* between adjacent light settings. So the shared
+`Zelda3dEnvBlend` shape (four indices, two weights) is right for both games, but MM needs **four
+additive colour offsets carried alongside it**. Folding MM into SoH's rule without that term is not a
+simplification — it is a second, silently-wrong blend policy, which is the same class of error as the
+per-draw carriage bugs this campaign already found twice. The term is therefore named here as a
+requirement of the shared contract rather than approximated away, and the struct is not extended
+until an MM consumer exists to read it.
 
 **And it is not a compression artifact, which was the obvious next excuse.** The two containers'
 first bytes differ: OoT3D's ZSI opens `5a 53 49 01` ("ZSI\x01", content at 0) while MM3D's opens
