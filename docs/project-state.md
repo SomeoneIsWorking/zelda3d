@@ -767,6 +767,45 @@ cannot is the useful part.**
   predicting 0.981 at entry 120 against a measured 0.934 and missing the plunge entirely, and it landed
   on the coarse grid's edge (`zFar=1000`, `fogNear`/`fogFar` 60/63), so the search was under-resolved as
   well as under-controlled.
+* **DECISIVE, and it closes off "just tune the window" for MM3D with a number.** The recovered
+  `z2_lost_woods` record has **8 slots**, each with its own `fogNear`/`fogFar`/`zFar`. Run as a
+  *prediction* — no fitting, the window comes from the table and the form from the shipping code
+  (`zelda3d_fog.cpp:23-24,35-38` + `unified_shader.cpp:371-376`, first checked against OoT3D's Zora
+  window where it reproduces the recorded 834 / 0.979 / flat-1.0 exactly) — against MM3D's measured
+  128-entry LUT:
+
+  | prediction | result |
+  | --- | --- |
+  | **A** `cameraNear = 7` (OoT3D's measured near plane), all 8 slots | best mean-abs **0.01986** over 8/8 |
+  | **B** `cameraNear` solved from `LUT(0)`, all 8 slots | **0 of 8 admit a usable solution** |
+  | control, shuffled LUT | 0.02117 — **does not separate** from 0.01986 |
+
+  Prediction B is the informative one. Because `d(0)` is *exactly* `cameraNear`, inverting
+  `LUT(0) = (fogFar - cn)/(fogFar - fogNear)` is exact — but that expression only holds when
+  `cn < fogNear`; at or past `fogNear` the form clamps to 1.0. **For every one of the 8 windows the
+  required `cameraNear` lands at or beyond its own `fogNear`** (197.8 vs 160, 668.5 vs 632, 77.0 vs
+  40, 822.8 vs 788, 652.9 vs 617, 668.1 vs 632, 77.0 vs 40, 547.6 vs 512). So the host's form cannot
+  produce MM3D's `LUT(0) = 0.9971` from **any** recovered window, and prediction A's 0.01986 is not
+  separable from the 0.02117 a shuffled LUT scores.
+
+  **Verdict: the recovered scene record's window does not predict MM3D's authored curve.** This is
+  *not* a defect in the recovered record — its layout is independently confirmed by MM's own N64
+  `EnvLightSettings` and gated two-sided against OoT3D's data. It means the fog column of the record
+  is not what drives this curve, which is consistent with two things already on record: the curve is
+  **game-authored**, and the Lost Woods is reached through a **cutscene** that may carry its own
+  palette. So the fog port for MM3D needs the curve recovered from `mm3d-decomp/`, and a host that
+  keeps computing the curve from a window can only ever be right for OoT3D. That is now a measured
+  bound rather than an expectation.
+
+  **And the instrument itself is part of the finding.** This prediction reported success **twice**
+  before it was correct, both times from the same defect: when no candidate produced a usable
+  prediction, it returned the *worst* error in the "best" slot, so the verdict compared a real worst
+  against a shuffled best — which guarantees separation, and therefore guarantees a positive answer.
+  The first version was worse still: it read "no slot admitted a valid cameraNear" on the *control*
+  as support for the positive conclusion. **An instrument that cannot report `no prediction exists`
+  will always report success**, and the fix was structural — a `Prediction` type whose `best` is
+  `None` when nothing was predicted, and a verdict that treats a missing prediction as refuted.
+
 * **A better instrument than a fit: the derivative.** The LUT dump prints each entry as
   `value/diff`, and `diff` is that entry's difference from its neighbour — the authored curve's
   **derivative**, sampled at the same 128 points. A derivative identifies a function family far better
