@@ -1507,7 +1507,33 @@ within 0.
 Also recorded, because it cost a crash and is not a defect: warping to `z2_lost_woods` via entrance
 `0xC40B` crashes MM in `Actor_InitContext` after the room load fails (`Room: 127`). Spawns `0x00`/`0x03`
 of the same scene load fine, so it is a bad spawn argument reaching a room the entrance cannot resolve,
-not a lighting or warp-path fault. The 1-in-60 random-colour test is withdrawn as support for the
+not a lighting or warp-path fault.
+
+**The host now renders MM's Lost Woods, and the window is verified in both of that scene's animated
+states.** `warp 0xC400` plus `mm_game.py shot` produces real scene content -- hollow log, trunks,
+mossy ground, ferns -- and the live window tracks MM's own water-lights override between two recovered
+records, matching each **exactly** (residual 0.00) and agreeing with MM's own blend (d=0.00) in both:
+`near=160.0` (slot 0) and `near=632.0` (slot 1), both `far=13200.0 zFar=16000.0`, colour slot 1's
+`(28,20,0)` predicted to within 0. So the window fix holds across an animated transition, not just a
+static frame.
+
+**The coordinate-matched MM fog A/B is BLOCKED, and the reason is the skip policy rather than a
+missing tool.** The oracle's recorded `z2_lost_woods` LUT is for slot 2 (`40, 12800, 12800`); the host
+sits at slot 0 or 1 because MM's own scene actors own `lightSettingOverride` in that room. The `fogslot`
+command drives MM's public `Environment_EnableUnderwaterLights` / `Environment_DisableUnderwaterLights`
+-- the game's own entry points, not a field write -- and **both report `REFUSED`**, because each is
+guarded on the override currently being `NONE` (`z_kankyo.c:1162`) and in this scene it never is. The
+only way to reach slot 2 from here would be to write `envCtx.lightSettingOverride` directly, which is
+exactly the "write a phase, timer, or scene pointer" the project's skip rule forbids. So the remaining
+routes are to reach the state by playing (the oracle's own route) or to recover what triggers the
+water-lights actor -- and until one of those happens, the transitive validation stands as it is: the
+host's fed window equals MM's own blend, and the recovered record's window predicts MM3D's authored LUT
+to 0.00466 against a 0.02117 control.
+
+That `fogslot` reports `REFUSED` rather than `ok` matters more than it looks. Its first version printed
+`ok` on a call that provably changed nothing, which is the failure mode this project keeps meeting: a
+diagnostic that reports the call returned instead of what the call did, so a later measurement looks
+like a failed fix when nothing was ever attempted. The 1-in-60 random-colour test is withdrawn as support for the
 strong claim: it refuted interpolation of the table, which was never in dispute.
 
 **WITHDRAWN: "MM3D's fog COLOUR is closed on the host side" was MY OVERREACH, and it is wrong.**
