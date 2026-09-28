@@ -67,7 +67,8 @@ def main():
     ci = {n.lower(): n for n in folders}
 
     rows = []  # (soh_name, enum, oot3d_name_or_None)
-    for line in open(SCENE_TABLE):
+    table = Path(SCENE_TABLE).read_text(encoding="utf-8")
+    for line in table.splitlines():
         m = re.search(r"DEFINE_SCENE\(\s*([A-Za-z0-9_]+)_scene\s*,\s*[A-Za-z0-9_]+\s*,\s*(SCENE_[A-Z0-9_]+)", line)
         if not m:
             continue

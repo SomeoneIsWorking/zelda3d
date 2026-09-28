@@ -58,6 +58,7 @@ tuning ints) — safe to commit, like zelda3d_scene_names.inc and n64_scene_ligh
 Run: ZELDA3D_OOT3D_ROM=<path.3ds> python3 tools/gen_oot3d_scene_lighting.py
 """
 import os, re, sys, struct
+from pathlib import Path
 sys.path.insert(0, os.path.dirname(__file__))
 from ctr_romfs import CtrRom
 import gen_scene_names as gsn  # reuse OVERRIDES + SCENE_TABLE row derivation
@@ -118,7 +119,8 @@ def main():
 
     # Reproduce gen_scene_names row order + name resolution.
     rows = []  # (soh, enum, oot3d_name|None)
-    for line in open(gsn.SCENE_TABLE):
+    table = Path(gsn.SCENE_TABLE).read_text(encoding="utf-8")
+    for line in table.splitlines():
         m = re.search(r"DEFINE_SCENE\(\s*([A-Za-z0-9_]+)_scene\s*,\s*[A-Za-z0-9_]+\s*,\s*(SCENE_[A-Z0-9_]+)", line)
         if not m:
             continue
