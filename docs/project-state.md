@@ -17,7 +17,7 @@ S003 is the current focus.
 | --- | --- | --- | --- | --- |
 | S001 | One launcher provisions, validates, builds, and chooses between the OoT and MM game cores | verified | — | G003 |
 | S002 | 3DS containers, models, animations, scenes, collision, cameras, lighting, and face data are available to both engines | partial | S001 | G001, G002 |
-| S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; **OoT's PICA distance fog: measured and applied on both host routes**, MM's is missing per S005; material/fragment lighting still partial) | S002 | G001, G002 |
+| S003 | The PC renderer reproduces the reached PICA200 material, texture, lighting, fog, and transparency semantics | partial (texture formats **and** sampler filtering/wrapping: **verified for both games**; **OoT's PICA distance fog: measured and applied on both host routes**, MM's is missing per S005; material/fragment lighting still partial — **the two-light configuration counterfactual is now MEASURED in MM3D** (`max_light_index=1`/`slot_mapping=[0,1,...]` 12/12, `config0=0x80000400` 12/12, `config1` `0xff7fffff` 11/12 and `0xff7effff` 1/12 so it is not a constant; the host's slot count of 2 is confirmed with a denominator), and the builder's one open `+0x18A` bit is cross-title) | S002 | G001, G002 |
 | S004 | OoT3D actor animation, facial, camera, and game-specific behavior replaces N64 behavior where grounded | partial | S002, S003 | G001 |
 | S005 | MM3D actor animation, presentation, and game-specific behavior replaces N64 behavior where grounded | partial (**scene-authored fog: data RECOVERED and independently validated** — MM3D's env region is command `0x0F` in its scene ZSI, inflated first (182 of 424 are LzS), base `ptr+0x28` stride `0x20` with the N64 `EnvLightSettings` at `+0x0B`; **MM3D also has an oracle now**; the submission and a fogged-frame counterfactual are outstanding, so it renders unfogged but no longer lacks data) | S002, S003 | G002 |
 | S006 | An embedded Azahar oracle and parity tooling can compare the port with independent 3DS execution | partial | S001 | G001, G002 |
@@ -465,16 +465,49 @@ The recorded reason was a *state* argument — 0 of 207 title draws on the autho
   scene — 65 draws, one model, `fragLit=0` on all of them, static camera, cursor still advancing past
   the script's end. The host never transitions out of the title presentation, matching the recorded
   oracle behaviour ("Start at the logo → 200 frames black → sky-only screen, stuck 2400+ frames").
-* **MM3D cannot supply one either, for a different reason.** MM has 6,428 of 6,791 materials
-  fragment-lit, so it needs no rare fixture — it needs any MM3D scene, and MM3D has **no oracle capture
-  at all**. That is a different blocker from OoT3D's and must not be folded into it: OoT3D is blocked
-  on reaching gameplay, MM3D on having any image to compare against.
+* **MM3D could not supply one either — and that reason is now REFUTED and replaced with a
+  measurement.** This bullet previously read "MM3D has no oracle capture at all". MM3D has an oracle
+  (see below), and the counterfactual was sitting in it. On the authoritative `picaLit` field
+  (`regs.lighting.disable`), MM3D's opening is fragment-lit on **116–143 of 131–161 draws per frame**
+  across frames 1200–3800. So the third blocker dissolves, and the two OoT3D reasons above are
+  untouched: they are about OoT3D's *content*, and no MM3D evidence can speak to them.
 
-The instrument that made the second one measurable is `fragLit=` on the per-draw `[Zelda3D_SG] draw N`
+**What MM3D's live registers actually say** (`lighting_capture`, 12 captures at frame 2000 of 24
+armed — the misses are draw indices that stop being submitted when the scene advances between the
+arming frame and the next one, reported here rather than dropped):
+
+* **Two lights, not one and not three.** `max_light_index = 1` and `slot_mapping = [0,1,0,0,0,0,0,0]`
+  on 12 of 12, with both slots carrying real `specular0`/`diffuse`/`xy` data. This is the first
+  **two-light** fragment-lit fixture in the project — Gravekeeper's Hut is a ONE-light material, so
+  the OoT3D fixture could never discriminate the host's hardcoded slot count. `Zelda3D_GL_SetLightParams`'s
+  count of 2 is now consistent with every capture, with a denominator.
+* **`config0 = 0x80000400` on 12 of 12** — the same word the OoT3D Gravekeeper capture recorded. Two
+  independent titles with separate material compilers land on it, so it is the platform's baseline
+  configuration word, not a fixture coincidence.
+* **`config1` is NOT a constant:** `0xff7fffff` on 11 of 12 and `0xff7effff` on 1, a real per-material
+  difference at bit `0x11`, which the recovered builder names `MODE_SPOT_INDEX`. Any host that hardcodes
+  `config1` is wrong for the materials that differ.
+* **This strengthens the one open bit.** The builder's constructor default predicts
+  `config0 = 0x80020400` — the observed word plus bit `0x11`, which comes solely from the
+  constructor's `+0x18A = 1`, a byte `FUN_004c6364` does not write. The single OoT3D fixture already
+  showed that bit clear; MM3D shows it clear on 12 of 12 draws in a different title. "The ordinary
+  lit path clears `+0x18A`" is now cross-title, not a single observation. Which code clears it is
+  still open, and is recorded as such rather than guessed.
+
+**A trap this measurement walked into, recorded so it is not walked into again.** `light_enable` is
+**not a bitmask of enabled slots** — Azahar reads it as a per-slot *light index*
+(`pica_core.cpp:100`, `regs.light_enable.GetNum(slot)`), and the capture's `slot_mapping` array is that
+index per slot. A slot count derived by popcounting the word, or by treating `0x10` as "slot 4 is on",
+produces a confident wrong answer. `max_light_index` and `slot_mapping` are the authority. A second
+trap: `lighting_capture` only *arms* the request and the PICA hook fills the file when that draw is
+actually submitted, so arming and reading immediately yields a 0-byte file that looks like a silent
+failure.
+
+The instrument that made the OoT3D reasons measurable is `fragLit=` on the per-draw `[Zelda3D_SG] draw N`
 list, added this turn: the corpus says which materials carry the flag, and the draw list says which of
 them were actually drawn, so "no fragment-lit draw" is now a per-frame number instead of an inference
-from a register. What would open it is a state that already has a menu — the equipment screen is worth
-30 of 205 materials in one reachable place — or, for MM3D, any MM3D frame at all.
+from a register. What would still open the OoT3D half is a state that already has a menu — the
+equipment screen is worth 30 of 205 materials in one reachable place.
 
 **Majora's Mask's scene lighting was NOT missing, and MM3D now has an oracle. Two of this project's
 own negatives were wrong; both are now closed.**
