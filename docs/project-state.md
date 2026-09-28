@@ -664,6 +664,35 @@ responds to it. The sequence, each step confirmed by a captured frame rather tha
    Epona between trunks with foliage, fogged in a blue haze under PICA fog palette **`(40,140,220)`**.
    It animates continuously and does not settle in 8 x 120-frame windows.
 
+**The fog qualification from earlier is therefore LIFTED, and that is the practical consequence.**
+The opening's 1.6% attenuation was the reason no MM3D fog number could be taken; further into the same
+sequence the reachable frames measure **50.8% total attenuation at the far plane** — every one of the
+128 LUT entries below 0.999, the first at entry **0**, a non-zero slope on all 128, from 0.997 at the
+near end to **0.4915** at the far end. So a host with the wrong window, or with PICA fog off, would
+**not** match these frames, and **MM3D fog is now a comparable family.**
+
+The curve's SHAPE also differs from OoT3D's measured gameplay case, which matters for the port. OoT3D's
+Zora window (`fogNear=800` of `zFar=12000`) gave a **flat 1.0 through entry 125** and 0.979 at 127 —
+the host's `fog3dNode`'s flat-then-ramp shape. MM3D here ramps from the **very first** LUT entry with
+no flat leading region at all. Both are the same function with a different window, which is the useful
+result: **the host's mechanism is parameterised correctly and the window is what must come from the
+scene**, so a hard-coded window would be wrong for MM3D and right for OoT3D. That is an argument for
+carrying the recovered per-scene window and against any constant, and it is now measured on both
+titles rather than reasoned.
+
+Also measured on the same 6780-draw frame: PICA fragment lighting ON on **5100/6780 (75.2%)**, per-draw
+fog mode 5 on **4380/6780 (64.6%)** (the remaining 2400 are mode 0), and still exactly **one** active
+TEV stage on every draw.
+
+**Two honesty limits on the above, both recorded rather than smoothed over.** The frame at the moment
+those numbers were taken is the **dark-blue transition wipe into** the Lost Woods, not the steady
+forest — the forest frame (Link on Epona, confirmed by image) was reached in an earlier run at a
+different point in the sequence, and a later run with 1400 extra frames was still inside the wipe.
+And the reason is a real limitation: **the cutscene drive is sensitive to exact frame counts** and is
+not reproducible frame-for-frame, so "frame N of the Lost Woods" is not yet a stable address the way
+OoT3D's cached gameplay savestate is. The fog figures belong to the Lost Woods *sequence*, and calling
+them the forest's steady state would be asserting something the runs do not show.
+
 What this opens, in the objective's own terms: MM3D now has reachable frames that exercise the
 families the campaign cares about — scene fog with a real palette, a skinned character model, alpha
 foliage, multiple texture units, and depth — **without a gameplay `PlayState`**. It does *not* open
