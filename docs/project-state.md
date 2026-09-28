@@ -582,6 +582,20 @@ opening is not a scene ZSI at all.
 
 **The apparent register discrepancy is resolved: there is only ONE register.** `soh3d_fog_dump` (`pica_core.cpp:994`) and the per-draw `fog=` field (`pica_core.cpp:414-421`) both read the same triple -- `regs.internal.texturing.{fog_mode, fog_flip, fog_color}` -- so "the frame-level register says mode=0 and the per-draw field says mode=5" is not two registers disagreeing, it is **one register sampled at two different times**. `az_fog` is a snapshot taken whenever the command is issued, which lands between draws, when the game has just cleared the texturing fog state; the per-draw field is read *inside* `WriteInternalReg` at the `trigger_draw` hunk, so it reports what the draw actually used. The per-draw field is therefore the authority for every fog question, and an `az_fog` reading of `mode=0` is **not** evidence that fog is off. This is the same trap this project already recorded for the host side -- read `az_fog` after a frame, never before -- arriving from the other direction.
 
+**MM3D's PICA raster state is now measurable from live registers, and the answer has a sharp edge.**
+Over **667 draws across frames 1200–3800**, MM3D's opening uses **exactly one active TEV stage on every
+draw (667/667); zero draws use more than one.** Stage-0 operations are op 1 (526), op 0 (66), op 8 (58),
+op 2 (12), op 9 (5) — five distinct ops, 27 distinct sources — and the per-frame spread is stable, so no
+one atypical frame carries it. Texture units, by contrast, genuinely are multi-unit: 538 draws bind one
+unit, **91 bind two and 27 bind three**, across 8 distinct texture0 formats.
+
+The sharp edge: **this is the OPENING, not gameplay**, so it bounds what is reached rather than
+measuring it, and it means **a host validated only against MM3D's opening would never once execute TEV
+stage 1 or later.** It is evidence that the single-stage path is reached, and explicitly *not* evidence
+that the multi-stage path is right — that evidence remains the corpus survey plus Zora water's 3-stage
+chain checked against live OoT3D registers. Recorded here so nobody later reads a green MM3D comparison
+as multi-stage coverage.
+
 **A census that was discarded, not reported.** MM3D's per-draw log carries a field named
 `texMappingMethod`, and reading its first component as an integer yields a tidy-looking distribution
 (`1`: 638, `0`: 20, `3`: 9 on unit 0) that reads exactly like the mapping-method population the
