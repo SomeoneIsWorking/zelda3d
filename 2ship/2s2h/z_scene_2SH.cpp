@@ -38,6 +38,7 @@
 #include "2s2h/resource/type/scenecommand/SetMinimapChests.h"
 #include "2s2h/resource/type/scenecommand/SetCsCamera.h"
 #include "2s2h/zelda3d/mm3d_collision.h"
+#include "2s2h/zelda3d/mm3d_scene_lighting.h"
 
 s32 OTRScene_ExecuteCommands(PlayState* play, SOH::Scene* scene);
 
@@ -277,11 +278,43 @@ void Scene_CommandTransiActorList(PlayState* play, SOH::ISceneCommand* cmd) {
     MapDisp_InitTransitionActorData(play, play->transitionActors.count, play->transitionActors.list);
 }
 
+// The 0x16 stride is the load-bearing fact behind the MM3D lighting substitution, and it is asserted
+// here rather than left as a comment: `EnvLightSettings`'s own header documents 0x16 in a comment
+// only, and if the struct ever gains or loses a field the substitution would start reading slot 0
+// correctly and every later slot at the wrong offset -- a plausible frame, not a build error. The cast
+// in Scene_CommandEnvLightSettings is unchecked by construction, so this is the only thing that can
+// catch it.
+static_assert(sizeof(EnvLightSettings) == 0x16, "EnvLightSettings must stay 0x16; MM3D's lighting "
+                                              "substitution indexes it by this stride");
+static_assert(sizeof(Mm3dEnvLightSettings) == 0x16,
+              "Mm3dEnvLightSettings must match EnvLightSettings exactly, stride included");
+
 void Scene_CommandEnvLightSettings(PlayState* play, SOH::ISceneCommand* cmd) {
     SOH::SetLightingSettings* lightSettings = (SOH::SetLightingSettings*)cmd;
 
     play->envCtx.numLightSettings = lightSettings->settings.size();
     play->envCtx.lightSettingsList = (EnvLightSettings*)lightSettings->GetRawPointer();
+
+    // MM3D (3DS) per-scene lighting: install the recovered 3DS records INSTEAD of the N64 list.
+    //
+    // This is a data substitution, deliberately with no blend arithmetic here. MM's own z_kankyo
+    // computes the whole environment blend -- the time LERP, the config LERP, and the additive
+    // `adjLightSettings` term -- from this one pointer, and `func_800F6CEC` takes the list as a
+    // parameter, so the additive term derives from whatever is installed. Re-deriving MM's blend in a
+    // zelda3d module would be a second, divergent copy of game logic that already works.
+    //
+    // The records are the 0x16 N64 shape, not the 0x20 ROM record: `EnvLightSettings` is 0x16 bytes and
+    // z_kankyo indexes `lightSettingsList[i]`, so substituting 0x20 data would read slot 0 correctly
+    // and every later slot at the wrong offset -- a plausible frame rather than a crash.
+    //
+    // Scenes with no recovered palette keep the N64 list, which is the correct fallback rather than a
+    // failure: 11 of MM's 113 scene-table entries have no 3DS palette yet.
+    u8 mm3dCount = 0;
+    const Mm3dEnvLightSettings* mm3dList = Mm3d_SceneEnvList(play->sceneId, &mm3dCount);
+    if (mm3dList != NULL) {
+        play->envCtx.numLightSettings = mm3dCount;
+        play->envCtx.lightSettingsList = (EnvLightSettings*)mm3dList;
+    }
 }
 
 void Scene_CommandTimeSettings(PlayState* play, SOH::ISceneCommand* cmd) {

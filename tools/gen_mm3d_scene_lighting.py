@@ -86,6 +86,8 @@ class Layout:
     dir1: int
     col1: int
     fogcol: int
+    #: offset of the packed `blendRateAndFogNear` (MM) / `blendRate|fogNear` (OoT3D) u16
+    blend_fognear: int
 
     def ok(self, blob: bytes, count: int, ptr: int) -> bool:
         base = ptr + self.record_base
@@ -95,13 +97,13 @@ class Layout:
 MM3D = Layout(
     name="MM3D", record_base=0x28, stride=0x20,
     zfar=0x00, fogfar=0x04, fognear=0x08,
-    ambient=0x0B, dir0=0x0E, col0=0x11, dir1=0x14, col1=0x17, fogcol=0x1A,
+    ambient=0x0B, dir0=0x0E, col0=0x11, dir1=0x14, col1=0x17, fogcol=0x1A, blend_fognear=0x08,
 )
 
 OOT3D = Layout(
     name="OoT3D", record_base=0x10, stride=0x1C,
     zfar=0x00, fogfar=0x04, fognear=0x08,
-    ambient=0x0A, dir0=0x0D, col0=0x10, dir1=0x13, col1=0x16, fogcol=0x19,
+    ambient=0x0A, dir0=0x0D, col0=0x10, dir1=0x13, col1=0x16, fogcol=0x19, blend_fognear=0x08,
 )
 
 LAYOUTS = (MM3D, OOT3D)
@@ -135,6 +137,48 @@ def maybe_inflate(raw: bytes) -> bytes:
     return lzs_decompress(raw) if lzs_is_compressed(raw) else raw
 
 
+# ---------------------------------------------------------------------------------------------
+# The N64-shaped projection: what MM's own blend can actually consume.
+#
+# MM's blend reads ONE list, `play->envCtx.lightSettingsList`, indexed `lightSettingsList[i]`, and
+# `EnvLightSettings` is 0x16 bytes (`2ship/include/z64environment.h:214`). The 3DS record is 0x20.
+# **Substituting the 0x20 table directly would walk it in 0x16 steps: slot 0 would read correctly and
+# every later slot would read the wrong bytes** -- a plausible frame rather than a crash, which is the
+# worst kind of bug and the shape this project keeps meeting. So the table is projected to 0x16 here.
+#
+# The projection is a pure rearrangement, not a reinterpretation: MM's N64 struct IS the 3DS record's
+# tail byte-for-byte, so `ambientColor`..`fogColor` are copied in the same order, and
+# `blendRateAndFogNear` is the 3DS `u16 fogNear | blendRate<<10` verbatim. Only `zFar` changes
+# representation -- f32 on the 3DS side, s16 in the N64 struct -- and that is a CLAMP, not a cast, so
+# a value outside s16 is reported rather than silently wrapped.
+#
+# The 3DS-only distances (`f32 zFar`, `f32 fogFar`) are what drive the PICA fog window and are NOT
+# representable in the N64 struct at all, so they go to a parallel array indexed the same way. They
+# are not optional: `z2_lost_woods` slot 2's window is what predicts MM3D's authored fog LUT to 1.19
+# byte steps (`tools/mm3d_fog_prediction.py`), and that prediction reads these values.
+# ---------------------------------------------------------------------------------------------
+
+N64_ENV_STRIDE = 0x16
+S16_MIN, S16_MAX = -32768, 32767
+
+
+def project_to_n64(slot: dict) -> tuple[list[int], int | None]:
+    """(the 9 s16/u8 triples of an `EnvLightSettings`, clamped zFar) or (values, None).
+
+    Field order is `2ship/include/z64environment.h:205-214`, and it is dir-BEFORE-colour in every
+    group -- the same order the recovered 3DS record already stores, which is why this is a
+    rearrangement rather than a fixup.
+    """
+    values: list[int] = []
+    for key in ("amb", "l0dir", "l0col", "l1dir", "l1col", "fogcol"):
+        values.extend(int(v) for v in slot[key])
+    values.append(int(slot["blendratefognear"]) & 0xFFFF)  # s16, two's complement
+    zfar = int(round(slot["zfar"]))
+    clamped = None if S16_MIN <= zfar <= S16_MAX else (S16_MAX if zfar > 0 else S16_MIN)
+    values.append(zfar if clamped is None else clamped)
+    return values, clamped
+
+
 def parse_env(raw: bytes, layout: Layout) -> list[dict]:
     """Decode a scene ZSI's env records under `layout`, or [] if it has none / they do not fit."""
     blob = maybe_inflate(raw)
@@ -156,6 +200,7 @@ def parse_env(raw: bytes, layout: Layout) -> list[dict]:
             "l1col": _u8x3(blob, o + layout.col1),
             "fogcol": _u8x3(blob, o + layout.fogcol),
             "fognear": struct.unpack_from("<H", blob, o + layout.fognear)[0] & 0x3FF,
+            "blendratefognear": struct.unpack_from("<H", blob, o + layout.blend_fognear)[0],
             "fogfar": struct.unpack_from("<f", blob, o + layout.fogfar)[0],
             "zfar": struct.unpack_from("<f", blob, o + layout.zfar)[0],
         })
@@ -255,6 +300,8 @@ def main() -> int:
         out.write("// is the recorded-but-wrong negative this table replaces.\n")
         out.write(f"// {mapped}/{len(rows)} scenes have a palette.\n\n")
         emitted: dict[str, str] = {}
+        emitted_env: dict[str, str] = {}
+        clamped_slots = 0
         for name in sorted(parsed):
             slots = parsed[name]
             if not slots:
@@ -269,6 +316,31 @@ def main() -> int:
                         *s["amb"], *s["l0dir"], *s["l0col"], *s["l1dir"], *s["l1col"],
                         *s["fogcol"], s["fognear"], s["fogfar"], s["zfar"]))
             out.write("};\n")
+        # The N64-shaped projection, at 0x16 stride, for the list substitution.
+        #
+        # A 3DS f32 zFar can exceed the N64 struct's s16 zFar -- real values reach 60000 against a
+        # 32767 ceiling -- so 35 of the 102 scenes have at least one slot that cannot be represented
+        # exactly. Those slots are CLAMPED and counted rather than wrapped and not counted: wrapping
+        # would compile and would be silently wrong, and skipping the whole scene would make the port
+        # cover less than the data supports when the loss is bounded and reportable. The clamp is a
+        # limit of the N64 *struct*, not an error in the 3DS data, and the PICA fog window is NOT
+        # affected: it reads the f32 from the 0x20 table above, not the s16 from this projection.
+        out.write("\n// N64-shaped projection for the lightSettingsList substitution. 0x16 stride,\n")
+        out.write("// matching 2ship/include/z64environment.h exactly; see project_to_n64().\n")
+        for name in sorted(parsed):
+            slots = parsed[name]
+            if not slots:
+                continue
+            projected = [project_to_n64(s) for s in slots]
+            clamped_slots += sum(1 for _v, c in projected if c is not None)
+            sym = "kMm3dEnv_" + re.sub(r"[^A-Za-z0-9_]", "_", name)
+            out.write(f"static const Mm3dEnvLightSettings {sym}[] = {{ // {name}\n")
+            for values, _c in projected:
+                out.write("    {" + ",".join(str(v) for v in values[:18]) + ","
+                          + ",".join(str(v) for v in values[18:]) + "},\n")
+            out.write("};\n")
+            emitted_env[name] = sym
+
         out.write("\nstatic const Zelda3dSceneLight kMm3dSceneLighting[] = {\n")
         for num, enum, name in rows:
             if name and parsed.get(name):
@@ -278,8 +350,33 @@ def main() -> int:
                 out.write(f"    /* 0x{num:02X} {enum:<40} */ {{ 0, 0 }},\n")
         out.write("};\n")
 
+        # The substitution index: sceneNum -> (count, 0x16-stride array). This is what MM's own
+        # Scene_CommandEnvLightSettings installs in place of the N64 list, and it is indexed by the
+        # SAME sceneNum as kMm3dSceneLighting so one lookup serves both the colours and the PICA window.
+        out.write("\nstatic const Mm3dEnvList kMm3dEnvList[] = {\n")
+        for num, enum, name in rows:
+            if name and name in emitted_env:
+                out.write(f"    /* 0x{num:02X} {enum:<40} */ {{ {len(parsed[name])}, "
+                          f"{emitted_env[name]} }},\n")
+            else:
+                out.write(f"    /* 0x{num:02X} {enum:<40} */ {{ 0, 0 }},\n")
+        out.write("};\n")
+
+        # The clamp is a generator-side FACT, emitted rather than re-derived at runtime: a clamped slot
+        # lands on S16_MAX, which is indistinguishable from a legitimately huge zFar, so no consumer
+        # could detect it by inspection. Recording the count makes the loss visible without every
+        # reader having to diff the ROM against the table.
+        out.write(f"\n/// {clamped_slots} of the emitted slots had an f32 zFar past the N64 struct's s16\n"
+                  f"/// range and were clamped. The PICA fog window reads the f32 from "
+                  f"kMm3dSceneLighting and is unaffected.\n"
+                  f"#define MM3D_CLAMPED_ZFAR_SLOTS {clamped_slots}\n")
+
     print(f"wrote {OUT}: {mapped}/{len(rows)} scenes have a palette "
-          f"({compressed}/{variants_consulted} ZSI variants read were LzS-compressed)")
+          f"({compressed}/{variants_consulted} ZSI variants read were LzS-compressed); "
+          f"{len(emitted_env)} have a 0x16-stride N64 projection"
+          + (f"; {clamped_slots} slot(s) had an f32 zFar past the N64 struct's s16 range and were "
+             "CLAMPED (counted, not wrapped -- the PICA window reads the f32 and is unaffected)"
+             if clamped_slots else ""))
     rom.fp.close()
     return 0
 
