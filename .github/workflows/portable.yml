@@ -96,6 +96,7 @@ jobs:
           tools.test_sdl3gpu_renderer_structure
           tools.test_unified_carryage_audit
           tools.test_ctr_oracle_rom
+          tools.test_harness_rom_environment
           tools.test_gen_scene_names
           tools.test_mm_python_structure
           tools.test_portable_native_contracts

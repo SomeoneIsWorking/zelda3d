@@ -140,6 +140,15 @@ class TheControlIsAMenuWithNothingToFlip(unittest.TestCase):
             self.skipTest("no OoT3D ROM in the environment")
         flags = rom_mod.read_flags(Path(rom))
         self.assertEqual(flags >> 2 & 1, 1, "OoT3D's dump is the known-good control: it must load")
+        self.assertEqual(rom_mod.read_media_id(Path(rom)), rom_mod.OOT3D_MEDIA_ID)
+
+    def test_a_real_mm3d_image_is_recognised_as_mm3d(self) -> None:
+        """The provisioning policy keys on the media ID, so the real image must resolve to MM3D."""
+        rom = os.environ.get("ZELDA3D_MM3D_ROM")
+        if not rom or not Path(rom).is_file():
+            self.skipTest("no MM3D ROM in the environment")
+        self.assertEqual(rom_mod.read_media_id(Path(rom)), rom_mod.MM3D_MEDIA_ID)
+        self.assertNotEqual(rom_mod.read_media_id(Path(rom)), rom_mod.OOT3D_MEDIA_ID)
 
 
 class TheCommandLineRefusesRatherThanGuesses(unittest.TestCase):

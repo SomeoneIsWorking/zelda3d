@@ -53,14 +53,49 @@ NCCH_MAGIC_SEARCH = 0x800  # how far into the partition to accept the magic for 
 NCCH_FLAGS_OFFSET = NCCH_BASE + 0x18F
 NO_CRYPTO_BIT = 0x04
 
+# The media ID is the 3DS container's own identity field, and it is what distinguishes a game's image
+# from the other's. Reading it is strictly better than trusting a filename: with both a 3DS release
+# and its N64 counterpart in play, a glob like `*.3ds` can hand one game's ROM to the other game's
+# oracle, and every reading taken through it is then confidently about the wrong game.
+#
+# The two values below were each measured off the real images and cross-checked against the program
+# ID the same header carries (OoT3D `0x0004000000033500`, MM3D `0x0004000000125500`).
+NCCH_MEDIA_ID_OFFSET = NCCH_BASE + 0x150
+OOT3D_MEDIA_ID = b"CTR-P-AQEE"
+MM3D_MEDIA_ID = b"CTR-P-AJRE"
 
-def read_flags(path: Path) -> int:
-    """The NCCH `flags` byte of partition 0, or raise if this is not the layout assumed.
 
-    Refusing is the point: flipping a bit at a guessed offset in a container we do not understand is
-    how a ROM gets corrupted, and the failure is silent because the emulator's own complaint
-    (`ErrorEncrypted`) arrives through a libretro message callback nobody handles.
+def read_media_id(path: Path) -> bytes:
+    """The image's NCCH media ID, e.g. `CTR-P-AQEE`, or raise if this is not the assumed layout.
+
+    The field is 11 bytes of NUL-padded ASCII — `CTR-P-AQEE` is 10 characters plus its terminator —
+    so it is read as text and right-stripped. Comparing raw field bytes against a 10-character
+    constant fails, and reading a fixed 10 bytes would silently ignore the padding rather than fix it.
     """
+    _require_ncch(path)
+    with path.open("rb") as handle:
+        handle.seek(NCCH_MEDIA_ID_OFFSET)
+        return handle.read(11).rstrip(b"\x00")
+
+
+def describe(path: Path) -> str:
+    """A one-line identity summary, for logs and for refusing an ambiguous drop-in.
+
+    Deliberately only the two fields verified against both real images: the media ID and the
+    `no_crypto` flag. The header also carries the 64-bit program ID, but its byte order is not
+    established here — a first attempt at it read byte-swapped, and an unverified field in a
+    diagnostic is exactly how a confident wrong reading gets made downstream. It is left out rather
+    than shipped approximately.
+    """
+    try:
+        media = read_media_id(path).decode("ascii", "replace")
+        flags = read_flags(path)
+    except ValueError as error:
+        return f"unidentified ({error})"
+    return f"{media} no_crypto={flags >> 2 & 1}"
+
+
+def _require_ncch(path: Path) -> None:
     with path.open("rb") as handle:
         handle.seek(NCCH_BASE)
         window = handle.read(NCCH_MAGIC_SEARCH)
@@ -69,7 +104,16 @@ def read_flags(path: Path) -> int:
             f"{path}: no NCCH header within 0x{NCCH_MAGIC_SEARCH:x} of partition 0 "
             f"(0x{NCCH_BASE:x}); refusing to guess a layout"
         )
-    handle_offset = window.index(b"NCCH")
+
+
+def read_flags(path: Path) -> int:
+    """The NCCH `flags` byte of partition 0, or raise if this is not the layout assumed.
+
+    Refusing is the point: flipping a bit at a guessed offset in a container we do not understand is
+    how a ROM gets corrupted, and the failure is silent because the emulator's own complaint
+    (`ErrorEncrypted`) arrives through a libretro message callback nobody handles.
+    """
+    _require_ncch(path)
     with path.open("rb") as handle:
         handle.seek(NCCH_FLAGS_OFFSET)
         return handle.read(1)[0]
