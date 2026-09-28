@@ -701,8 +701,36 @@ still need MM3D's own recovered addresses, and `docs/issues/0023` still applies 
 state. But "MM has zero visual evidence" and "MM has no oracle capture" are both now false, and
 `render.mm-scene-coverage` has a reachable surface.
 
-**The fog-colour join to the recovered table FAILS, and the failure has a cause that is already
-recorded.** The Lost Woods frame's `(40,140,220)` is not a table value (495 distinct `fogCol` values
+**The fog-colour join is REFUTED, and the reason is now a PROOF rather than a suspicion: MM's blend
+rule is ADDITIVE, so its result is not a convex combination of the table's colours at any weight.**
+MM blends `list[slot] + spA4[...]` for four sources, then time-LERPs the two pairs, then config-LERPs
+(`2ship/src/code/z_kankyo.c:1394`), where `spA4` is `adjLightSettings` — the *difference* between
+adjacent light settings. Adding a difference moves the result **outside** the convex hull of the raw
+slot values, so no interpolation over the table can reproduce it, and the correct instrument is not a
+blend at all.
+
+That was tested rather than argued. With the correct `fogCol` values read from the right capture
+groups — `(90,133,180) (28,20,0) (0,0,30) (5,55,75) (130,180,180) (28,20,0) (0,0,30) (114,115,101)` —
+the live `(40,140,220)` is **not inside the convex hull of any 4 of them**, and the control says the
+miss is meaningful: only **1 of 60 random colours** is reachable in that hull, so this is a sparse
+space rather than one where everything matches. (The first run of that test read the wrong capture
+groups and got `(amb[0], amb[1], fogCol[0])` — a plausible triple from the wrong field. Same shape as
+the `proj0`/`proj2` and `dif0`/`picaLit` mistakes earlier this session.)
+
+**The window and the colour now have different verdicts, and keeping them apart is the point:**
+
+| recovered field | verdict on live MM3D hardware |
+| --- | --- |
+| `fogNear`/`fogFar`/`zFar` (slot 2) | **PREDICTS the authored LUT to 1.19 byte steps** |
+| `fogCol` (all 8 slots) | **not reachable by any interpolation** — MM's rule is additive |
+
+So the fog *curve* is implementable now, from the recovered table and the existing host mechanism. The
+fog *colour* is not derivable from the table at all and requires MM's runtime `adjLightSettings` —
+which is the submission. Those are separable: the host's `Zelda3D_Fog3dSet` takes the window, and the
+colour is a separate field, so the window half of MM's fog can land without the colour half and
+**must not be reported as MM fog parity** until the colour joins too.
+
+ The Lost Woods frame's `(40,140,220)` is not a table value (495 distinct `fogCol` values
 across 1509 slots, 0 matches), and it is not a convex combination of **any pair** of them either, at a
 2-per-channel tolerance. The control says the test could have detected a hit: **35% of random colours
 are also reachable from some pair**, so the colour space is dense enough that a match would mean
