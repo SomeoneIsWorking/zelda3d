@@ -747,6 +747,36 @@ a gameplay `PlayState`. `docs/issues/0023` still governs reaching gameplay, and 
 commands still need MM3D's own recovered addresses — but the cutscene-reachable 3D surface is now
 stable enough to carry recorded oracle evidence.
 
+**Is the shipped `fog3dNode` form right for MM3D? OPEN, and the control is what says so rather than
+the fit.** The mechanism was recovered and validated on OoT3D — one `fog3dNode` on both host routes,
+reproducing OoT3D's measured LUT node values byte-exactly at the Zora window. Whether that same
+functional form is right for **MM3D** is a separate question, because MM3D is a different game with its
+own material compiler. With a reproducible MM3D state the question became cheap to ask, and the
+attempt to answer it is recorded because **the answer was "this test cannot decide", and the reason it
+cannot is the useful part.**
+
+* **Measured**: MM3D's 128-entry LUT runs 0.9971 at entry 0 to **0.4915** at entry 127, with a **knee in
+  the last ~8 entries** — 0.979 at 104, 0.968 at 112, 0.934 at 120, then 0.4915 at 127. That is a
+  visibly different shape from OoT3D's Zora case, which was flat 1.0 through entry 125 and 0.979 at
+  127. **The knee is solid** and it is a port-relevant shape difference: a host whose fog was shaped only
+  against OoT3D would mis-render MM3D's fog near the far plane.
+* **The fit is noise, and the control proved it.** A 4-parameter search over
+  `(zFar, scale, fogNear, fogFar)` scored mean-abs 0.01329 on MM3D's real LUT and **0.01669 on a
+  SHUFFLED** one. Those do not separate, so the fit demonstrates nothing — a 4-parameter search against
+  128 points will always find something. The fitted curve is also visibly wrong where it matters,
+  predicting 0.981 at entry 120 against a measured 0.934 and missing the plunge entirely, and it landed
+  on the coarse grid's edge (`zFar=1000`, `fogNear`/`fogFar` 60/63), so the search was under-resolved as
+  well as under-controlled.
+* **What would decide it**: evaluate the form with MM3D's **actual** window and no fitting at all. The
+  window (`fogNear`/`fogFar`/`zFar`) is in the scene record, and the Lost Woods *cutscene*'s palette is
+  not in the recovered table — the colour join already failed for a recorded reason (MM's additive
+  `adjLightSettings` term, plus a cutscene-specific palette). So the deciding input is MM3D's runtime
+  env values for that state, which is the same missing input as the submission.
+
+So: **MM3D fog is comparable (the dynamic range is real) and the mechanism is unverified for MM3D.**
+Both halves are recorded together, because "comparable" and "verified" are different claims and
+conflating them is how a wrong port gets declared done.
+
 **A census that was discarded, not reported.** MM3D's per-draw log carries a field named
 `texMappingMethod`, and reading its first component as an integer yields a tidy-looking distribution
 (`1`: 638, `0`: 20, `3`: 9 on unit 0) that reads exactly like the mapping-method population the
