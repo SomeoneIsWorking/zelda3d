@@ -164,6 +164,40 @@ extern "C" s32 Zelda3D_MmFogReplDispatch(PlayState* play, const char* command, Z
         }
         return 1;
     }
+    if (Zelda3D_MmReplMatch(command, "fogslot", &args)) {
+        s32 slot = 0;
+        if (!Zelda3D_MmReplParseI32(&args, 0, &slot) || !Zelda3D_MmReplArgsEnd(&args)) {
+            reply("usage: fogslot <n>   (0 disables the override)", user);
+            return 1;
+        }
+        if (play == nullptr) {
+            reply("fogslot err (no PlayState)", user);
+            return 1;
+        }
+        // MM's own public entry points, not a field write. The game then blends to the requested
+        // setting through its real `lightBlend` / `changeDuration` path on the following frames, so
+        // the state is reached the way the game reaches it -- this is a controlled setup for a
+        // coordinate-matched A/B, and is labelled as such wherever it is used as evidence.
+        if (slot == 0) {
+            Environment_DisableUnderwaterLights(play);
+        } else {
+            Environment_EnableUnderwaterLights(play, slot);
+        }
+        // Report what the game ACTUALLY did, not that the call returned. `EnableUnderwaterLights`
+        // only acts when the override is currently NONE and a private latch is clear, so a request
+        // can be a silent no-op -- and "ok" on a no-op is exactly the kind of diagnostic that makes a
+        // later measurement look like a failed fix when nothing was ever attempted.
+        const EnvironmentContext& env = play->envCtx;
+        const bool landed = (slot == 0) ? (env.lightSettingOverride == LIGHT_SETTING_OVERRIDE_NONE)
+                                        : (env.lightSettingOverride == slot);
+        reply(fmt::format("{} fogslot requested={} override={} lightSetting={} prev={} blend={:.3f} blendEnabled={}",
+                          landed ? "ok" : "REFUSED", slot, static_cast<int>(env.lightSettingOverride),
+                          static_cast<int>(env.lightSetting), static_cast<int>(env.prevLightSetting),
+                          static_cast<double>(env.lightBlend), env.lightBlendEnabled)
+                  .c_str(),
+              user);
+        return 1;
+    }
     if (!Zelda3D_MmReplMatch(command, "fog", &args)) {
         return 0;
     }
