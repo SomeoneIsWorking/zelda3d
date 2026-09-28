@@ -100,10 +100,24 @@ POSE column is noted. **Last swept 2026-07-15T12:36Z.**
 |---|---|---|---|---|
 | MM Link idle / walk / run via `Zelda3D_PlayerForce*` hooks | CLOSED-parity (by-construction) | Force* hook installs the literal RE'd body of the real installer (`func_80839E74`/`func_8083A794`) — verified by reading the installer, no external oracle exists yet | `f5740ff1` | 2026-07-15 |
 
-> MM parity is "by construction" (matches the decomp source it was ported from), NOT oracle-verified
-> against MM3D visuals — no MM3D player oracle exists yet. This is a weaker CLOSED than the OoT rows;
-> a real MM3D A/B would upgrade it. It is closed only in the sense "the ported state = the decomp's
-> state"; the whole MM visual-parity surface is OPEN.
+> MM parity was "by construction" (matches the decomp source it was ported from), NOT oracle-verified
+> against MM3D visuals, because no MM3D player oracle existed. **That is no longer the reason.**
+> MM3D boots in the Azahar oracle: the harness is game-agnostic and takes a ROM path with no identity
+> check, and MM3D's image needed its NCCH `no_crypto` header bit set **in a copy**
+> (`tools/ctr_oracle_rom.py`, 13 tests) before the emulator would load it. Frames, `run`, `mem`,
+> `az_fog` and the PICA draw logs all work today. So an MM3D A/B is now *available* — the rows above
+> are still "by construction" because nobody has run the A/B, not because the oracle is missing.
+>
+> What is still genuinely unavailable for MM3D, and is a different gap from the above: the **high-level**
+> harness commands (`playstate`, `scene`, `actors`, `warp`, `az_daytime`) resolve addresses through
+> OoT3D's `oracle_layout.h`, so MM3D needs its own recovered addresses; and MM3D has no gameplay state
+> (`docs/issues/0023` applies to it verbatim), so no MM3D A/B can yet be taken at a *gameplay* state.
+>
+> The first MM3D oracle readings, recorded 2026-09-28: PICA fog is scene-driven — `(0,0,0)` to frame
+> 1600, `(187,110,110)` from 1800, `(90,110,0)` from 3600 — and fragment lighting is on for
+> **116–143 of 131–161 draws per frame** (frames 1200–3800) with `config0=0x80000400` 12/12,
+> `max_light_index=1` 12/12, and `config1` `0xff7fffff` 11/12 vs `0xff7effff` 1/12. See
+> `docs/project-state.md` S003/S005 and `oot3d-decomp/docs/fragment_lighting.md`.
 
 ### Gameplay scene parity (Kokiri Forest) — closed 2026-07-22
 
