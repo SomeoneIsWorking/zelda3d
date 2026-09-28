@@ -448,6 +448,34 @@ inputs; it does not supply the counterfactual a port must be checked against, an
 enables fragment lighting (0 of 207 draws on `regs.lighting.disable`), so that check is still behind
 issue #23. The 0x1CC-vs-0x4C8 stride conflict is also unchanged.
 
+**The fragment-lighting counterfactual is now blocked for three measured reasons, not one hint.**
+The recorded reason was a *state* argument — 0 of 207 title draws on the authoritative
+`regs.lighting.disable` register. Two more, and the second is a content fact:
+
+* **The title's content contains no fragment-lit material at all.** The 205 fragment-lit OoT3D
+  materials live in 150 files, and `/scene/spot99_info.zsi` — the title's own scene — has **none**. So
+  even a perfect title route with every draw captured could not produce a fragment-lit fixture: there
+  is no material in that scene that asks for one. That is a property of the retail content, not of the
+  route, and it is why "spend more title-side effort" is the wrong instruction rather than a hard one.
+* **The equipment screen is the only large fragment-lit population reachable without gameplay, and
+  the title does not enter a menu to reach it.** `menu_link_ura.cmb` and `menu_link_omote.cmb` are
+  30 of the 205 — the equipment screen's Link model. Reaching it needs the menu, and pressing START
+  mid-title does nothing (the title is a **scripted playback**, so input is ignored until the script
+  ends); running the host title past `cs=2400` to its end and pressing START there leaves the same
+  scene — 65 draws, one model, `fragLit=0` on all of them, static camera, cursor still advancing past
+  the script's end. The host never transitions out of the title presentation, matching the recorded
+  oracle behaviour ("Start at the logo → 200 frames black → sky-only screen, stuck 2400+ frames").
+* **MM3D cannot supply one either, for a different reason.** MM has 6,428 of 6,791 materials
+  fragment-lit, so it needs no rare fixture — it needs any MM3D scene, and MM3D has **no oracle capture
+  at all**. That is a different blocker from OoT3D's and must not be folded into it: OoT3D is blocked
+  on reaching gameplay, MM3D on having any image to compare against.
+
+The instrument that made the second one measurable is `fragLit=` on the per-draw `[Zelda3D_SG] draw N`
+list, added this turn: the corpus says which materials carry the flag, and the draw list says which of
+them were actually drawn, so "no fragment-lit draw" is now a per-frame number instead of an inference
+from a register. What would open it is a state that already has a menu — the equipment screen is worth
+30 of 205 materials in one reachable place — or, for MM3D, any MM3D frame at all.
+
 **Majora's Mask has no PICA distance fog at all, and the natural fix is refuted.** `Zelda3D_Fog3dSet` is
 called only from the SoH layer (`title_lighting.cpp`, `lighting/zelda3d_lighting.c`) and never from
 `2ship/`, so `gZelda3dFog3dOn` stays 0 for the whole game and every MM draw is unfogged on both
