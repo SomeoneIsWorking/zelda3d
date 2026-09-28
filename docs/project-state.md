@@ -415,6 +415,39 @@ matched against the host's two-enabled-slot model instead of assumed equal; and 
 one. The configuration counterfactual still needs one lit material, and the title demo never enables
 fragment lighting (0 of 207 draws, `picaLit` register), so that half remains behind issue #23.
 
+**The per-draw fragment-lighting path is now fully read, and it has one missing input, not an RE
+blocker.** `FUN_003fa34c` (672 B) is short enough to state completely: gate on `material[+0x00]`, set
+`object[+0x164 + i] = 1` for each of **three** light slots whose `+0xE4` equals `1.0f`, compute
+`object[+0x10..+0x12]` as a clamp+scale of the material's own `+0xA0/+0xA4/+0xA6`, and call
+`FUN_00308498` — the already-confirmed chain. `FUN_003fa5d0` (1608 B) is the same routine with the full
+per-slot pack, and negates the slot direction inside the same enable test, so what it submits is
+light-TRAVEL.
+
+Three of the four inputs are already in the host's parsed data — the gate is
+`CmbMaterial::fragment_lighting` (205/11172 OoT3D, 6428/6791 MM3D, both re-measured this turn), the
+`object[+0x10..+0x12]` terms are `mat_ambient`/`mat_diffuse`, and the mode bytes are
+`fragment_lighting_descriptor`. The builder is already transcribed and mutation-tested, and the
+fragment-lighting *maths* is the oracle's own software rasterizer rather than a recovered unknown.
+
+**The fourth input is a real finding, and it is a constant where a predicate belongs.** The rig is a
+**three-slot array at stride 0x60**, and the third slot is enabled by the same `+0xE4 == 1.0f` test as
+the first two. `per_draw_light_setup.md` records two opposed directional terms and concludes "the
+standard N64 two-light rig" — true of the two configurations *observed*, and the oracle's per-draw log
+agrees that two slots are occupied in every sample, but nothing in that data distinguishes "two slots"
+from "three slots, third disabled every time". The host encodes the observation: `Zelda3D_GL_
+SetLightParams(ambient, light1Color, light2Direction, light2Color, 2)` passes a literal `2` that becomes
+the enabled-slot count. That is right for every configuration measured and **silently drops a third
+slot** if one is ever enabled. Recorded rather than attempted: the honest claim is "three slots, we
+observe two", and widening the light-bank UBO on an unverified third slot is the same shape of
+speculative change as the `+0x138` misreading above. The `+0xE4` producer is also not in the
+decompiled set (1,321 of the image's functions), so "which field is `+0xE4`" stays open — the *rule* is
+read from its consumer, which is enough to evaluate the predicate once the producer is found.
+
+**This does not license aliasing `FRAGMENT_PRIMARY` to the vertex `PRIMARY`.** The section supplies
+inputs; it does not supply the counterfactual a port must be checked against, and the title demo never
+enables fragment lighting (0 of 207 draws on `regs.lighting.disable`), so that check is still behind
+issue #23. The 0x1CC-vs-0x4C8 stride conflict is also unchanged.
+
 **Majora's Mask has no PICA distance fog at all, and the natural fix is refuted.** `Zelda3D_Fog3dSet` is
 called only from the SoH layer (`title_lighting.cpp`, `lighting/zelda3d_lighting.c`) and never from
 `2ship/`, so `gZelda3dFog3dOn` stays 0 for the whole game and every MM draw is unfogged on both
