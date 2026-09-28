@@ -219,6 +219,12 @@ struct DrawGroup {
     uint32_t first, count;
     int model_group_index = -1;
     int material_index = -1;
+    // The CMB's own fragment-lighting flag (material +0x00, `CmbMaterial::fragment_lighting`; 205 of
+    // 11172 OoT3D materials and 6428 of 6791 MM3D materials set it). Carried per draw because it is
+    // the ONLY per-draw signal that a material is expected to consume PICA fixed-function fragment
+    // lighting, and the draw list is where "did a fragment-lit material actually draw" belongs: the
+    // corpus says which materials are flagged, the draw list says which of them were reached.
+    int fragment_lighting = 0;
     int dual_tex_mode = 0;
     int tev_generic = 0;
     int tex1_index = -1;
@@ -914,6 +920,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         dg.count = grp.count;
         dg.model_group_index = gIdx;
         dg.material_index = grp.materialIndex;
+        dg.fragment_lighting = grp.fragmentLighting;
         dg.dual_tex_mode = grp.dualTexMode;
         dg.tev_generic = grp.tevGeneric;
         dg.tex1_index = grp.tex1Index;
@@ -1042,12 +1049,15 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             // the OoT3D sky cloud band's .cmab rate (#28b) and is 0 for every other draw, so a
             // capture without it cannot distinguish "the band does not scroll" from "no draw asked
             // it to scroll" -- which is exactly the two cases a shader divergence looks alike.
+            // fragLit is here for the same reason: the corpus says which materials carry the
+            // fragment-lighting flag, and only the draw list says which of them were actually drawn.
             fprintf(stderr,
-                    "[Zelda3D_SG] draw %d model=%d group=%d material=%d first=%u count=%u dual=%d tev=%d "
-                    "tex1idx=%d coord0=%d coord1=%d uvScroll=(%.5f,%.5f) tex=%p tex1=%p tex2=%p\n",
-                    drawIdx, modelId, g.model_group_index, g.material_index, g.first, g.count, g.dual_tex_mode,
-                    g.tev_generic, g.tex1_index, g.coord0_mapping, g.coord1_mapping, uvOffU, uvOffV, (const void*)g.tex,
-                    (const void*)g.tex1, (const void*)g.tex2);
+                    "[Zelda3D_SG] draw %d model=%d group=%d material=%d fragLit=%d first=%u count=%u "
+                    "dual=%d tev=%d tex1idx=%d coord0=%d coord1=%d uvScroll=(%.5f,%.5f) "
+                    "tex=%p tex1=%p tex2=%p\n",
+                    drawIdx, modelId, g.model_group_index, g.material_index, g.fragment_lighting, g.first, g.count,
+                    g.dual_tex_mode, g.tev_generic, g.tex1_index, g.coord0_mapping, g.coord1_mapping, uvOffU, uvOffV,
+                    (const void*)g.tex, (const void*)g.tex1, (const void*)g.tex2);
         }
         if (!Zelda3D_SgDrawIsolationIncludes(modelId, drawIdx)) {
             continue; // draw-isolation probe: suppress groups excluded by the active controls
