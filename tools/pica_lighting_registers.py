@@ -340,6 +340,76 @@ def diff_config_words(a: int, b: int, word: str, regmap: LightingRegisterMap | N
     return out
 
 
+def predict_fragment_lighting(
+    slots: list[dict],
+    global_ambient: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    normal: tuple[float, float, float] = (0.0, 0.0, 1.0),
+) -> dict[str, tuple[float, float, float]]:
+    """The REDUCED `ComputeFragmentsColors` for a configuration needing no optional term.
+
+    This is the executable form of what `reduce_lighting` reports, so the port has a reference
+    answer to check against rather than prose. It is only valid when the active-term list is
+    empty (or is exactly `['lut:Distribution0']`, which this does not model -- see the docstring
+    note below), and it is a reference in the same sense `oot3d-decomp/tools/pica_lighting_config.py`
+    is: a transcription of the oracle's own maths, not an independent approximation.
+
+    Mirrors `sw_lighting.cpp` for the no-LUT case, per enabled slot:
+
+        L      = normalize(position)            when directional, else normalize(position + view)
+        n_dot_l= max(dot(L, N), 0)              or abs() when two_sided_diffuse
+        diffuse  += light.diffuse * n_dot_l + light.ambient
+        specular += 1.0 * light.specular_0 + 1.0 * (1,1,1) * light.specular_1
+
+    then `diffuse += global_ambient`, and BOTH outputs are clamped to [0,1].
+
+    The `specular_0 + specular_1` line with no `N·H` factor is the whole point: with
+    `disable_lut_d0 = 1` the emulator leaves `d0_lut_value` at its initial `1.0f`
+    (`sw_lighting.cpp:214`), so the specular is a FLAT additive term. Channel values are the
+    10-bit `LightColor` fields scaled by 1/255 (`regs_lighting.h:88-97`), NOT 1/1023.
+
+    NOT modelled, and refused rather than approximated: the `lut:Distribution0` exception, bump
+    mapping, geometric factors, clamp-highlights, spot/distance attenuation, and shadow. If a
+    configuration needs any of those the reduction above is not the whole story, so this function
+    takes no config and its scope is stated here instead of inferred.
+    """
+    nx, ny, nz = normal
+    diffuse = list(global_ambient)
+    specular = [0.0, 0.0, 0.0]
+    for slot in slots:
+        px, py, pz = slot["position"]
+        length = (px * px + py * py + pz * pz) ** 0.5
+        if length == 0.0:
+            raise ValueError("zero-length light vector; the oracle would divide by zero here")
+        lx, ly, lz = px / length, py / length, pz / length
+        n_dot_l = lx * nx + ly * ny + lz * nz
+        n_dot_l = abs(n_dot_l) if slot.get("two_sided_diffuse") else max(n_dot_l, 0.0)
+        slot_ambient = slot.get("ambient", (0.0, 0.0, 0.0))
+        slot_diffuse = slot.get("diffuse", (0.0, 0.0, 0.0))
+        for c in range(3):
+            diffuse[c] += slot_diffuse[c] * n_dot_l + slot_ambient[c]
+            specular[c] += slot.get("specular_0", (0.0, 0.0, 0.0))[c]
+            specular[c] += slot.get("specular_1", (0.0, 0.0, 0.0))[c]
+    clamp = lambda v: (max(0.0, min(1.0, v[0])), max(0.0, min(1.0, v[1])), max(0.0, min(1.0, v[2])))
+    return {"primary": clamp(diffuse), "secondary": clamp(specular)}
+
+
+# MM3D's two captured lit slots at frame 2000, `oot3d-decomp/docs/fragment_lighting.md` section
+# "What the two lit slots actually contain". 10-bit channels divided by 255, per
+# `LightColor::ToVec3f` (`regs_lighting.h:88-97`). Both slots are `directional` and exactly
+# antiparallel in x, with different colours -- a factor of ~2.3 on the same hue -- so neither a
+# negated-direction nor a copied-colour reduction reproduces them.
+MM3D_CAPTURED_SLOTS: list[dict] = [
+    {"diffuse": (41 / 255, 31 / 255, 26 / 255),
+     "specular_0": (83 / 255, 63 / 255, 53 / 255),
+     "ambient": (0.0, 0.0, 0.0),
+     "position": (-0.9365, 0.0, 0.0), "directional": True},
+    {"diffuse": (96 / 255, 82 / 255, 72 / 255),
+     "specular_0": (193 / 255, 165 / 255, 146 / 255),
+     "ambient": (0.0, 0.0, 0.0),
+     "position": (0.9365, 0.0, 0.0), "directional": True},
+]
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
 

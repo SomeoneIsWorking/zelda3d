@@ -54,6 +54,26 @@ MUTATIONS: list[tuple[str, str, str]] = [
         '_mask(regmap, "config0", "bump_mode")',
         '_mask(regmap, "config0", "bump_selector")',
     ),
+    (
+        "reduced form re-introduces a half-vector specular term",
+        "specular[c] += slot.get(\"specular_0\", (0.0, 0.0, 0.0))[c]",
+        "specular[c] += slot.get(\"specular_0\", (0.0, 0.0, 0.0))[c] * n_dot_l",
+    ),
+    (
+        "reduced form forgets to clamp the outputs",
+        "clamp = lambda v: (max(0.0, min(1.0, v[0])), max(0.0, min(1.0, v[1])), max(0.0, min(1.0, v[2])))",
+        "clamp = lambda v: v",
+    ),
+    (
+        "light direction is not normalised",
+        "lx, ly, lz = px / length, py / length, pz / length",
+        "lx, ly, lz = px, py, pz",
+    ),
+    (
+        "global_ambient leaks into the specular output",
+        'return {"primary": clamp(diffuse), "secondary": clamp(specular)}',
+        'return {"primary": clamp(diffuse), "secondary": clamp([specular[c] + global_ambient[c] for c in range(3)])}',
+    ),
 ]
 
 
