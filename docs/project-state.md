@@ -767,6 +767,38 @@ cannot is the useful part.**
   predicting 0.981 at entry 120 against a measured 0.934 and missing the plunge entirely, and it landed
   on the coarse grid's edge (`zFar=1000`, `fogNear`/`fogFar` 60/63), so the search was under-resolved as
   well as under-controlled.
+* **A better instrument than a fit: the derivative.** The LUT dump prints each entry as
+  `value/diff`, and `diff` is that entry's difference from its neighbour — the authored curve's
+  **derivative**, sampled at the same 128 points. A derivative identifies a function family far better
+  than the function does, and it involves no fitting, so there is nothing for a control to have to
+  catch. MM3D's differences:
+
+  | entry | value | diff | | entry | value | diff |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | 0 | 0.9971 | -0.0005 | | 96 | 0.9844 | -0.0010 |
+  | 48 | 0.9946 | -0.0005 | | 104 | 0.9790 | -0.0010 |
+  | 80 | 0.9897 | -0.0005 | | 112 | 0.9678 | -0.0024 |
+  | 88 | 0.9878 | -0.0005 | | 120 | 0.9345 | -0.0098 |
+  | | | | | 127 | 0.4915 | **-0.4919** |
+
+  So MM3D's curve is a **long shallow ramp of about -0.0005 per entry for ~120 entries, then a cliff:
+  the last 7 entries carry a -0.4919 step, essentially the whole remaining drop.** Only **19 distinct
+  difference values** occur across 128 entries, and the slope changes by more than 0.002 at just 7
+  entries (first at 121). So the curve is *steepness-quantised* — the game computes it at coarse
+  precision, not as a smooth per-entry evaluation.
+
+  That is a genuine narrowing, and it cuts both ways. It is **consistent in character** with the host's
+  `1/(zFar - t)` form, which produces exactly this flat-then-cliff shape when the projection's far plane
+  sits at `zFar ≈ 1` in normalised units. But closing the parameters against the host's form
+  **fails algebraically**: with `LUT(0) = 0.9971` and `LUT(127) = 0.4915` the two endpoint equations
+  force `fogNear ≈ 1057 × fogFar`, which contradicts `fogNear < fogFar`. So the family is *not*
+  identified, and the discrepancy is most likely the quantisation above rather than a different curve.
+
+  **The RE target is now a signature rather than a topic**: a routine producing a monotone ramp of about
+  -0.0005 per entry for ~120 of 128 steps, a cliff of about -0.49 in the final 7, and only ~19 distinct
+  slope values. That is searchable in `mm3d-decomp/` by constants and loop bounds, and it is a better
+  thing to look for than "the fog function".
+
 * **What would decide it**: evaluate the form with MM3D's **actual** window and no fitting at all. The
   window (`fogNear`/`fogFar`/`zFar`) is in the scene record, and the Lost Woods *cutscene*'s palette is
   not in the recovered table — the colour join already failed for a recorded reason (MM's additive
