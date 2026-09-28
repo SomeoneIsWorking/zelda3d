@@ -48,79 +48,63 @@ std::string MatchAgainstTable(s16 sceneId, const Zelda3dEnvBlend& blend, f32 fog
     return " | no recovered slot matches (expected mid-blend)";
 }
 
-/// MM's own convex combination of the four recovered slot colours, using the SAME rule the window
-/// uses: Lerp(Lerp(s0,s1,wTime), Lerp(s2,s3,wTime), wConfig).
-///
-/// This is a MEASUREMENT baseline, not a second blend. MM's real colour additionally adds
-/// `adjLightSettings` per source, which is exactly what the residual below is for; reporting the
-/// convex combination AS MM's colour is the mistake this diagnostic exists to avoid.
-std::string TableColourAt(s16 sceneId, const Zelda3dEnvBlend& blend) {
-    const Zelda3dLightSlot* slots[4] = { Mm3d_SceneFogSlot(sceneId, blend.idx[0]),
-                                         Mm3d_SceneFogSlot(sceneId, blend.idx[1]),
-                                         Mm3d_SceneFogSlot(sceneId, blend.idx[2]),
-                                         Mm3d_SceneFogSlot(sceneId, blend.idx[3]) };
-    for (const Zelda3dLightSlot* slot : slots) {
-        if (slot == nullptr) {
-            return "unavailable (a captured index is outside the recovered palette)";
-        }
-    }
-    const float wTime = std::clamp(blend.wTime, 0.0f, 1.0f);
-    const float wConfig = std::clamp(blend.wConfig, 0.0f, 1.0f);
-    float channels[3] = {};
-    for (int c = 0; c < 3; c++) {
-        const auto lerp = [c](const Zelda3dLightSlot* a, const Zelda3dLightSlot* b, float w) {
-            const float lo = static_cast<float>(a->fogCol[c]);
-            const float hi = static_cast<float>(b->fogCol[c]);
-            return lo + (hi - lo) * w;
-        };
-        const float first = lerp(slots[0], slots[1], wTime);
-        const float second = lerp(slots[2], slots[3], wTime);
-        channels[c] = first + (second - first) * wConfig;
-    }
-    return fmt::format("({:.0f},{:.0f},{:.0f})", channels[0], channels[1], channels[2]);
-}
-
 } // namespace
 
-/// Report MM's LIVE blended fog colour beside what the recovered table alone predicts.
+/// Report MM's LIVE fog colour against the record it was actually copied from.
 ///
-/// The gap between them is not something to tune away: it is MM's additive `adjLightSettings` term,
-/// which the 3DS table does not contain and which no interpolation of the table can produce. While MM
-/// could not be run this was an argument; here it is a measurement.
+/// MM's `Environment_UpdateLights` has THREE writers of `envCtx->lightSettings`, and they consume
+/// different things: the time-based branch blends four slots by `skyboxTime`, the plain branch COPIES
+/// `lightSettingsList[envCtx->lightSetting]` when `!lightBlendEnabled`, and a third LERPs
+/// `prevLightSetting` against `lightSetting`. This command therefore names the branch and compares
+/// against that branch's own source.
+///
+/// It has to, and the reason is worth recording: an earlier version of this diagnostic compared the
+/// live colour against a two-LERP over the CAPTURED schedule's four indices, and reported a 239/255
+/// "residual" that read like a missing additive term. It was neither. `spA4` is memset to 0 and
+/// `func_800F6CEC` writes it only for indices in [4,8) or in rain, so with indices below 4 the additive
+/// term is IDENTICALLY ZERO; and the frame in question was produced by the plain branch, not the
+/// time-based one whose indices the capture had recorded. The two data paths are allowed to disagree:
+/// the fog WINDOW is read from the 0x20 table through the captured schedule, while the COLOUR comes
+/// through the substituted 0x16 list and whichever branch ran. A plausible number from a comparison
+/// across two branches is exactly the failure mode this project keeps hitting.
 static void ReplyFogColour(PlayState* play, Zelda3DMmReplReply reply, void* user) {
-    const Zelda3dEnvBlend& blend = gZelda3dEnvBlend;
-    const CurrentEnvLightSettings& live = play->envCtx.lightSettings;
-    std::string line = fmt::format("fogcolour scene={} live=({},{},{})", play->sceneId, live.fogColor[0],
-                                   live.fogColor[1], live.fogColor[2]);
-    const std::string predicted = blend.valid ? TableColourAt(play->sceneId, blend) : std::string("unavailable");
-    line +=
-        fmt::format(" table={} idx={},{},{},{} w=({:.3f},{:.3f})", predicted, blend.idx[0], blend.idx[1], blend.idx[2],
-                    blend.idx[3], static_cast<double>(blend.wTime), static_cast<double>(blend.wConfig));
-    if (predicted.rfind("unavailable", 0) == 0) {
-        reply(line.c_str(), user);
-        return;
-    }
-    // The per-channel residual IS the additive term's contribution to this frame. Reported, not
-    // subtracted: the host still hazes toward the N64 colour, so that gap is still open.
-    const int live0 = live.fogColor[0];
-    const int live1 = live.fogColor[1];
-    const int live2 = live.fogColor[2];
-    const auto channel = [](const std::string& text, int index) {
-        return std::stoi(text.substr(2 + static_cast<std::size_t>(index) * 3, 3));
-    };
-    const int worst = std::max({ std::abs(live0 - channel(predicted, 0)), std::abs(live1 - channel(predicted, 1)),
-                                 std::abs(live2 - channel(predicted, 2)) });
-    line += fmt::format(" | max |residual| = {}", worst);
-    // Which list MM is actually blending. Without this the residual is UNINTERPRETABLE: it could be
-    // the additive `adjLightSettings` term (the expected reading, if the 3DS records are installed),
-    // or simply the difference between the N64 and 3DS palettes (if the substitution never happened).
-    // Those two demand opposite responses, so the pointer identity decides, not a guess.
+    const EnvironmentContext& env = play->envCtx;
+    const CurrentEnvLightSettings& live = env.lightSettings;
+
+    // Which list is installed. A residual is uninterpretable without this: it is the difference
+    // between the N64 and 3DS palettes if the substitution did not happen, and nothing at all if it did.
     u8 slotCount = 0;
     const Mm3dEnvLightSettings* recovered = Mm3d_SceneEnvList(play->sceneId, &slotCount);
     const bool substituted =
-        recovered != nullptr && play->envCtx.lightSettingsList == reinterpret_cast<const EnvLightSettings*>(recovered);
-    line += substituted ? " | list=SUBSTITUTED (MM is blending the recovered 3DS records)"
-                        : " | list=N64 (the 3DS records are NOT installed for this scene)";
+        recovered != nullptr && env.lightSettingsList == reinterpret_cast<const EnvLightSettings*>(recovered);
+    const char* source = substituted ? "SUBSTITUTED 3DS records" : "N64 light settings";
+
+    std::string line =
+        fmt::format("fogcolour scene={} live=({},{},{}) list={} slots={}", play->sceneId, live.fogColor[0],
+                    live.fogColor[1], live.fogColor[2], source, static_cast<int>(env.numLightSettings));
+    line += fmt::format(" lightSetting={} prev={} blendEnabled={} override={}", static_cast<int>(env.lightSetting),
+                        static_cast<int>(env.prevLightSetting), env.lightBlendEnabled ? 1 : 0,
+                        static_cast<int>(env.lightSettingOverride));
+    if (!substituted || env.lightSetting >= env.numLightSettings) {
+        line += " | no record to compare against";
+        reply(line.c_str(), user);
+        return;
+    }
+
+    // The plain branch copies slot `lightSetting` wholesale, so that is the comparison to make when
+    // the blend is off; when it is on, the two-slot LERP is, and this says so rather than quietly
+    // comparing against the wrong thing.
+    const Mm3dEnvLightSettings& slot = recovered[env.lightSetting];
+    if (!env.lightBlendEnabled) {
+        const bool exact = live.fogColor[0] == slot.fogColor[0] && live.fogColor[1] == slot.fogColor[1] &&
+                           live.fogColor[2] == slot.fogColor[2];
+        line +=
+            fmt::format(" | plain branch -> record slot {} fogCol=({},{},{}) {}", env.lightSetting, slot.fogColor[0],
+                        slot.fogColor[1], slot.fogColor[2], exact ? "MATCHES EXACTLY" : "DIFFERS");
+    } else {
+        line += fmt::format(" | blend branch -> lerp(prev={}, lightSetting={}); not compared here",
+                            env.prevLightSetting, env.lightSetting);
+    }
     reply(line.c_str(), user);
 }
 
