@@ -9,6 +9,30 @@ created: 2026-09-12
 updated: 2026-09-29
 ---
 
+## MEASURED: both cached states are unloadable, for two DIFFERENT reasons (2026-09-29)
+
+With a working oracle available, the load was actually attempted rather than reasoned about. The
+exception boundary added earlier is what made this readable at all -- before it, the first of these
+took the whole session down with it.
+
+| state | result |
+| --- | --- |
+| `scratch/raw/fd2-oracle-fixed.state` (OoT3D) | `reason=error:unregistered class` -- **threw** |
+| `scratch/harness/save/mm3d/lost_woods.state` (MM3D) | `reason=incompatible` -- returned false, no throw |
+
+**This is the refutation above, confirmed, and it is stronger than the header argument.** The
+OoT3D state does carry the current Azahar revision in its `CSTHeader`, so the version check passes
+and the failure is something that check does not cover: boost could not find a registered class for
+something in the archive. "Unregistered class" is a missing/renamed type registration, not a
+version skew, and nothing in the 256-byte header records the registry -- which is precisely the gap
+the `p45-00401070` render-contract marker exists to cover by hand.
+
+**The MM3D state is a different failure and is not an excuse.** It returns false rather than
+throwing, so it is a clean "this archive is not loadable" rather than a missing type. It does not
+matter: `tools/mm3d_oracle_state.py drive` regenerates that state from the ROM (boot 900 -> 14
+confirms x 150 -> 900 unpressed -> 1400 settle), so MM3D's fragment-lit surface was never actually
+lost. **Re-derive, do not repair.** Nothing here needs a hand-built `system.dat`.
+
 ## The stale-state diagnosis is REFUTED by the file's own header (2026-09-29)
 
 The section below concludes the on-disk state is "an *unmarked predecessor* ... written by an
