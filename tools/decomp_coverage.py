@@ -45,8 +45,22 @@ FILE_PATTERNS = (
     re.compile(r"^fn_0x([0-9a-f]{8})\.c$"),
 )
 
-# A file this short is Ghidra emitting a stub, not a recovered function.
-MIN_USEFUL_BYTES = 200
+# Deciding "did this decompile?" by FILE SIZE was wrong, and measurably so: an audit of all 127
+# files it excluded found every one of them was a real, complete function -- a 4-byte ARM thunk
+# yields ~90 bytes of C, which is smaller than any size threshold that does not also discard real
+# work. A file is counted when it has a function signature and a braced body; the size of the
+# MACHINE code is the honest denominator, and it is in the inventory.
+_BODY = re.compile(r"\{.*\}", re.DOTALL)
+
+
+def looks_decompiled(text: str) -> bool:
+    """True when the file holds an actual decompiled body rather than a bare header comment.
+
+    Ghidra writes a `// Function at VA ...` comment before it knows whether decompilation
+    succeeded, so a file can be header-only. A signature line plus a braced body is the smallest
+    condition that is true for a decompiled function and false for a failure.
+    """
+    return bool(_BODY.search(text))
 
 
 def load_inventory(game: pathlib.Path) -> dict[int, str]:
@@ -64,7 +78,7 @@ def load_inventory(game: pathlib.Path) -> dict[int, str]:
 
 
 def load_recovered(game: pathlib.Path) -> tuple[dict[int, pathlib.Path], list[pathlib.Path]]:
-    """Return (address -> file) for substantial output, plus the stubs found on the way."""
+    """Return (address -> file) for functions that actually decompiled, plus the failures."""
     decomp = game / "build" / "decomp"
     recovered: dict[int, pathlib.Path] = {}
     stubs: list[pathlib.Path] = []
@@ -77,11 +91,10 @@ def load_recovered(game: pathlib.Path) -> tuple[dict[int, pathlib.Path], list[pa
             match = pattern.match(path.name)
             if not match:
                 continue
-            # Bytes, not lines: a function that decompiles to nothing still gets a header comment.
-            if path.stat().st_size < MIN_USEFUL_BYTES:
-                stubs.append(path)
-            else:
+            if looks_decompiled(path.read_text(encoding="utf-8", errors="replace")):
                 recovered[int(match.group(1), 16)] = path
+            else:
+                stubs.append(path)
             break
     return recovered, stubs
 
@@ -131,8 +144,7 @@ def report(results: list[dict], floor: float) -> int:
               f"({pct:5.2f}%)  {bar}")
         print(f"  {'':<6} {r['named']:>6} / {r['total']:<6} READABLE (named) ({rpct:5.2f}%)")
         if r["stubs"]:
-            print(f"  {'':<6} {r['stubs']} file(s) are decompiler stubs under "
-                  f"{200} bytes and are NOT counted")
+            print(f"  {'':<6} {r['stubs']} file(s) have no decompiled body and are NOT counted")
         if r["orphans"]:
             print(f"  {'':<6} {r['orphans']} recovered file(s) are outside the Ghidra inventory")
     ok = [r for r in results if r["status"] == "ok"]
