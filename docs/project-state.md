@@ -627,23 +627,36 @@ been a free simplification. Over **8 captured draws / 16 non-zero slots it holds
 the light specular is **independent** of the diffuse and must be transported as its own quantity. A
 two-sample reading could not have distinguished that, which is the whole reason the spread was run.
 
-**And the decomp does not say what the record above says it says.** `fragment_lighting.md` and the
-reading this row was built on describe the products as `material.specularN * light.specularN`.
-Reading `oot3d-decomp/build/decomp/003fa5d0.c` directly contradicts that on two counts:
+**AND THE CORRECTION ABOVE IS ITSELF WRONG -- withdrawn, because I read a Ghidra register name as
+a single object.** The two sections before this one first recorded that the products never read the
+material, and that `iVar6 + 0xac` is read as both a byte and a float. **Both halves of that are
+refuted, and the original `material.specularN * light.specularN` reading is CORRECT.** `iVar6` is
+assigned TWICE in `003fa5d0.c`: `iVar6 = *param_2` (the material colour block) before the loop, and
+`iVar6 = *(int *)(param_1 + 0x10) + iVar10 * 0x60` (the light record) inside it. So line 69's
+`*(byte *)(iVar6 + 0xac)` is the **material** and line 173's `*(float *)(iVar6 + 0xac)` is the
+**light record** -- two different objects that happen to share an offset and a Ghidra register
+name. The products at lines 165-186 are exactly `light.spec0 * material.spec0 * fVar1`, with
+`fVar14/15/16` already computed from the material bytes at `+0xAC/+0xAD/+0xAE` before the loop.
 
-* **The specular products never read the material.** Lines 165-186 compute
-  `*(float *)(iVar6 + 0xa8) * fVar14 * fVar1`, `*(float *)(iVar6 + 0xac) * fVar15 * fVar1` and
-  `*(float *)(iVar6 + 0xb0) * fVar16 * fVar1`, where `iVar6` is the **light record** base
-  (`*(param_1+0x10) + i*0x60`) and there is **no `param_2` read anywhere in those expressions**.
-* **The same offset is read as two incompatible types.** `iVar6 + 0xac` is read as `*(byte *)` at
-  line 69 and as `*(float *)` at line 173. Both cannot be right.
+**This is the second time in one session that I published a refutation from a plausible reading
+without checking the pointer it was read through**, and the first was retracted the same way. The
+generalisation is now explicit: a Ghidra decomp reuses registers across scopes, so an offset read
+means nothing until the BASE POINTER at that point in the function has been identified.
 
-So the `material.specularN` half of that reading is **not established by this function**, and the
-row's claim that the material side is "recovered" is weaker than stated. The host still parses
-`+0xAC`/`+0xB0` (correct and harmless -- it retains authored data either way), but **it must not be
-cited as the product's material term** until the `0xac`-as-float/byte conflict is resolved. This is
-the project's standing trap once more: a clean `material × light` story that the byte-level evidence
-refuses.
+**The light record's real layout, now recovered (0x60 stride, all reads are floats):**
+
+| offset | field |
+| --- | --- |
+| `+0x88/0x8c/0x90` | diffuse |
+| `+0x98/0x9c/0xa0` | ambient |
+| `+0xa8/0xac/0xb0` | **specular 0** |
+| `+0xb8/0xbc/0xc0` | **specular 1** |
+| `+0xd8/0xdc/0xe0` | direction (negated) |
+| `+0xe4` | enable (`== 1.0f`) |
+
+`0x94/0xa4/0xb4` are unread, and the material triples are RGBA8 at 4-byte stride with a pad byte
+(`0xa7`, `0xaf`). This is what the 2-of-16 live control is consistent with: the light specular is a
+**separate** field at `+0xa8`, which is why it does not track the diffuse at `+0x88`.
 
 **The light side is the remaining input, and it is NOT decompiled.** `FUN_004093f8` (a 48-byte
 wrapper, not in the decompiled set) submits the per-slot records to `FUN_0040d1a8`, which serialises
@@ -662,6 +675,28 @@ specular anywhere. `grep -rni specular` over `libultraship/src/fast/` and `cmb3d
 hits, and the only mentions in `soh/src/zelda3d/` are comments recording that the term is unused.
 So a flat additive specular is PICA-specific, it cannot be validated against the N64 path, and the
 vertex-lit CmbVShader path will never grow one on its own.
+
+**Neither recovered table can supply the light specular, and that is now a TRUE NEGATIVE rather
+than an absence of looking.** `Zelda3dLightSlot`
+(`Shipwright/zelda3d_shared/lighting/zelda3d_env_record.h`, the struct both `.inc`s expand into) is
+`amb[3] l0dir[3] l0col[3] l1dir[3] l1col[3] fogCol[3] fogNear fogFar zFar` -- pure
+`EnvLightSettings`. **There is no specular, highlight, shininess or coefficient field in either
+game's table.** The first version of the search reported `matched 0` and that zero was meaningless:
+it unpacked the 10-bit-per-channel PICA `LightColor` and compared it unscaled against 8-bit table
+bytes, so it searched a range the table cannot contain and a true positive was undetectable. It
+now bridges with `round(v10 * 255 / 1023)`, matches only the four COLOUR fields of each record
+(a whole-file regex was also matching direction vectors and the fog-distance triple), and proves
+itself: it round-trips a real table colour through the 10-bit encoding on both tables and both
+PASS. **1248 colour triples over 784 OoT3D records and 1545 over 3018 MM3D records, matched 0.**
+
+**So the remaining work is new RE on the 3DS env-light source, and it is now scoped to one
+structure**: the 0x60-stride light record's `+0xa8/0xac/0xb0` (specular 0) and `+0xb8/0xbc/0xc0`
+(specular 1), which the recovered `EnvLightSettings` tables demonstrably do not populate. Note this
+is a DIFFERENT record from the scene env table: the light array is per-draw runtime state, and its
+producer is the open question, not the scene palette. Second required change, named so it is not
+discovered late: **`Zelda3D_GL_SetLightParams` has no specular parameter at all**
+(`Shipwright/soh/src/zelda3d/render/scene_lighting_submission.cpp:92`), so plumbing the term
+requires changing that signature and the UBO with it.
 
 **A trap this measurement walked into, recorded so it is not walked into again.** `light_enable` is
 **not a bitmask of enabled slots** — Azahar reads it as a per-slot *light index*
