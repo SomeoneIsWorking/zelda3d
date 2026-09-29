@@ -314,6 +314,14 @@ bool Cmb::parseMats() {
         rgb_be(o + 0xA4, m.mat_ambient);
         rgb_be(o + 0xA8, m.mat_diffuse);
         m.mat_diffuse[3] = b[o + 0xAB] / 255.0f;
+        // The rest of the authored colour block. Offsets and roles are the table in
+        // oot3d-decomp/docs/fragment_lighting.md:20-27, corroborated by the tracked decomp
+        // build/decomp/003fa5d0.c:62-77, which reads exactly +0xAC/+0xAD/+0xAE and
+        // +0xB0/+0xB1/+0xB2 as the two material specular colours and multiplies them by the
+        // per-slot light specular before submitting a PICA LightSrc record. All three of
+        // emission and the two speculars were previously unread, which is why the host had no
+        // specular term anywhere and `fragSecondary` was hard-bound to black.
+        DecodeMaterialColorBlock(b + o, m);
         // PICA200 TEV constant-color palette: 6 slots at +0xB4..+0xCB (u8 RGBA per slot, matching
         // noclip readMatsChunk's constantColors[0]=+0xB4 and the byte-level decode in
         // oot3d-decomp/docs/title_logo_fireglow_cmab.md §3.1). BUGFIX 2026-07-10: this used to

@@ -122,6 +122,19 @@ struct CmbMaterial {
     // CmbVShader c8 MatDiffuseColor. Alpha is live in both the unlit/no-color fallback
     // (words 112--120) and the lit per-enabled-light sum (words 89--110), so preserve RGBA.
     float mat_diffuse[4] = { 1, 1, 1, 1 };
+    // The rest of the authored colour block: material +0xA0 emission, +0xAC specular 0 and
+    // +0xB0 specular 1 (`oot3d-decomp/docs/fragment_lighting.md:20-27`, read by the tracked
+    // decomp `build/decomp/003fa5d0.c:62-77`, which forms
+    // `material.specularN * light.specularN` and submits it as the PICA `LightSrc` colour).
+    // These were NOT parsed before, so the host had no specular at all and
+    // `fragSecondary` could only ever be black. They are retained, not applied: applying the
+    // reduced fragment-lighting form needs the per-slot LIGHT specular as well, whose producer
+    // (`FUN_004093f8` -> `FUN_0040d1a8`) is not decompiled. Keeping the authored values here is
+    // what makes that port a transport question instead of a decode question.
+    // Alpha is preserved because the decomp quantises all four channels of the product.
+    float mat_emission[4] = { 0, 0, 0, 0 };
+    float mat_specular_0[4] = { 0, 0, 0, 0 };
+    float mat_specular_1[4] = { 0, 0, 0, 0 };
     // Stage-0 TEV combiner. Scene materials are overwhelmingly a single
     // MODULATE(PRIMARY_COLOR=v_Color, TEXTURE0) stage, but the combine op and especially the
     // RGB SCALE (x1/x2/x4) are per-material — Kokiri grass MODULATEs at scaleRGB=x2, the
@@ -280,6 +293,19 @@ struct CmbVertex {
 // visibility at draw time — e.g. Link's childlink_v2 bakes several hand-pose / equipment
 // variants onto ONE skin material, distinguished only by mesh_id; the game shows a subset
 // per frame. Keeping them in separate groups lets us cull the hidden ones without rebuilding.
+// The five authored RGBA8 colours of the CMB material colour block, decoded from
+// `bytes + 0xA0`. Offsets and roles are the table in `oot3d-decomp/docs/fragment_lighting.md:20-27`
+// (`+0xA0` emission, `+0xA4` ambient, `+0xA8` diffuse, `+0xAC` specular 0, `+0xB0` specular 1),
+// corroborated by the tracked decomp `build/decomp/003fa5d0.c:62-77` which reads exactly those
+// bytes for the two material speculars.
+//
+// This exists as a free function, in the owner, so a test can exercise the SHIPPING decode on
+// synthetic bytes instead of reimplementing it or needing a real ROM asset. `parseMats` is the
+// only production caller. The block is `+0xA0..+0xB3` and the TEV constant palette starts at
+// `+0xB4`, so decoding specular 1's alpha at `+0xB3` touches nothing the palette owns — which is
+// the boundary this function exists to make checkable.
+void DecodeMaterialColorBlock(const uint8_t* bytes, CmbMaterial& material);
+
 struct CmbDrawGroup {
     int material_index = 0;
     int mesh_id = -1;             // CMB mesh_id of the contributing meshes (the visibility-switch key)

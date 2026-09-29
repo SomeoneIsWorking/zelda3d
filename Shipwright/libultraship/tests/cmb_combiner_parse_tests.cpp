@@ -31,6 +31,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <string>
+#include <utility>
 #include <vector>
 
 using Zelda3D::Cmb;
@@ -350,6 +351,70 @@ TEST(CmbPrimaryParse, BottledPoePreservesLitNoColorDiffuseAlpha) {
 // when IsFragmentLighting is set. Dark Link deliberately authors a FRAGMENT_PRIMARY TEV source
 // while leaving that flag clear, so substituting vertex PRIMARY changes the material instead of
 // reproducing the disabled unit.
+// The colour block is decoded on SYNTHETIC bytes through the shipping `DecodeMaterialColorBlock`
+// seam, so this runs with no ROM and cannot be skipped. Every other fragment-lighting close-test
+// in this file needs ZELDA3D_OOT3D_ROM, which means the offsets that decide the specular were
+// previously gated behind an asset an agent may not have -- the exact reason the host could ship
+// with no specular at all and still look green.
+//
+// Each colour is given a distinct 4-byte signature so a wrong offset cannot land on another
+// entry and still look plausible.
+TEST(CmbColorBlock, DecodesAllFiveAuthoredColoursAtTheirOffsets) {
+    std::vector<uint8_t> record(0x200, 0x00);
+    const uint32_t kBase = 0xA0;
+    struct Entry {
+        uint32_t index;
+        uint8_t rgba[4];
+    };
+    const Entry entries[] = {
+        { 0, { 10, 11, 12, 13 } }, // emission   +0xA0
+        { 1, { 20, 21, 22, 23 } }, // ambient    +0xA4
+        { 2, { 30, 31, 32, 33 } }, // diffuse    +0xA8
+        { 3, { 40, 41, 42, 43 } }, // specular 0 +0xAC
+        { 4, { 50, 51, 52, 53 } }, // specular 1 +0xB0
+    };
+    for (const Entry& entry : entries) {
+        for (int c = 0; c < 4; ++c) {
+            record[kBase + entry.index * 4 + c] = entry.rgba[c];
+        }
+    }
+
+    CmbMaterial material;
+    Zelda3D::DecodeMaterialColorBlock(record.data(), material);
+
+    const std::pair<const float*, int> decoded[] = {
+        { material.mat_emission, 0 },   { material.mat_ambient, 1 },    { material.mat_diffuse, 2 },
+        { material.mat_specular_0, 3 }, { material.mat_specular_1, 4 },
+    };
+    for (const auto& [value, index] : decoded) {
+        // `mat_ambient` is a 3-wide array (PICA's `LightColor` is RGB; only `mat_diffuse` carries
+        // an alpha the CmbVShader consumes), so it is checked for RGB only. Reading a 4th
+        // component here is an out-of-bounds read into the next member, which is exactly the bug
+        // this test caught on its first run.
+        const int channels = (index == 1) ? 3 : 4;
+        for (int c = 0; c < channels; ++c) {
+            EXPECT_FLOAT_EQ(value[c], entries[index].rgba[c] / 255.0f) << "colour " << index << " channel " << c;
+        }
+    }
+}
+
+// The decode must not read past the block. The TEV constant palette starts at +0xB4, one byte
+// after the block's last, so a stride or width error here would silently steal a palette slot --
+// the same class of bug as the historical +0xB8 constant-palette shift recorded in cmb.cpp.
+TEST(CmbColorBlock, DoesNotReadIntoTheTevConstantPalette) {
+    std::vector<uint8_t> record(0x200, 0x00);
+    record[0xAC + 3] = 43; // specular 0 alpha
+    // Sentinel: every byte from the end of the colour block to well past the palette.
+    for (size_t i = 0xB4; i < 0xE0; ++i) {
+        record[i] = 0xFF;
+    }
+    CmbMaterial material;
+    Zelda3D::DecodeMaterialColorBlock(record.data(), material);
+    // specular 1's alpha lives at +0xB3 and must be 0, not the 0xFF sentinel at +0xB4.
+    EXPECT_FLOAT_EQ(material.mat_specular_1[3], 0.0f);
+    EXPECT_FLOAT_EQ(material.mat_specular_0[3], 43.0f / 255.0f);
+}
+
 TEST(CmbFragmentLightingParse, DarkLinkPreservesDisabledFragmentSourceBranch) {
     if (OoT3dRomPath().empty()) {
         GTEST_SKIP() << "ZELDA3D_OOT3D_ROM not set — cannot exercise real-asset close-test";
