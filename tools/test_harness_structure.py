@@ -185,5 +185,77 @@ class HarnessStructureTests(unittest.TestCase):
         self.assertIn("ZELDA3D_SHIPPING_BUILD_DIR", manifest)
 
 
+class SavestateLoadFailureTests(unittest.TestCase):
+    """A savestate load failure must be REPORTED, never fatal.
+
+    `Core::System::LoadStateBuffer` throws `boost::archive::archive_exception` on a savestate it
+    cannot deserialize. The first version of this owner let that escape, so the oracle hit
+    `std::terminate` and the whole session died printing nothing -- taking every measurement taken
+    up to that point with it. That is how `docs/issues/0023` came to describe loading a stale
+    state as "it kills the oracle" with no reason attached: the process had no chance to give one.
+
+    These are STRUCTURAL contracts, not behavioural ones: `oracle_state_storage.cpp` includes
+    Azahar's `core/core.h`, so the catch cannot be exercised without building the emulator. What is
+    pinned here is that the exception boundary exists at the single owner and that every call site
+    surfaces the reason, which is what stops the throw from reaching `std::terminate`.
+    """
+
+    STORAGE = HARNESS / "oracle_state_storage.cpp"
+    HEADER = HARNESS / "oracle_state_storage.h"
+    CALL_SITES = (HARNESS / "title_sync_runtime.cpp",)
+
+    def test_load_is_wrapped_in_a_try_catch(self) -> None:
+        source = self.STORAGE.read_text(encoding="utf-8")
+        self.assertRegex(source, r"catch\s*\(", "no catch: a thrown archive_exception terminates")
+        # The catch must be at the owner, not at one call site: three routes reach this.
+        # Match the real `try {` token -- a plain substring search for "try" also matches
+        # "entry"/"country", which is how the first version of this test passed vacuously. Anchor
+        # on the CALL (`LoadStateBuffer(`) rather than the bare name, because the name also appears
+        # in the explanatory comment above the function.
+        try_at = re.search(r"\btry\s*\{", source)
+        self.assertIsNotNone(try_at, "no try block around the throwing call")
+        call_at = source.index("LoadStateBuffer(")
+        self.assertLess(
+            try_at.start(), call_at,
+            "the try must open before the throwing call")
+        self.assertRegex(source, r"catch\s*\(\s*\.{3}\s*\)",
+                         "no catch-all: a non-std::exception would still terminate")
+
+    def test_the_catch_names_the_type_that_actually_catches_it(self) -> None:
+        """`catch (const int&)` compiles, passes the structural checks, and catches NOTHING.
+
+        The failure being fixed is a thrown `boost::archive::archive_exception`, which reaches
+        `std::exception`. A catch-all clause does not cover it: it catches non-`std` throws only.
+        A structural test cannot prove the behaviour, but it CAN pin that the clause names
+        `std::exception`, which is the difference between catching the real failure and missing it
+        while looking correct.
+        """
+        source = self.STORAGE.read_text(encoding="utf-8")
+        self.assertRegex(
+            source, r"catch\s*\(\s*const\s+std::exception",
+            "the typed catch must name std::exception, or the archive_exception still escapes")
+
+    def test_load_failure_returns_a_named_reason(self) -> None:
+        source = self.STORAGE.read_text(encoding="utf-8")
+        for reason in ("unreadable", "incompatible"):
+            self.assertIn(reason, source, f"{reason} reason token missing")
+        header = self.HEADER.read_text(encoding="utf-8")
+        self.assertIn("StateLoadResult", header)
+        self.assertIn("reason", header)
+
+    def test_no_bare_boolean_load_result_remains(self) -> None:
+        """The reason must not be discarded at a call site (which is what hid it before)."""
+        for path in self.CALL_SITES:
+            source = path.read_text(encoding="utf-8")
+            self.assertNotRegex(
+                source, r"if \(!HarnessOracleStorage::LoadStateFile",
+                f"{path.name} still treats a load as a bare bool, dropping the reason")
+
+    def test_every_call_site_reports_the_reason(self) -> None:
+        for path in self.CALL_SITES:
+            source = path.read_text(encoding="utf-8")
+            self.assertIn("load.reason", source, f"{path.name} does not surface the reason")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -6,8 +6,59 @@ symptom: The cold title-to-gameplay route does not reach a gameplay PlayState (m
 state_items: S006
 tags: oracle,harness,savestate,render-contract,title-route
 created: 2026-09-12
-updated: 2026-09-28
+updated: 2026-09-29
 ---
+
+## The stale-state diagnosis is REFUTED by the file's own header (2026-09-29)
+
+The section below concludes the on-disk state is "an *unmarked predecessor* ... written by an
+incompatible build ... genuinely stale, not misnamed", and reasons from that that it "cannot simply
+be re-made". **Both halves of that are wrong, and the file says so.**
+
+`scratch/raw/fd2-oracle-fixed.state` is a `CSTHeader` (`Azahar/src/core/savestate.cpp:25-34`), whose
+third member is `std::array<u8, 20> revision`, documented as the **git hash of the revision the
+savestate was created with**. Reading it at the struct's offset (bytes 12..31):
+
+```
+header revision : 156c7e66fb9b1f64904e01f96aa49fda1da5457b
+Azahar HEAD     : 156c7e66fb9b1f64904e01f96aa49fda1da5457b
+program_id      : 0x0004000000033500   (= OoT3D; MM3D is 0x0004000000125500)
+```
+
+**The embedded revision is byte-identical to the current Azahar checkout**, and the program id is the
+right title. So the state was not written by a different build.
+
+**And the revision check could not have produced the exception in any case.** `ValidateSaveState`
+compares the header revision to `Common::g_scm_rev` and on a mismatch takes the `LOG_WARNING` path
+(`savestate.cpp:68-82`) -- it never throws. A `boost::archive::archive_exception` therefore does not
+originate from the build-revision check at all; it comes from deserializing the object graph. The
+"incompatible build" cause is not merely unproven, it is **ruled out**.
+
+**The two markers were conflated.** `p45-00401070` is a hand-maintained marker in
+`tools/soh3d_harness/AZAHAR_RENDER_CONTRACT`, bumped "only when an Azahar patch can alter emulated
+or rendered output". It is a *render contract*, and it is **not** the Azahar git revision. Treating a
+filename that lacks `p45-00401070` as evidence of an incompatible **build** compares two different
+things.
+
+**Consequences, stated as limits rather than as a fix.** The state is the right title at the right
+revision, so the `archive_exception` is a real serialization failure of unmeasured cause --
+truncation, an object-graph change from an un-bumped contract, or something else. It is NOT the
+version story this issue told, so "it cannot simply be re-made because the build moved on" is
+**withdrawn**: the premise it rested on does not hold. Re-test the load and read the real exception
+before spending anything else here.
+
+**And the reason was unobservable, which is a defect of its own.** `LoadStateFile` called
+`Core::System::LoadStateBuffer` with no `try`/`catch`, so the exception escaped, `std::terminate`
+fired, and the oracle died **printing nothing** -- taking every measurement taken in that session
+with it. That is why this issue could only ever say "it kills the oracle": the process had no chance
+to say why. `tools/soh3d_harness/oracle_state_storage.cpp` now owns the boundary, returns a typed
+`StateLoadResult` with a greppable `reason` (`unreadable` / `incompatible` / `error:<what()>`), and
+keeps the session alive so the failure becomes a measurement. The one other call site,
+`title_sync_runtime.cpp`'s baseline reload, now reports the reason too. Pinned structurally by
+`tools/test_harness_structure.py::SavestateLoadFailureTests` (5 tests, mutation-verified). A
+structural test cannot prove the behaviour; the honest next step is still to load the state with a
+ROM present and read the real `what()`.
+
 
 ## Root cause
 
@@ -48,6 +99,10 @@ more capabilities look blocked than are. Measured:
   That is Azahar's boost serialization refusing a savestate written by an incompatible build, i.e. the
   render-contract/version invalidation the `azahar_render_contract_marker()` filename encodes. The
   marker is doing its job; the state is genuinely stale, not misnamed.
+  **WITHDRAWN 2026-09-29 — see "The stale-state diagnosis is REFUTED by the file's own
+  header" above.** The state embeds the CURRENT Azahar revision byte-for-byte, and the
+  revision check only warns rather than throws, so "incompatible build" is ruled out and
+  the marker was being read as a build id when it is a render contract.
 * **And it cannot simply be re-made.** Writing a fresh gameplay state requires reaching gameplay,
   which is the cold title route this issue already documents as failing (the missing system title
   `title/0004000e/00033500/content/00000000.app` and the empty save slots).
