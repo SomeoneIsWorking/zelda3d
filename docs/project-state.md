@@ -613,6 +613,38 @@ substituting black for a near-white constant. This is the largest single known e
 it is now bounded by a number rather than a suspicion — but it is **not yet fixed**, because the
 other half of the product is still missing (below).
 
+**LIVE CONFIRMATION on MM3D hardware, and a CORRECTION to the reading above (2026-09-29).**
+The oracle is now runnable (`source .env`), MM3D's Lost Woods state regenerates from the ROM
+(`tools/mm3d_oracle_state.py drive`: draws 3390, fog (40,140,220), LUT min 0.4915 — all three match
+the recorded values exactly), and `tools/mm3d_lit_specular.py` captured a real fragment-lit draw
+(draw 89 of 113, `picaLit=1` on 85). On that draw the reduction is **confirmed against live
+registers**: `config0=0x80000400`, `config1=0xff7fffff` → **zero active terms**, exactly as predicted.
+`max_light_index=1`, `light_enable=0x00000010`, `slot_mapping=[0,1,0,...]`, as recorded.
+
+**The single-draw `specular0 == diffuse` reading was a coincidence, and the control caught it.**
+One captured draw showed `specular0` bit-identical to `diffuse` on both its slots, which would have
+been a free simplification. Over **8 captured draws / 16 non-zero slots it holds on 2 (12.5%)**, so
+the light specular is **independent** of the diffuse and must be transported as its own quantity. A
+two-sample reading could not have distinguished that, which is the whole reason the spread was run.
+
+**And the decomp does not say what the record above says it says.** `fragment_lighting.md` and the
+reading this row was built on describe the products as `material.specularN * light.specularN`.
+Reading `oot3d-decomp/build/decomp/003fa5d0.c` directly contradicts that on two counts:
+
+* **The specular products never read the material.** Lines 165-186 compute
+  `*(float *)(iVar6 + 0xa8) * fVar14 * fVar1`, `*(float *)(iVar6 + 0xac) * fVar15 * fVar1` and
+  `*(float *)(iVar6 + 0xb0) * fVar16 * fVar1`, where `iVar6` is the **light record** base
+  (`*(param_1+0x10) + i*0x60`) and there is **no `param_2` read anywhere in those expressions**.
+* **The same offset is read as two incompatible types.** `iVar6 + 0xac` is read as `*(byte *)` at
+  line 69 and as `*(float *)` at line 173. Both cannot be right.
+
+So the `material.specularN` half of that reading is **not established by this function**, and the
+row's claim that the material side is "recovered" is weaker than stated. The host still parses
+`+0xAC`/`+0xB0` (correct and harmless -- it retains authored data either way), but **it must not be
+cited as the product's material term** until the `0xac`-as-float/byte conflict is resolved. This is
+the project's standing trap once more: a clean `material × light` story that the byte-level evidence
+refuses.
+
 **The light side is the remaining input, and it is NOT decompiled.** `FUN_004093f8` (a 48-byte
 wrapper, not in the decompiled set) submits the per-slot records to `FUN_0040d1a8`, which serialises
 them into the PICA light block at `0x140 + slot*0x10`. So the reduced form now has: per-slot
