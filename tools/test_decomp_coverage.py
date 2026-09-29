@@ -33,7 +33,14 @@ def write_fixture(root: pathlib.Path, inventory: list[tuple[int, str, int]],
     return decomp
 
 
-BIG = "// header comment\n" + "int x = 1;\n" * 80
+BIG = "// header comment\nvoid FUN_00001000(void) {\n" + "    int x = 1;\n" * 80 + "}\n"
+# A SMALL BUT REAL function. The instrument previously used a 200-byte size threshold and this
+# was excluded, which an audit proved was wrong: a 4-byte ARM thunk legitimately decompiles to
+# under 100 bytes of C, so the size rule discarded real work.
+TINY_BUT_REAL = ("// Function at VA 0x0 - FUN_00000000\nvoid FUN_00000000(void) {\n"
+                 "    return;\n}\n")
+# Ghidra writes the header comment before it knows whether decompilation worked, so a genuine
+# failure is a header and nothing else.
 STUB = "// Function at VA 0x0 - FUN_00000000\n\n\n"
 
 
@@ -62,7 +69,7 @@ class CoverageCounting(unittest.TestCase):
         self.assertGreater(got["coverage"], 0.0)
 
     def test_stub_output_is_not_counted(self):
-        """Ghidra emitting a near-empty file is a failure, not progress."""
+        """Ghidra emitting a header with no body is a failure, not progress."""
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp) / "oot3d-decomp"
@@ -70,6 +77,22 @@ class CoverageCounting(unittest.TestCase):
             got = dc.measure("oot3d", root)
         self.assertEqual(got["recovered"], 0)
         self.assertEqual(got["stubs"], 1)
+
+    def test_tiny_but_real_function_IS_counted(self):
+        """Regression guard for the size-threshold bug: 127 real functions were being discarded.
+
+        The old rule was `file size < 200 bytes => not recovered`. An audit of every excluded
+        file found all 127 were complete, correct decompilations; the smallest were 4-byte ARM
+        thunks at ~90 bytes of C. The rule is now "has a signature and a braced body".
+        """
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / "oot3d-decomp"
+            write_fixture(root, [(0x1000, "FUN_00001000", 4)], {"00001000.c": TINY_BUT_REAL})
+            got = dc.measure("oot3d", root)
+        self.assertEqual(got["recovered"], 1,
+                         "a real small function must count; size must not decide this")
+        self.assertEqual(got["stubs"], 0)
 
     def test_both_naming_conventions_count(self):
         import tempfile
