@@ -18,6 +18,13 @@ Counting rules, and why each one exists:
 * The denominator is the Ghidra function inventory, not a file count. Coverage of a corpus with
   no denominator is a vanity number.
 
+The 0.90 floor is a regression guard, and it is set from measured standing rather than from a wish.
+Both titles are now at 99.31% (mm3d, 11971/12054) and 99.99% (oot3d, 8264/8265) -- the whole
+inventory decompiles, via `tools/decomp_fill.py`. A 0.10 floor was toothless at that standing: it
+caught the MM3D pipeline writing almost nothing, but not the loss of a few hundred functions. 0.90
+sits far enough below the measured standing to survive a re-analysis while still failing a real
+regression. Raise it as coverage improves; never lower it to make a red run green.
+
 The inventory files are produced by the Ghidra script
 `oot3d-decomp/tools/ghidra_scripts/DecompDump.py` run with no targets file, which writes
 `build/decomp/functions.csv` (addr,size,name) for the analyzed project.
@@ -164,8 +171,8 @@ def report(results: list[dict], floor: float) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="gate mode: non-zero exit on regression")
-    parser.add_argument("--floor", type=float, default=0.10,
-                        help="minimum recovered fraction per game (default 0.10)")
+    parser.add_argument("--floor", type=float, default=0.90,
+                        help="minimum recovered fraction per game (default 0.90)")
     parser.add_argument("--json", action="store_true", help="machine-readable output")
     args = parser.parse_args()
 
