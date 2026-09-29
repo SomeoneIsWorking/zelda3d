@@ -329,3 +329,57 @@ So MM3D's *remaining* gap is the same one OoT3D has, plus one thing OoT3D does n
 
 The practical consequence: reaching gameplay for EITHER title is the single highest-value unblock in
 this campaign, and it is one task, not two.
+
+## MEASURED: the OoT3D title is touch-driven, and the harness's touch path is DEAD (2026-09-29)
+
+This replaces the vague "missing system title app, empty save slots" as the actionable reason, and it
+is **a harness gap, not missing external data**. OoT3D is a retail card title, so a New Game ought
+to be reachable with nothing external at all.
+
+**The input path is verified, so the failures below are about the game and the core, not the probe.**
+The harness's `diag` reports the live input mask, and it moves: `mask=0x00000000` before a press and
+`mask=0x00000100` with A held. An earlier attempt at this probe used a `hold <button> <n>` command
+that **does not exist** in the harness, so no input was ever delivered, and it then reported "still
+on the title" as if that were a fact about the game. It was a fact about the probe. Every button
+result below is one where the mask was confirmed delivered before and after the run.
+
+| step | result |
+| --- | --- |
+| 1200 frames of logo | `mode=title`, `gameplay=no`, `scene=0x006b` |
+| A x2, START, A, A x2, B, X, DOWN+A, UP+A, A-long (all masks confirmed) | `mode=title`, `gameplay=no` throughout |
+| after the second A press | **`scene` moved `0x006b` -> `0x0000`** |
+
+That `scene` change is the load-bearing observation: input demonstrably reaches game logic and
+provokes a transition, yet **no button advances the title to gameplay**. The reason is visible in
+the capture -- `scratch/title_probe/title.az.ppm` is the top screen at 400x240 and shows the moonlit
+field with **no menu at all**, because a 3DS title menu lives on the *bottom* screen, which this
+harness does not expose as a framebuffer. So the menu cannot be read off a screenshot, and its
+coordinates must not be guessed.
+
+**And the touch path that would replace the buttons does not work, for a specific and fixable
+reason.** `diag` reports `pointer_polls=0` and `pointer_ids=0x00000000` before and after a
+`pointer x y 1` / `pointer x y 0` cycle, so the harness records no touch poll at all. Reading
+`tools/soh3d_harness/frontend_input.cpp:48-56`, `pointer_polls` only increments when the *guest*
+calls `input_state_callback(RETRO_DEVICE_POINTER, ...)`, and `g_pointer_ids_seen` only records ids
+the guest asked for. The guest therefore never asks. The reason is in
+`tools/soh3d_harness/libretro_callbacks.cpp`: the environment callback handles **eleven**
+`RETRO_ENVIRONMENT_*` calls (`GET_CAN_DUPE`, `SET_PIXEL_FORMAT`, `GET_LOG_INTERFACE`,
+`GET_SYSTEM_DIRECTORY`, `GET_SAVE_DIRECTORY`, `SET_HW_RENDER`,
+`SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE`, `GET_HW_RENDER_INTERFACE`, `GET_VARIABLE`, ...) and
+**none of them is `SET_INPUT_DESCRIPTORS`, `SET_POINTER`, or `SET_INPUT_BITMASKS`** -- grep count 0.
+
+The core options are already right: `libretro_callbacks.cpp:106-108` explicitly answers `"enabled"`
+for `citra_enable_mouse_touchscreen`, `citra_enable_touch_touchscreen` and
+`citra_enable_touch_pointer_timeout`, precisely so the fork's pointer path stays on. So the option is
+on, the state is set, and the core still never polls -- because **no pointer device is ever
+registered with it**.
+
+**The fix, named and not yet implemented:** register the pointer device in the harness's environment
+callback (`RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS` advertising a `RETRO_DEVICE_POINTER` with
+X/Y/PRESSED, and `RETRO_ENVIRONMENT_SET_POINTER`), then re-run the sweep. Until that lands, any
+statement of the form "the title cannot be advanced" is only true of the *buttons*, and the touch
+sweep was correctly refused rather than run: `scratch/oot3d_title_touch.py` aborts when
+`pointer_ids` never moves, because a grid sweep over a dead input path produces a confident zero.
+
+This is the highest-value unblock in the campaign and it is now a bounded C++ change in one file
+rather than an open-ended hunt for external data.
