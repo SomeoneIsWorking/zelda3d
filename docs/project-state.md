@@ -439,9 +439,11 @@ SetLightParams(ambient, light1Color, light2Direction, light2Color, 2)` passes a 
 the enabled-slot count. That is right for every configuration measured and **silently drops a third
 slot** if one is ever enabled. Recorded rather than attempted: the honest claim is "three slots, we
 observe two", and widening the light-bank UBO on an unverified third slot is the same shape of
-speculative change as the `+0x138` misreading above. The `+0xE4` producer is also not in the
-decompiled set (1,321 of the image's functions), so "which field is `+0xE4`" stays open — the *rule* is
-read from its consumer, which is enough to evaluate the predicate once the producer is found.
+speculative change as the `+0x138` misreading above. The `+0xE4` producer's absence was asserted
+against a corpus of 1,321 functions; the image is now 99.99% decompiled (8264/8265, driven by
+`tools/decomp_fill.py`), so "not in the decompiled set" is no longer a fact about this project and
+the `+0xE4` producer question must be re-asked against the full inventory rather than carried as
+open. The *rule* is read from its consumer either way, which is enough to evaluate the predicate.
 
 **This does not license aliasing `FRAGMENT_PRIMARY` to the vertex `PRIMARY`.** The section supplies
 inputs; it does not supply the counterfactual a port must be checked against, and the title demo never
@@ -658,13 +660,20 @@ means nothing until the BASE POINTER at that point in the function has been iden
 (`0xa7`, `0xaf`). This is what the 2-of-16 live control is consistent with: the light specular is a
 **separate** field at `+0xa8`, which is why it does not track the diffuse at `+0x88`.
 
-**The light side is the remaining input, and it is NOT decompiled.** `FUN_004093f8` (a 48-byte
-wrapper, not in the decompiled set) submits the per-slot records to `FUN_0040d1a8`, which serialises
-them into the PICA light block at `0x140 + slot*0x10`. So the reduced form now has: per-slot
-diffuse (host has it, `uLitDif1/2`), per-slot ambient (host has it, folded into `uAmbient`), the
-per-fragment normal (host has `vNrmView`), and **material specular (now parsed)**, but still no
-per-slot **light** specular. That is a single named function to decompile, and it is the whole
-remainder of the transport.
+**The light side was the remaining input and WAS NOT DECOMPILED — that is now false.** `FUN_004093f8`
+(a 48-byte wrapper) submits the per-slot records to `FUN_0040d1a8`, which serialises them into the
+PICA light block at `0x140 + slot*0x10`; this paragraph's "NOT in the decompiled set" was true of a
+15.32% corpus. Driving the whole inventory (`tools/decomp_fill.py`: oot3d 15.32% -> **99.99%**,
+mm3d 0.25% -> **99.31%**) recovered all three. `FUN_0040d15c` loops 8 slots, tests an enable byte at
+`+0x164 + slot`, and serialises the record at `+0x04 + slot*0x2C`, advancing `param_2` by 0x38 per
+enabled slot — so the eight slot-enable bytes are located from the submit loop's own test, and the
+eight 0x2C records span `+0x04..+0x163` because `4 + 8*0x2C = 0x164` exactly. The record carries
+**four** triple-shaped fields (`[4..6]`, `[7..9]`, `[0xd..0xf]`, `[0xa..0xc]`), so the three-field
+reading above is incomplete; the register meaning of each triple is not yet claimed. The reduced form
+has per-slot diffuse (`uLitDif1/2`), per-slot ambient (folded into `uAmbient`), per-fragment normal
+(`vNrmView`) and material specular (parsed), and the per-slot **light** specular is now *readable* —
+what remains is the **producer** that fills the 0x2C records, which is a question about a known
+structure rather than a guessed one. `oot3d-decomp/docs/fragment_lighting.md` carries the full read.
 
 **There is no N64/F3DEX analogue to cross-check the specular against, and that is worth knowing
 before someone looks for one.** The F3DEX2 RSP here is *interpreted*
