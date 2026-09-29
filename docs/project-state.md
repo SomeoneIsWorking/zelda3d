@@ -596,6 +596,41 @@ the per-slot **colour** values (`diffuse`/`ambient`/`specular_0`/`specular_1`) a
 plus a counterfactual — and the counterfactual is the cheap half now, because MM3D's reproducible
 Lost Woods state is 75.2% fragment-lit with no gameplay `PlayState` needed.
 
+**The material side of the specular is RECOVERED and the host simply was not reading it.** The
+colour block is five authored RGBA8 entries — `+0xA0` emission, `+0xA4` ambient, `+0xA8` diffuse,
+`+0xAC` specular 0, `+0xB0` specular 1 (`oot3d-decomp/docs/fragment_lighting.md:20-27`) — and the
+tracked decomp `build/decomp/003fa5d0.c:62-77` reads exactly `+0xAC/+0xAD/+0xAE` and
+`+0xB0/+0xB1/+0xB2` to form `material.specularN * light.specularN` before submitting a PICA
+`LightSrc` record. The host read only `+0xA4` and `+0xA8`; **emission and both speculars were
+unread**, so it had no specular term anywhere and `fragSecondary` could only ever be black. They
+are now parsed (`cmb_color_block.cpp`), which is transport, not a port.
+
+**The magnitude is not small, and it is now measurable.** Combined with the reduction above, PICA's
+FRAGMENT_SECONDARY for MM3D's captured slots is `Σ(specular_0 + specular_1)` = **(1.082, 0.894,
+0.780)**, which **clamps to essentially white**. The host adds black. So for the 691 MM3D and 69
+OoT3D materials that consume FRAGMENT_SECONDARY, the host is not slightly dark on that term, it is
+substituting black for a near-white constant. This is the largest single known error in the arc and
+it is now bounded by a number rather than a suspicion — but it is **not yet fixed**, because the
+other half of the product is still missing (below).
+
+**The light side is the remaining input, and it is NOT decompiled.** `FUN_004093f8` (a 48-byte
+wrapper, not in the decompiled set) submits the per-slot records to `FUN_0040d1a8`, which serialises
+them into the PICA light block at `0x140 + slot*0x10`. So the reduced form now has: per-slot
+diffuse (host has it, `uLitDif1/2`), per-slot ambient (host has it, folded into `uAmbient`), the
+per-fragment normal (host has `vNrmView`), and **material specular (now parsed)**, but still no
+per-slot **light** specular. That is a single named function to decompile, and it is the whole
+remainder of the transport.
+
+**There is no N64/F3DEX analogue to cross-check the specular against, and that is worth knowing
+before someone looks for one.** The F3DEX2 RSP here is *interpreted*
+(`Shipwright/libultraship/src/fast/interpreter_rsp.cpp:232-288`, inside `Interpreter::GfxSpVertex`),
+it runs **per vertex**, and its lighting is diffuse-only: `intensity = dot(n, coeff)/127`, then
+`r = ambient + intensity * light.col`, clamped. No `N·H`, no half-vector, no view vector, no
+specular anywhere. `grep -rni specular` over `libultraship/src/fast/` and `cmb3d/` returns **zero**
+hits, and the only mentions in `soh/src/zelda3d/` are comments recording that the term is unused.
+So a flat additive specular is PICA-specific, it cannot be validated against the N64 path, and the
+vertex-lit CmbVShader path will never grow one on its own.
+
 **A trap this measurement walked into, recorded so it is not walked into again.** `light_enable` is
 **not a bitmask of enabled slots** — Azahar reads it as a per-slot *light index*
 (`pica_core.cpp:100`, `regs.light_enable.GetNum(slot)`), and the capture's `slot_mapping` array is that
