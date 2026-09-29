@@ -161,29 +161,72 @@ def colour_to_unit(raw: str) -> tuple[int, int, int] | None:
 
 
 def search_tables(values: dict[str, tuple[int, int, int]]) -> None:
-    """Does the captured specular appear in a recovered scene-lighting table?
+    """Is the captured light specular already present in a recovered scene-lighting table?
 
-    A hit would mean the producer is the environment record and no new RE is needed. A miss is
-    equally informative, so the scanned extent is printed either way.
+    The first version of this reported `matched 0` and that zero was **meaningless**: it unpacked
+    the 10-bit-per-channel PICA `LightColor` (0..1023) and compared it, unscaled, against 8-bit
+    table bytes (0..255), so it was looking for values in a range the table cannot contain. A
+    "true positive" could not have been detected. Diagnosed as an instrument that cannot show the
+    other answer, which is why it is being fixed rather than reported.
+
+    The domain bridge is `round(v10 * 255 / 1023)`, the inverse of `LightColor::ToVec3f` scaled
+    into the table's byte domain, and it is applied to the CAPTURE rather than to the table, so
+    there is exactly one conversion and it is the one the consumer implies (both tables are read
+    `/255.0f` on 8-bit data).
+
+    The search is field-aware rather than a whole-file regex: a record is six brace groups and only
+    `amb`, `l0col`, `l1col` and `fogCol` are colours, so matching every integer triple would also
+    match direction vectors and fog distances. Matching the wrong element is how this project has
+    produced several confident wrong answers, so the colour fields are selected explicitly.
     """
     tables = [
         REPO / "Shipwright/soh/src/zelda3d/tables/zelda3d_scene_lighting.inc",
         REPO / "2ship/2s2h/zelda3d/mm3d_scene_lighting.inc",
     ]
-    triples = {v for v in values.values() if v != (0, 0, 0)}
+    # The two games' records are both {{amb},{l0dir},{l0col},{l1dir},{l1col},{fogCol}} + distances,
+    # so the colour groups are the 0th, 2nd, 4th and 5th brace group of a record.
+    colour_groups = (0, 2, 4, 5)
+    captured = {v for v in values.values() if v != (0, 0, 0)}
+    bridged = {(round(c * 255 / 1023), round(g * 255 / 1023), round(b * 255 / 1023))
+               for c, g, b in captured}
+
     for table in tables:
         if not table.is_file():
             print(f"    {table.name}: ABSENT")
             continue
-        text = table.read_text(errors="replace")
-        # A table entry is a parenthesised integer triple; compare in the same 0..255-ish domain
-        # the capture reports, tolerating the /255 scaling used in the .inc.
-        rows = re.findall(r"\(?\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)?", text)
-        scaled = {(round(int(r) / 255.0 * 255), round(int(g) / 255.0 * 255), round(int(b) / 255.0 * 255))
-                  for r, g, b in rows}
-        hits = sorted(triples & (scaled | {s for s in scaled}))
-        print(f"    {table.name}: scanned {len(rows)} triples, matched {len(hits)}"
-              + (f" -> {hits}" if hits else ""))
+        # A record is one line: `{{a,b,c},{d,e,f},{g,h,i},{j,k,l},{m,n,o},{p,q,r}, n, f, f},`
+        # so the six brace groups come in order on a single line. Matching innermost groups and
+        # chunking by 6 is simpler and more robust than nesting-aware regexes, and the first
+        # attempt at that scanned 0 triples and would have reported that as a clean miss.
+        candidates: set[tuple[int, int, int]] = set()
+        record_count = 0
+        for line in table.read_text(errors="replace").splitlines():
+            if not line.lstrip().startswith("{"):
+                continue
+            record_count += 1
+            groups = re.findall(r"\{([^{}]*)\}", line)
+            for index in colour_groups:
+                if index < len(groups):
+                    parsed = [int(x) for x in re.findall(r"-?\d+", groups[index])[:3]]
+                    if len(parsed) == 3:
+                        candidates.add(tuple(parsed))
+        hits = sorted(bridged & candidates)
+        print(f"    {table.name}: scanned {len(candidates)} colour triples from {record_count} "
+              f"records, matched {len(hits)}" + (f" -> {hits}" if hits else ""))
+        # CONTROL. The first version of this planted an ARBITRARY triple and required it back,
+        # which fails for a correct search -- it was a control that could only ever say "broken".
+        # The defect it must catch is the BRIDGE (10-bit capture vs 8-bit table), so the control
+        # now round-trips a value that IS in the table: take a real table colour, encode it as the
+        # 10-bit value the hardware would hold, and require the bridge to decode it back to the
+        # original. If that fails, `matched 0` above is unknown, not a negative.
+        if candidates:
+            sample = sorted(candidates)[len(candidates) // 2]
+            as_ten_bit = tuple(min(1023, round(channel * 1023 / 255)) for channel in sample)
+            back = (round(as_ten_bit[0] * 255 / 1023), round(as_ten_bit[1] * 255 / 1023),
+                    round(as_ten_bit[2] * 255 / 1023))
+            print(f"      control: table colour {sample} encodes to {as_ten_bit} and decodes back to "
+                  f"{back} -> " + ("PASS (the bridge round-trips)" if back == sample
+                                    else "FAIL -- treat the miss above as unknown"))
 
 
 def main() -> int:
