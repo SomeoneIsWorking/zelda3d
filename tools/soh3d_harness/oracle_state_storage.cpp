@@ -1,6 +1,8 @@
 #include "oracle_state_storage.h"
 
 #include <cstdio>
+#include <exception>
+#include <string>
 #include <utility>
 
 #include "binary_file.h"
@@ -9,9 +11,26 @@
 
 namespace HarnessOracleStorage {
 
-bool LoadStateFile(const std::string& path) {
+// `boost::archive::archive_exception` derives from `std::exception`, so catching the standard
+// type keeps the harness free of a boost include and still catches the real failure. The catch is
+// deliberately at this owner: `LoadStateBuffer` is reached from the REPL, from the cache
+// importer, and from the gameplay boot route, and a throw that terminates the process is worse
+// than a false return in every one of them.
+StateLoadResult LoadStateFile(const std::string& path) {
     auto buffer = HarnessBinaryFile::Read(path);
-    return !buffer.empty() && Core::System::GetInstance().LoadStateBuffer(std::move(buffer));
+    if (buffer.empty()) {
+        return {false, "unreadable"};
+    }
+    try {
+        if (!Core::System::GetInstance().LoadStateBuffer(std::move(buffer))) {
+            return {false, "incompatible"};
+        }
+    } catch (const std::exception& exception) {
+        return {false, std::string("error:") + exception.what()};
+    } catch (...) {
+        return {false, "error:unknown"};
+    }
+    return {true, ""};
 }
 
 bool HandleLoad(std::istringstream& arguments) {
@@ -20,8 +39,12 @@ bool HandleLoad(std::istringstream& arguments) {
         HarnessRepl::PrintErr("loadstate: usage: loadstate <path>");
         return false;
     }
-    if (!LoadStateFile(path)) {
-        HarnessRepl::PrintErr("loadstate: read/deserialize failed");
+    const StateLoadResult result = LoadStateFile(path);
+    if (!result.loaded) {
+        // `PrintErr` takes a `const char*`, not a `std::string`, so the reason is formatted into a
+        // named local rather than concatenated at the call.
+        const std::string message = "loadstate: failed reason=" + result.reason;
+        HarnessRepl::PrintErr(message.c_str());
         return false;
     }
     std::printf("ok\n");

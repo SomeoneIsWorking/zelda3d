@@ -12,6 +12,7 @@
 #include "frame_watchdog.h"
 #include "libretro.h"
 #include "oracle_state_storage.h"
+#include "repl_protocol.h"
 #include "soh_runtime.h"
 #include "soh_title_bridge.h"
 #include "title_sync.h"
@@ -26,7 +27,14 @@ uint64_t gArmAdvanceRuns = 0;
 float gArmAnchorEye[3] = { 0, 0, 0 };
 
 bool ReloadOracleToBaseline() {
-    if (!HarnessOracleStorage::LoadStateFile(kTitleSettledStatePath)) {
+    const HarnessOracleStorage::StateLoadResult load =
+        HarnessOracleStorage::LoadStateFile(kTitleSettledStatePath);
+    if (!load.loaded) {
+        // Name the reason: a baseline reload that fails silently is indistinguishable from a
+        // scene that changed, and this is the route every cached capture is taken through.
+        // `PrintErr` takes a `const char*`, so the reason is formatted into a named local.
+        const std::string message = "title_sync: baseline state load failed reason=" + load.reason;
+        HarnessRepl::PrintErr(message.c_str());
         return false;
     }
     FrameWatchdog watchdog("ReloadOracleToBaseline/retro_run");
