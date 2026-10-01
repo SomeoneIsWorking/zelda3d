@@ -8,7 +8,7 @@ morph must cover. Driving morphFrames = gap / OOT3D_BUDGET (the oracle's measure
 ceiling) bounds the per-frame velocity to oracle parity, and picking the end with the smaller gap chooses
 the nearer continuation — replacing the decomp's leg-phase sweet-spot math, which assumes a CSAB↔leg-phase
 offset K=0 that does NOT hold for Zelda3D's single-CSAB (non-blend) walk, so it let morphFrames collapse to
-~0 at the wrong φ → the 119° arm snap (measured, tools/walk_stop_phase_sweep.py).
+~0 at the wrong φ → the 119° arm snap (measured over the phase sweep).
 
 bone9 (upper-pivot/spine twist) is INCLUDED and is decisive for the R/L choice: endR@0 and endL@0
 differ ~90° on bone9 because they continue OPPOSITE-foot strides (the torso counter-twist). walk@φ's

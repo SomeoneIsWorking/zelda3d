@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """title_settle.py — generate the current render-contract title checkpoint once.
 
-`title_ab.py`, `oracle_cache.py`, `title_daytime_scan.py` etc. all treat
+`title_ab.py`, `oracle_cache.py` etc. all treat
 the render-contract-keyed title checkpoint as an input they require but none
 of them produce it. This tool creates that cache input once. A matching
 checkpoint is reused without launching the oracle; a serializer-contract

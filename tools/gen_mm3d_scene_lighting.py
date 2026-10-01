@@ -15,9 +15,9 @@ the old measurement: parsing those 182 files as plain yields 256 distinct "ctype
 entire byte space, which is the signature of data, not a command stream.
 
 **The record layout DIFFERS, and that is the trap this module is built to prevent.** So both layouts
-live here as data, in one place, and `tests/test_gen_mm3d_scene_lighting.py` checks them
-two-sided: at the MM layout OoT3D scores zero, and at the OoT3D layout MM scores zero. A generator
-that hard-coded one game's offsets would pass a one-sided check and silently misread the other game.
+live here as data, in one place, and the cross-title check is deliberately two-sided: at the MM layout
+OoT3D scores zero, and at the OoT3D layout MM scores zero. A generator that hard-coded one game's
+offsets would pass a one-sided check and silently misread the other game.
 An OoT3D-derived consumer hard-coded to `+0x0A` reads MM3D's `fogColor` as its second light colour.
 
     MM3D record, 0x20 bytes at (cmd-0x0F ptr + 0x28):
