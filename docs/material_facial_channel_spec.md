@@ -148,8 +148,8 @@ draw state".
   - **Open question to resolve at impl time (see Unknowns):** whether the alternate eye frames are
     distinct *textures* (name-suffix `eye00/eye01/...`) — the expected case — or distinct *materials*,
     or sub-rects of one texture (UV-based mat-anim). For the common OoT3D NPC face the frames are
-    distinct textures; build the name→frame table from the live CMB dump (`tools/link_cmb_dump.py`
-    already dumps per-mesh material/texture, extend it to list all `*eye*`/`*mouth*` texture names per
+    distinct textures; build the name→frame table from a live CMB dump (`tools/cmb.py`
+    already dumps per-mesh material/texture; add a mode that lists all `*eye*`/`*mouth*` texture names per
     face CMB for En_Ko/En_Sa so the frame order can be confirmed, not guessed).
 
 ### A3. Driver: `Shipwright/soh/src/soh3d/soh3d_anim_override.{h,cpp}`
@@ -204,9 +204,9 @@ limb-18 condition is just *when* the toggle flips; the OUTPUT is mesh show/hide.
 - **Needs (Unknown):** which `zelda_sa` CMB **mesh_ids** are the ocarina-hand vs empty-hand meshes.
   The OoT3D mesh INDICES (2 / 5) in the decomp doc are OoT3D draw-time mesh indices and may not equal
   the parsed CMB `mesh_id` byte (`mshs[i].mesh_id`); confirm by dumping `zelda_sa`'s meshes
-  (extend `tools/link_cmb_dump.py` to print per-mesh `mesh_id` + bones + material for `zelda_sa.zar`),
+  (add a `tools/cmb.py` mode that prints per-mesh `mesh_id` + bones + material for `zelda_sa.zar`),
   framing En_Sa in the Meadow live, and finding which mesh is the ocarina. Same workflow that mapped
-  the En_Ko head variants (`link_cmb_dump.py`, `soh3d.c:2053-2056`).
+  the En_Ko head variants (`tools/cmb.py`, `soh3d.c:2053-2056`).
 - Wire it in next to the En_Ko mask at `soh3d.c:2244` (generalize the call so it covers any auto actor
   with a mid-mask row, not just En_Ko).
 
@@ -230,7 +230,7 @@ follow-up, not part of the P0 minimum.
 | `Shipwright/soh/src/soh3d/soh3d_model.cpp` | set `cg.materialIndex` in `makeCgroup`; add `SoH3D_FindMaterialByTexName` / `SoH3D_FindFaceTexFrame` over `Cmb` materials/textures |
 | `Shipwright/soh/src/soh3d/soh3d_anim_override.{h,cpp}` | `FacialActor` table (ZAR-keyed, parallel to `kTrackActors`); read live eye/mouth indices from N64 actor; map index→tex; call `SoH3D_GL_SetMatTexOverride`; clear at top; `gSoH3dFacial` gate |
 | `Shipwright/soh/src/soh3d/soh3d.c` | generalize `SoH3D_EnKoMidMask` → `SoH3D_AutoActorMidMask` covering En_Sa ocarina (scene-`0x56`-gated) + En_Sa blink-overlay; keep the `SetMidMask` call at ~2244 |
-| `tools/link_cmb_dump.py` | extend to dump per-mesh `mesh_id` + all `*eye*`/`*mouth*` texture names for `zelda_sa` / `zelda_km1` / `zelda_kw1` (feeds the frame→tex + ocarina-mesh tables) |
+| `tools/cmb.py` | add a mode dumping per-mesh `mesh_id` + all `*eye*`/`*mouth*` texture names for `zelda_sa` / `zelda_km1` / `zelda_kw1` (feeds the frame→tex + ocarina-mesh tables) |
 
 ## New per-model channel API (analogous to `SoH3D_SetBonePostRot`)
 
@@ -263,7 +263,7 @@ on the `SoH3D_DoRetarget` auto branch (`soh3d.c:2148`+, `SetMidMask` at 2244):
 
 1. **Eye/mouth material slot + frame→texture mapping per face CMB** (En_Ko km1/kw1, En_Sa). Whether the
    eye frames are distinct textures (`*eye00/01/..`, expected) or UV sub-rects; the frame ORDER. Resolve
-   by extending `link_cmb_dump.py` to list every `*eye*`/`*mouth*` texture + owning material per CMB and
+   by adding a `tools/cmb.py` mode that lists every `*eye*`/`*mouth*` texture + owning material per CMB and
    cross-checking against the OoT3D mat-anim order. The decomp doc gives the index SEMANTICS (En_Sa eye
    = direct, mouth = remap {0,3,4,1,2}); it does NOT give the SoH3D CMB texture indices.
 2. **N64-side live eye/mouth index field offsets** in `z_en_sa.c` / `z_en_ko.c` (these are N64 offsets,
@@ -288,7 +288,7 @@ on the `SoH3D_DoRetarget` auto branch (`soh3d.c:2148`+, `SetMidMask` at 2244):
 
 ---
 
-## Resolved unknowns (2026-06-22, read-only dump pass; tools `tools/face_cmb_dump.py` + extended `tools/cmab.py` use)
+## Resolved unknowns (2026-06-22, read-only dump pass through `tools/cmab.py`)
 
 > ⚠ **The spec's central premise about facial is WRONG and the implementation MUST change.** The
 > alternate eye/mouth frame sprites are **NOT bundled in the CMB `tex ` chunk** (`*eye00/01/...`).
@@ -398,6 +398,5 @@ correct; OoT3D and N64 scene ids align here. `z_en_sa.c` gates the ocarina DL sw
   for the live variant.
 - Ocarina (Part B1): midMask mesh_id 5 = ocarina hand, mesh_id 2 = empty hand; scene-0x56-gated.
 
-New tool added (read-only, uncommitted): `tools/face_cmb_dump.py` (per-CMB material/tex/mesh dump). The
-cmab frame names were extracted with `tools/cmab.py` (TexturePalette path) + a `strt`-table read; consider
-folding a `--names` mode into `tools/cmab.py` when implementing.
+The cmab frame names were extracted with `tools/cmab.py` (TexturePalette path) + a `strt`-table read;
+add a `--names` mode to `tools/cmab.py` when implementing.

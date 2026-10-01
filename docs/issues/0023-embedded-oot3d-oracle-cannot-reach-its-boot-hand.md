@@ -78,10 +78,8 @@ with it. That is why this issue could only ever say "it kills the oracle": the p
 to say why. `tools/soh3d_harness/oracle_state_storage.cpp` now owns the boundary, returns a typed
 `StateLoadResult` with a greppable `reason` (`unreadable` / `incompatible` / `error:<what()>`), and
 keeps the session alive so the failure becomes a measurement. The one other call site,
-`title_sync_runtime.cpp`'s baseline reload, now reports the reason too. Pinned structurally by
-`tools/test_harness_structure.py::SavestateLoadFailureTests` (5 tests, mutation-verified). A
-structural test cannot prove the behaviour; the honest next step is still to load the state with a
-ROM present and read the real `what()`.
+`title_sync_runtime.cpp`'s baseline reload, now reports the reason too. The honest next step is
+still to load the state with a ROM present and read the real `what()`.
 
 
 ## Root cause
@@ -132,16 +130,16 @@ more capabilities look blocked than are. Measured:
   `title/0004000e/00033500/content/00000000.app` and the empty save slots).
 
 So the residual blocker is precisely: **produce one gameplay savestate for the current Azahar build.**
-Everything downstream of that — the material-identified gameplay command lists that
-`tools/cmb_shader_uniform_coverage.py` says `render.cmb-texcoord-mapping` items (1), (2) and (4)
-need, and any gameplay-scoped host-vs-oracle image — is waiting on that one artifact, not on new RE.
+Everything downstream of that — the material-identified gameplay command lists the CMB texcoord
+mapping work needs, and any gameplay-scoped host-vs-oracle image — is waiting on that one artifact,
+not on new RE.
 
 The pre-handshake Vulkan work recorded below stays valid and stays fixed; it was never this blocker.
 
 ## The cold route, measured frame by frame (2026-09-27): the blocker is external state, and it is exact
 
 The record above said the cold title route "fails". It did not say *where*, so it was re-driven with
-a frame captured at every step (`tools/title_flow_watch.py`, `tools/title_load_watch.py`). The flow is
+a frame captured at every step through the harness REPL. The flow is
 **order-sensitive in a way that made earlier recipes look broken**:
 
 * **A alone does nothing at all.** `scene` stays `0x006b`, `playstate` stays `mode=title`.
@@ -187,7 +185,7 @@ second is a hand-built binary filesystem.
 
 The lit-material ground truth for `render.cmb-fragment-lighting` needs a gameplay scene, and this
 issue is why it cannot be had. Measured over **207 draws at two points in the title demo: `picaLit=1`
-on zero of them, 159 vertex-lit** (`tools/lit_pica_capture.py`, selecting on the authoritative
+on zero of them, 159 vertex-lit** (selecting on the authoritative
 `regs.lighting.disable`, not the independent CmbVShader boolean). The title demo is simply not a
 fragment-lit scene, which is why every fragment-lighting capture in this project is a negative control.
 
