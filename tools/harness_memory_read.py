@@ -4,7 +4,7 @@
 refuted a correctly-recorded project finding.** A probe read a structure's `+0x180..0x1C0` region, got
 all zeros, and concluded the fragment-lighting configuration object was not the per-material record --
 which `oot3d-decomp/docs/fragment_lighting.md` had recorded as FOUND two days earlier. It was not a
-wrong inference; the read had never happened. `lit_object_dump.py` runs the title demo before reading
+wrong inference; the read had never happened. the title demo runs to completion before reading
 and the probe did not, so the heap was still empty and every statistic drawn from it was a plausible
 wrong number. The same failure had already been diagnosed, and gated, inside the first tool -- and the
 gate did not help, because it lived in that tool and the second script never called it.
@@ -31,7 +31,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 
 # How many frames the title demo needs before the fragment path has produced a configuration. This is
-# the value `lit_object_dump.py` used and validated; it is the reference, not a guess.
+# the value the title-demo read validated; it is the reference, not a guess.
 WARM_FRAMES = 400
 WARM_TIMEOUT = 300.0
 

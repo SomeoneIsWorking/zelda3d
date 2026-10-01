@@ -5,7 +5,7 @@ Two independent cache namespaces share the scratch/oracle_cache/ root
 
   scratch/oracle_cache/warp/<ent>_<dayTime>.json
       The ORIGINAL warp-probe cache (this module's `warp()`/`invalidate()`
-      functions, used by tools/market_scene_probe.py): memoizes
+      functions): memoizes
       a harness warp to (<ent>, <dayTime>) —
       scene/head/pos/rot — since a warp costs ~3-5s of oracle time and is
       deterministic for a given (entrance, dayTime).
@@ -58,7 +58,7 @@ sys.path.insert(0, os.path.join(REPO, "tools"))
 
 # ---------------------------------------------------------------------------
 # Warp-probe cache (original; scratch/oracle_cache/warp/) — unchanged API,
-# consumed by tools/market_scene_probe.py.
+
 # ---------------------------------------------------------------------------
 
 def _cache_path(entrance, day_time):
@@ -349,7 +349,7 @@ def main(argv) -> int:
     inv = sub.add_parser("invalidate", help="delete all frame/probe cache entries for the CURRENT key context")
     inv.set_defaults(func=cmd_invalidate)
 
-    wp = sub.add_parser("warp", help="debug: warp-probe cache lookup (see warp()/market_scene_probe.py)")
+    wp = sub.add_parser("warp", help="debug: cached warp-context lookup")
     wp.add_argument("entrance")
     wp.add_argument("day_time")
     wp.add_argument("--refresh", action="store_true")
