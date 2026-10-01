@@ -106,14 +106,14 @@ Some of what that has produced:
 - `Shipwright/cmb3d/` — 3DS asset readers (CMB, CSAB, ZAR, ZSI, CMAB, faceb)
 - `tools/` — build, capture, and the oracle harness + parity tooling
 - `oot3d-decomp/`, `mm3d-decomp/` — reverse-engineering notes and derived C (submodules)
-- `docs/` — architecture, [codemap](docs/codemap.md), [parity map](docs/parity-map.md),
-  [RE frontier](docs/re-frontier.md)
+- `docs/` — architecture, [codemap](docs/codemap.md), [project state](docs/project-state.md),
+  and the open issues in `docs/issues/`
 
 ## Status
 
 Actively in development, and not a finished product. Rendering parity is measured
-scene-by-scene rather than assumed; `docs/parity-map.md` records what is confirmed at parity
-and `docs/re-frontier.md` records what is still reverse-engineering debt.
+scene-by-scene rather than assumed; `docs/project-state.md` records what is verified, what is
+partial, and what is still missing.
 
 ## Licence
 

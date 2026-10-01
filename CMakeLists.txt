@@ -406,24 +406,54 @@ if(LUS_BUILD_TESTS)
 
     # The remaining MM3D Player selection policies are pure lookup/decision owners, so each
     # exercises its shipping translation unit directly with no game engine linked.
-    foreach(policy
-        model      : mm3d_player_model_policy
-        mesh       : mm3d_player_mesh_policy
-        sheath     : mm3d_player_sheath_policy
-        right_hand : mm3d_player_right_hand_policy
-        left_hand  : mm3d_player_left_hand_policy
-        bottle     : mm3d_player_bottle_material_policy
-        deku_spin  : mm3d_player_deku_spin_material_policy)
-        string(REPLACE ":" ";" policy_parts "${policy}")
-        list(GET policy_parts 0 policy_tag)
-        list(GET policy_parts 1 policy_name)
-        set(policy_target mm3d_player_${policy_tag}_policy_test)
-        add_executable(${policy_target}
-            tools/mm3d_player_${policy_tag}_policy_test.cpp
-            2ship/2s2h/zelda3d/${policy_name}.cpp)
-        target_include_directories(${policy_target} PRIVATE ${ZELDA3D_MM_DIR})
-        add_test(NAME ${policy_target} COMMAND ${policy_target})
-    endforeach()
+    add_executable(mm3d_player_model_policy_test
+        tools/mm3d_player_model_policy_test.cpp
+        2ship/2s2h/zelda3d/mm3d_player_model_policy.cpp
+    )
+    target_include_directories(mm3d_player_model_policy_test PRIVATE ${ZELDA3D_MM_DIR})
+    add_test(NAME mm3d_player_model_policy_test COMMAND mm3d_player_model_policy_test)
+
+    add_executable(mm3d_player_mesh_policy_test
+        tools/mm3d_player_mesh_policy_test.cpp
+        2ship/2s2h/zelda3d/mm3d_player_mesh_policy.cpp
+    )
+    target_include_directories(mm3d_player_mesh_policy_test PRIVATE ${ZELDA3D_MM_DIR})
+    add_test(NAME mm3d_player_mesh_policy_test COMMAND mm3d_player_mesh_policy_test)
+
+    add_executable(mm3d_player_sheath_policy_test
+        tools/mm3d_player_sheath_policy_test.cpp
+        2ship/2s2h/zelda3d/mm3d_player_sheath_policy.cpp
+    )
+    target_include_directories(mm3d_player_sheath_policy_test PRIVATE ${ZELDA3D_MM_DIR})
+    add_test(NAME mm3d_player_sheath_policy_test COMMAND mm3d_player_sheath_policy_test)
+
+    add_executable(mm3d_player_right_hand_policy_test
+        tools/mm3d_player_right_hand_policy_test.cpp
+        2ship/2s2h/zelda3d/mm3d_player_right_hand_policy.cpp
+    )
+    target_include_directories(mm3d_player_right_hand_policy_test PRIVATE ${ZELDA3D_MM_DIR})
+    add_test(NAME mm3d_player_right_hand_policy_test COMMAND mm3d_player_right_hand_policy_test)
+
+    add_executable(mm3d_player_left_hand_policy_test
+        tools/mm3d_player_left_hand_policy_test.cpp
+        2ship/2s2h/zelda3d/mm3d_player_left_hand_policy.cpp
+    )
+    target_include_directories(mm3d_player_left_hand_policy_test PRIVATE ${ZELDA3D_MM_DIR})
+    add_test(NAME mm3d_player_left_hand_policy_test COMMAND mm3d_player_left_hand_policy_test)
+
+    add_executable(mm3d_player_bottle_material_policy_test
+        tools/mm3d_player_bottle_material_policy_test.cpp
+        2ship/2s2h/zelda3d/mm3d_player_bottle_material_policy.cpp
+    )
+    target_include_directories(mm3d_player_bottle_material_policy_test PRIVATE ${ZELDA3D_MM_DIR})
+    add_test(NAME mm3d_player_bottle_material_policy_test COMMAND mm3d_player_bottle_material_policy_test)
+
+    add_executable(mm3d_player_deku_spin_material_policy_test
+        tools/mm3d_player_deku_spin_material_policy_test.cpp
+        2ship/2s2h/zelda3d/mm3d_player_deku_spin_material_policy.cpp
+    )
+    target_include_directories(mm3d_player_deku_spin_material_policy_test PRIVATE ${ZELDA3D_MM_DIR})
+    add_test(NAME mm3d_player_deku_spin_material_policy_test COMMAND mm3d_player_deku_spin_material_policy_test)
 endif()
 
 ################################################################################

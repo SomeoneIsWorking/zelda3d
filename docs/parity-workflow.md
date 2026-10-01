@@ -4,11 +4,7 @@ The workflow that worked for title-screen parity. Reusable for ANY SoH3D↔OoT3D
 work (a scene, an actor, a lighting pass). Distilled 2026-07-08 from a session where the
 first three "bugs" turned out to be false alarms — the method below is what fixed that.
 
-See also: **`docs/codemap.md`** (what subsystem you're closing a gap in),
-**`docs/re-frontier.md`** (the ordered RE step this workflow is verifying — a step only becomes
-`re-verified` there once it survives the matched-frame audit below), and **`docs/parity-map.md`**
-(the CLOSED-CASES registry — when this workflow moves an item to parity, record a CLOSED-parity
-row there so sweeps/loops don't re-examine it; check it FIRST so you don't re-audit a closed case).
+See also **`docs/codemap.md`** (what subsystem you're closing a gap in).
 
 ## The one rule everything else serves
 **Verify against the oracle at CONTENT-MATCHED frames before you trust a finding OR a fix.**
@@ -30,9 +26,8 @@ Without this, skip to nothing — you'll just generate plausible-but-wrong work.
 
 ## Phase 1 — AUDIT at matched frames
 Enumerate real divergences quantitatively at matched frames. Rank by severity. A divergence
-only counts if it survives a genuine content-match. Persist the ranked list to
-`debug_journal/`. Re-measure if the matching tool later improves (this session's first audit
-used mismatched frames and had to be superseded).
+only counts if it survives a genuine content-match. Re-measure if the matching tool later
+improves (a first audit that used mismatched frames has to be superseded).
 
 ## Phase 2 — RE each divergence to GROUND TRUTH (the oot3d-decomp, not memory pokes)
 For each real gap, extend the OoT3D decomp until it covers the behavior; derive the correct
@@ -44,13 +39,6 @@ live oracle — dynamic observation (harness watchpoints, dump diffs) is permitt
 find the writer PC / struct address that static xrefs missed, after which you return to
 Ghidra and derive the mechanism from code. **"It's an asset difference" is NOT a terminal answer** — SoH already
 renders 3DS assets from the ROM, so an asset-rooted gap means "port that exact 3DS asset."
-
-**A separate, complementary RE track — CONTROL/DEBUG tooling on the N64-side decomp** (the
-`Shipwright/soh/src/`/`2ship/` code SoH vendors in-tree, NOT the 3DS ground-truth decomp
-above): `docs/re_control_debug_backlog.md` tracks unnamed/poorly-understood N64-decomp functions
-and fields whose further RE would unlock a better FORCE-state primitive or a cleaner debug readout
-for the sweeps, instead of the current bypass-the-gate Force* hooks. Consult it before re-deriving
-a sweep control/debug gap; add rows when a sweep session hits a fresh one.
 
 ## Phase 3 — FIX, and honor proven-negatives
 Root-cause, never bandaid. If RE proves the "divergence" isn't a bug (this session: terrain
@@ -143,9 +131,6 @@ again for a frame already captured in a prior session.
   rather than serving wrong data.
 - **soh3d_harness is single-instance** (PID-locked) — the frame cache does not change
   that; `warm`/`ab` cache-miss paths still need exclusive access to the harness process.
-  The tracked `tools/oracle_draw_isolate.py` also caches a completed per-draw sweep (including
-  its raw logs, base image, masks, and report) by entrance/time/probe settings before starting
-  a new oracle instance.
 
 ## Hi-res texture pack — ONE switch, both sides (`ZELDA3D_HARNESS_TEXPACK`)
 
@@ -166,7 +151,7 @@ get hi-res on one side and vanilla on the other**:
 - This is a **test-harness control**, not an N64-vs-3DS behaviour gate — the no-opt-out-gates
   rule is about game behaviour; keeping an A/B like-for-like is exactly what a harness switch
   is for. Use `off` when a comparison depends on stock texture content (e.g. the title
-  wordmark/copyright that `tools/title_sbs_verify.py`'s `content_score` reads) — but set it
+  wordmark/copyright art) — but set it
   for the whole run, so both sides move together.
 - **Prove it, don't assume it**: the `texpack` REPL command prints both sides in one line —
   `ok texpack mode=on root=<abs> az=<files>/<materials> az_hits=<h>/<m> soh=<indexed>
@@ -178,33 +163,14 @@ get hi-res on one side and vanilla on the other**:
   texpack env, so a game launched from the repo root (where `textures/` lives) is **hi-res** —
   and comparing that against oracle artifacts captured vanilla is the trap below.
 
-### Worked example: an entire "renderer deficit" that was only this asymmetry
-
-`render.zora-ground-deficit` sat on the RE frontier as an unexplained scene-wide 0.79/0.86
-darkening of Zora's ground and walls, with three shading hypotheses queued behind it. It was
-none of them: the oracle masks had been captured by a harness predating the "both sides" switch
-(Azahar vanilla) while the comparison screenshots came from the standalone game (hi-res), and
-the pack's Zora rock/ground art is ~20% darker than the ROM texels. Vanilla on both sides the
-same draws measure 0.977 and 1.002. Two rules came out of it, both now enforced in code:
-
-- `tools/oracle_draw_isolate.py` writes `texpack.txt` beside the masks, and
-  `tools/tev_mask_ratio.py` **hard-fails on an asymmetry** (or on an unknown state) rather than
-  printing a ratio. It also excludes our HUD by default — OoT3D's HUD is on the 3DS **bottom**
-  screen, so the oracle's top-screen capture has none while ours is fully overlaid.
-- A draw's isolation mask is *"pixels this draw changes"*, so a mask lying under a translucent
-  layer **inherits that layer's error**. Zora's rock wall read 0.88 over its whole mask and
-  1.002 over the pixels no other draw touches. Attribute residuals with
-  `tev_mask_ratio.py … --exclusive` before believing a per-surface number.
-
 ## Link (on-foot) state-matrix sweep — `tools/link_sweep.py`
 
 Reusable for the ZELDA3D_LINK on-foot Link body specifically (locomotion + discrete actions).
 Don't re-derive a Link state matrix or a fresh oracle transport — start here.
 
 - **Tool**: `tools/link_sweep.py sweep [--skip-oracle] [--only a,b,c]` drives Link through a
-  full state matrix in BOTH engines and writes `docs/link_parity_checklist.md`
-  (auto-generated — never hand-edit it; edit `STATE_MATRIX` in the tool instead). Raw
-  per-run JSON: `scratch/link_sweep/<ts>.json` + `latest.json` (gitignored, diffable).
+  full state matrix in BOTH engines. Raw per-run JSON lands in `scratch/link_sweep/<ts>.json`
+  + `latest.json` (gitignored, diffable).
   `show <state>` / `list [--status]` / `resolve <state> --commit <hash>` round out the CLI.
 - **Composes, does not reimplement**: `parity_state_sweep.py` (discrete forced-state CSAB
   selection vs oot3d-decomp ground truth) and `parity_speed_sweep.py` (SoH-side locomotion

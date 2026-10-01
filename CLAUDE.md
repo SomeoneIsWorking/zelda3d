@@ -11,14 +11,10 @@ SoH/OoT under `Shipwright/soh/` and 2Ship/MM under `2ship/`. The 3DS layers are 
 source layout, dependency direction, and release packaging map. Use its current paths rather than
 copying a layout from another port.
 
-Start nontrivial work with `tools/info.py brief <terms>`. Consult `docs/project-goals.md` for durable
-outcomes, `docs/project-state.md` for current capability status and focus, `docs/issues/` for atomic
-work, `docs/codemap.md` for ownership and placement, and `docs/re-frontier.md` for the next grounded
-RE dependency. Update only the authority whose answer changes. `docs/parity-map.md` records specific
-oracle comparisons; a closed case needs new regression evidence or a user request before reopening.
-`docs/parity-workflow.md` describes the comparison method. `KANBAN.md` and `debug_journal/` contain
-earlier reports and evidence; consult them for provenance, then record current issues and capability
-status in their canonical authorities.
+Consult `docs/project-goals.md` for durable outcomes, `docs/project-state.md` for current capability
+status and focus, `docs/issues/` for open bugs and missing features, and `docs/codemap.md` for
+ownership and placement. Update only the authority whose answer changes. `docs/parity-workflow.md`
+describes how a host-vs-oracle comparison is run.
 
 The launcher composes the two game cores. Keep actor behavior in focused modules under each game's
 `zelda3d/` tree and renderer mechanics in their existing resource, pipeline, pass, lifecycle, and
@@ -30,7 +26,7 @@ not coupled to the 3DS presentation boundary.
 behavioral divergence, recover the relevant 3DS behavior there and port the proven difference
 through the owning module. SoH's N64 struct-offset comments do not describe this 64-bit process's
 layout after pointer fields; read typed C fields instead of probing guessed offsets. Record new
-binary findings in the relevant decomp docs and project RE authority.
+binary findings in the relevant decomp docs.
 
 ## Driving and verification
 
@@ -41,8 +37,7 @@ embedded, windowless Azahar oracle is built through `tools/soh3d_harness.py` and
 `PlayState`; `warp` requires a loaded save. Extend the harness when a needed observation is missing.
 
 Reproduce the failing state through the shipping interaction path before changing behavior. Use
-the oracle and production probes for a focused discriminator, then exercise the live user path for a
-user-visible fix. A forced pose or one-frame comparison alone cannot prove the full interaction.
+the oracle for a focused discriminator, then exercise the live user path for a user-visible fix.
 `docs/lus_input_architecture.md` explains the existing physical-input to N64-pad route when input
 work is involved. For oversized source inspection, `tools/codequery.py` provides `outline`,
 `slice`, `def`, `callers`, and `find`.

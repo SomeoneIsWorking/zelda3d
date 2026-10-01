@@ -171,9 +171,6 @@ Current application boundaries:
   under `tools/clang_verifier/`. C/C++/header/Python structure is checked independently of which
   files clang-tidy compiles. Source selection ignores tracked symlink entry points: their targets
   remain owned and verified by their canonical repository instead of becoming duplicate local code.
-- `tools/info.py` is the repo-relative compatibility entry point to the canonical
-  `../shared/re-harness/tools/info.py`; it keeps every project registry query available without copying
-  the shared implementation into this repository.
 - `tools/cmake_build_policy.py` is the single shared CMake cache, Clang, Ninja, and configure-policy
   owner used by launcher and harness builds; those entry points do not duplicate build policy.
 - `Shipwright/libultraship/tools/dlist_harness/dlist_harness.cpp` is a 101-line composition entry
