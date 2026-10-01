@@ -66,7 +66,7 @@ set(SPDLOG_MIN_CUTOFF SPDLOG_LEVEL_TRACE CACHE STRING "cutoff at trace")
 # AddressSanitizer, off by default. Built in rather than hand-patched because locating a heap
 # corruption here has no cheaper instrument: valgrind is not installed, glibc malloc checking does
 # not move the detection point, and the release build is -O2/-DNDEBUG with no line info, so
-# addr2line resolves to "??:?" and a backtrace cannot name the writer. See docs/issues/0009.
+# addr2line resolves to "??:?" and a backtrace cannot name the writer.
 #
 #   cmake -S . -B scratch/build-asan -G Ninja -DZELDA3D_SANITIZE=address \
 #         -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
@@ -444,6 +444,7 @@ if(LUS_BUILD_TESTS)
     add_executable(mm3d_player_bottle_material_policy_test
         tools/mm3d_player_bottle_material_policy_test.cpp
         2ship/2s2h/zelda3d/mm3d_player_bottle_material_policy.cpp
+        2ship/2s2h/zelda3d/mm3d_player_left_hand_policy.cpp
     )
     target_include_directories(mm3d_player_bottle_material_policy_test PRIVATE ${ZELDA3D_MM_DIR})
     add_test(NAME mm3d_player_bottle_material_policy_test COMMAND mm3d_player_bottle_material_policy_test)

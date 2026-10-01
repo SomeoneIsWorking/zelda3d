@@ -12,9 +12,10 @@ source layout, dependency direction, and release packaging map. Use its current 
 copying a layout from another port.
 
 Consult `docs/project-goals.md` for durable outcomes, `docs/project-state.md` for current capability
-status and focus, `docs/issues/` for open bugs and missing features, and `docs/codemap.md` for
-ownership and placement. Update only the authority whose answer changes. `docs/parity-workflow.md`
-describes how a host-vs-oracle comparison is run.
+status and focus, `docs/issues/` for atomic work, `docs/codemap.md` for ownership and placement, and
+`docs/re-frontier.md` for the next grounded RE dependency (`tools/re_frontier.py next` /
+`hacks`). Update only the authority whose answer changes. `docs/parity-workflow.md` describes how a
+host-vs-oracle comparison is run.
 
 The launcher composes the two game cores. Keep actor behavior in focused modules under each game's
 `zelda3d/` tree and renderer mechanics in their existing resource, pipeline, pass, lifecycle, and
@@ -26,7 +27,7 @@ not coupled to the 3DS presentation boundary.
 behavioral divergence, recover the relevant 3DS behavior there and port the proven difference
 through the owning module. SoH's N64 struct-offset comments do not describe this 64-bit process's
 layout after pointer fields; read typed C fields instead of probing guessed offsets. Record new
-binary findings in the relevant decomp docs.
+binary findings in the relevant decomp docs and the RE frontier.
 
 ## Driving and verification
 

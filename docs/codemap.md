@@ -4,9 +4,10 @@ For the project's overall shape + naming (the **zelda / zelda3d × soh / 2ship**
 each part lives), see `docs/project-structure.md`. This file is the per-subsystem detail beneath it.
 
 Use this map to find the owning subsystem and its entry point. Update the relevant row when a
-responsibility moves. Current capabilities and gaps belong in `docs/project-state.md`; open bugs and
-missing features belong in `docs/issues/`. For the host-vs-oracle comparison method use
-`docs/parity-workflow.md`.
+responsibility moves. Current capabilities and gaps belong in `docs/project-state.md`; atomic work
+belongs in `docs/issues/`. For the ordered reverse-engineering dependencies use
+`docs/re-frontier.md` (`tools/re_frontier.py next` / `hacks`); for the host-vs-oracle comparison
+method use `docs/parity-workflow.md`.
 
 ## The big picture
 
@@ -17,7 +18,7 @@ collision all still run the N64 code faithfully; the **`zelda3d/` layer**
 substitute the 3DS asset/animation/camera-math/lighting, falling through to legacy N64
 rendering wherever a behavior hasn't been ported yet. Ground truth for any divergence is the
 **OoT3D decomp** (`oot3d-decomp/`, a private submodule fed by Ghidra RE), not memory-probing SoH
-at runtime; `oot3d-decomp/docs/` records what has actually been recovered from the binaries.
+at runtime — see `docs/re-frontier.md` for what's actually been RE'd vs assumed.
 
 A parallel arm ports **Majora's Mask 3D** the same way, but on a *different*
 runtime spine: MM uses the native **2S2H decomp** (`2ship/`, `2s2h/`) rather than a
@@ -159,9 +160,9 @@ state, issues, parity, RE, and subsystem documents for evidence and current gaps
 | **Headless run/drive tooling** | headless run/drive owners: `tools/zelda3d_game.py` and `tools/zelda3d_repl.py` for OoT, `tools/mm_game.py`/`tools/mm_control.py` and the direct `mm_runtime_{paths,manifest,launch,lease,lifecycle,errors}.py` owners for MM, `tools/mm_phase_tour.py` (CLI) with `mm_phase_{session,artifacts,orchestration,catalog,report}.py`, plus the shared `repo_environment.py` | `docs/parity-workflow.md`; `oot3d-decomp/docs/cmb_texcoord_mapping.md` |
 | **N64 OoT decomp integration (`overlays/`, `code/`)** | `Shipwright/soh/src/overlays/actors/` and `Shipwright/soh/src/code/` | — |
 | **MM native path — 2S2H glue** | `2ship/2s2h/` (`zelda3d/repl/` owners; `mm3d_player_force.{c,h}`; `mm3d_player.c/.h`; `mm3d_player_model*`; `mm3d_player_animation*`; `mm3d_player_mesh_policy*`; `mm3d_player_sheath*`; `mm3d_player_{left,right}_hand*`; `mm3d_player_bottle_material_policy*`; `mm3d_player_deku_spin_material*`; `mm3d_draw.c`; boot/UI glue); shared FIFO framing in `Shipwright/libultraship/include/libultraship/bridge/fifo_rpc.h` | `docs/MM_NATIVE.md`, `docs/MM_SKELANIME_PORT.md`; `mm3d-decomp/docs/player_models.md`; `mm3d-decomp/docs/player_draw.md` |
-| **MM native path — vendored N64-MM decomp** | `2ship/src/`, `2ship/include/` (native Player actions/types), with new control adapters in `2ship/2s2h/zelda3d/mm3d_player_force.{c,h}` | — |
+| **MM native path — vendored N64-MM decomp** | `2ship/src/`, `2ship/include/` (native Player actions/types), with new control adapters in `2ship/2s2h/zelda3d/mm3d_player_force.{c,h}` | `docs/re_control_debug_backlog.md` MM section |
 | **MM3D asset/format decomp + rigid/skinned render** | `Shipwright/cmb3d/asset/{gar,lzs}.{h,cpp}` (GAR2 parser + LzS inflate), `2ship/2s2h/zelda3d/mm3d_model.cpp` (objectId→GAR2→CMB→draw + SkelAnime hooks), generated `mm3d_animmap.inc` | `mm3d-decomp/docs/` |
-| **OoT3D decomp corpus (ground truth)** | `oot3d-decomp/docs/` (actor system, warp, title arc ×26, camera, lighting, cutscene format, player, en_horse, boss_goma, ram_map, static_decomp, divergence_map, ...) | — |
+| **OoT3D decomp corpus (ground truth)** | `oot3d-decomp/docs/` (actor system, warp, title arc ×26, camera, lighting, cutscene format, player, en_horse, boss_goma, ram_map, static_decomp, divergence_map, ...) | `docs/re-frontier.md` (this pass's new ordering of it) |
 | **N64 boot/libultra glue (vendored)** | `Shipwright/soh/src/boot/`, `buffers/`, `dmadata/`, `elf_message/`, `libultra/` | — |
 | **libultraship support dirs (vendored/generic)** | `Shipwright/libultraship/extern/StormLib/` (MPQ archive lib, unrelated 3rd-party dep), `imgui_shim/` (Dear ImGui integration), `include/` (public headers mirroring `src/ship`+`src/libultraship`), `tests/`, `tools/` (incl. `dlist_harness/`) | — |
 | **Asset exporter + release packaging** | `Shipwright/OTRExporter/` (ZAPD-driven OTR/O2R exporter), `launcher_bootstrap/mm_assets.py`, `tools/build_mm_custom_archive.py`, `tools/build_appimage_release.py`, `tools/package_appimage.py`, `packaging/`, remaining platform helpers under `Shipwright/scripts/`, dependency setup under `scripts/` | issue 0024 |
@@ -170,7 +171,7 @@ state, issues, parity, RE, and subsystem documents for evidence and current gaps
 | **MM asset extraction/build** | `2ship/assets/` (archives, code, interface, misc, objects, overlays, scenes, text, extractor, xml, custom) | `docs/MM_NATIVE.md` |
 | **Texture pack / hi-res assets** | `textures/`, `Shipwright/cmb3d/asset/texpack.{h,cpp}` | `docs/parity-workflow.md` "Hi-res texture pack" |
 | **RmlUi menu port** | `Shipwright/libultraship/src/ship/window/gui/rml/SohRmlUi.{h,cpp}`, focused `Zelda3D{MenuState,LauncherBridge,DiagnosticsBridge,MenuAutomationBridge,RmlUiRegistry}.*`, `Shipwright/libultraship/src/fast/Zelda3DMenuInputBridge.cpp`, and public contracts under `Shipwright/libultraship/include/ship/` | — |
-| **Input scheme (PC-native + hotswap glyphs)** | `Shipwright/libultraship/src/libultraship/controller/controldevice/controller/mapping/ControllerDefaultMappings.cpp` (the default table), `Shipwright/libultraship/src/ship/controller/controldeck/ControlDeck.cpp` (`kZelda3dInputSchemeVersion` migration), `Shipwright/soh/src/zelda3d/input/zelda3d_keymap.{h,cpp}` (live-binding → HUD label), `gZelda3dInputDevice` | `docs/lus_input_architecture.md`, , `docs/issues/0002-*`, , `soh3d-input-scheme` |
+| **Input scheme (PC-native + hotswap glyphs)** | `Shipwright/libultraship/src/libultraship/controller/controldevice/controller/mapping/ControllerDefaultMappings.cpp` (the default table), `Shipwright/libultraship/src/ship/controller/controldeck/ControlDeck.cpp` (`kZelda3dInputSchemeVersion` migration), `Shipwright/soh/src/zelda3d/input/zelda3d_keymap.{h,cpp}` (live-binding → HUD label), `gZelda3dInputDevice` | `docs/lus_input_architecture.md` |
 | **Desktop release setup and writable state** | `Shipwright/zelda3d_shared/platform/rom_{identity,install,setup}.*`; `Shipwright/libultraship/src/ship/Context.cpp`; launcher composition in `Shipwright/zelda3d_app/zelda3d_main.cpp`; N64 consumers in `rom_auto_extraction.cpp` and `BenPort.cpp` | issue 0024 |
 
 ## Where is X? (direct index)
@@ -181,8 +182,8 @@ state, issues, parity, RE, and subsystem documents for evidence and current gaps
 | Title cs dispatch / driver | `title_presentation.cpp` (`Zelda3D_Title_Update`, composition), with activity/camera/rider/atmosphere/lighting/overlay in focused title owners; ground truth `oot3d-decomp/docs/title_gamestate_driver.md`, `title_gamestate_v2.md`, `title_rider_cs_dispatch.md` |
 | Title rider (mounted Epona intro) | `behaviors/title/title_rider.cpp/.h`; `oot3d-decomp/docs/title_rider_driver.md`, `title_rider_port_spec.md` |
 | Link draw hook | `Shipwright/soh/src/zelda3d/player/zelda3d_link.cpp` (`Zelda3D_TryDrawPlayer`, composition); implementation in `Shipwright/soh/src/zelda3d/player/player_draw.cpp` and `player_draw_policy.cpp` |
-| Link facial animation (eye/mouth) | `Shipwright/soh/src/zelda3d/player/zelda3d_link_face.cpp` (`Zelda3D_LinkFaceUpdate`); format `Shipwright/cmb3d/asset/faceb.{h,cpp}`; RE in `oot3d-decomp/docs/` + |
-| Force-state layer (Link) | `Shipwright/soh/src/overlays/actors/ovl_player_actor/z_player.c` `Zelda3D_PlayerForce*` hooks (search that name) |
+| Link facial animation (eye/mouth) | `Shipwright/soh/src/zelda3d/player/zelda3d_link_face.cpp` (`Zelda3D_LinkFaceUpdate`); format `Shipwright/cmb3d/asset/faceb.{h,cpp}`; RE in `docs/re-frontier.md` `player.facial-anim` |
+| Force-state layer (Link) | `Shipwright/soh/src/overlays/actors/ovl_player_actor/z_player.c` `Zelda3D_PlayerForce*` hooks (search that name); catalog of gaps in `docs/re_control_debug_backlog.md` |
 | Oracle transport (the only one) | focused owners under `tools/soh3d_harness/`; `main.cpp` only composes libretro, lockstep, state/probes, comparisons, capture, REPL, watchdog, and process lifetime. `harness_transport.py` owns the build-aware REPL boot deadline; cache-owned PICA command-list provenance, writer, and submitter probes live in `tools/pica_command_{provenance,writer,submitter}_oracle_probe.py`; title-cursor raw command-list and register capture live with title restart/checkpoint policy in `tools/title_oracle_probe.py`; the shared pure packet decoder is `tools/pica_command_list.py`. The provenance probe captures one grounded draw's command buffer, the writer probe owns the rotating-buffer writer-lifetime discriminator plus exact template and active-state input write snapshots, and the submitter probe joins the exact GSP list submission to VM/direct-pointer/bulk-copy provenance with a reversible `WriteBlock` positive control owned by `harness_memory`. |
 | Fog / lighting port | `Shipwright/soh/src/zelda3d/tables/zelda3d_scene_lighting.inc`; RE in `oot3d-decomp/docs/scene_lighting.md`, `env_context_layout.md` |
 | Object→ZAR replacement tables | `Shipwright/soh/src/zelda3d/tables/zelda3d_object_zars.inc` (generated by `tools/gen_object_zars.py`) |

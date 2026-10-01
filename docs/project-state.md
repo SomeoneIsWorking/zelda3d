@@ -1,6 +1,7 @@
 # Project state
 
-Current focus: S003 (renderer / material / lighting parity on both titles).
+Current focus: S003 (renderer / material / lighting parity on both titles). The next grounded RE
+dependency for it is in `docs/re-frontier.md` (`tools/re_frontier.py next`).
 
 ## Comparison baseline
 
