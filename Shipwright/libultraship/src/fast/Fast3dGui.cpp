@@ -161,7 +161,7 @@ void Fast3dGui::ImGuiBackendNewFrame() {
     // ImGui::NewFrame does assert on this -- `IO.Fonts->IsBuilt() && "Font Atlas not built!"` -- but
     // asserts are compiled out under NDEBUG, so instead of a clear message it walked unbuilt fonts
     // and died dereferencing one in SetCurrentFont. That is how OoT-after-MM crashed on its first
-    // drawn frame (docs/issues/0010).
+    // drawn frame.
     ImGuiIO& io = ImGui::GetIO();
     if (io.Fonts != nullptr && !io.Fonts->IsBuilt()) {
         SPDLOG_INFO("Fast3dGui: font atlas has unbuilt fonts (a game registered its own); "

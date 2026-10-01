@@ -7,8 +7,8 @@
 // more than once; the process outlives the game; so every global and file static has a lifetime --
 // the run -- that belonged to nobody.
 //
-// It cost the same crash, in the same shape, for the same reason. `tools/zelda3d_sequence.sh mm,mm`
-// SIGSEGV'd on the second run inside `RegisterDebugMode` (2s2h/DeveloperTools/DeveloperTools.cpp),
+// It cost the same crash, in the same shape, for the same reason. Running MM twice in one
+// launcher process SIGSEGV'd on the second run inside `RegisterDebugMode` (2s2h/DeveloperTools/DeveloperTools.cpp),
 // reached from InitOTR, on this line:
 //
 //     if (gPlayState != NULL) { gPlayState->frameAdvCtx.enabled = false; }

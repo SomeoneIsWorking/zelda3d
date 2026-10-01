@@ -15,7 +15,7 @@
 // correction is unchanged (its per-bone idle-fit is independent of the b10/b11 mapping; re-deriving
 // reproduces the same -8.8deg left-C). b11<-HEAD pure-replace residual is 0.306, on par with the
 // known-good legs (0.33-0.57) — verified by tools/zelda3d_link_retarget_derive.py with the corrected
-// BONEMAP. Gated on tools/zelda3d_anim_qa.py before/after.
+// BONEMAP.
 //
 // #8 ROOT-CAUSE FIX (2026-06-21): the previous table's head bone b10 carried a hand-woven
 // correction that TWISTED the whole upper body ~126° and pitched the head/chest forward (b10 is

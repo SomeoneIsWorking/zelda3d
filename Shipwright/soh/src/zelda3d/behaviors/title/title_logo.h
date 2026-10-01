@@ -5,7 +5,7 @@
 // from Play_DrawOverlayElements (z_play.c) — see title_presentation.h. Unlike the per-actor
 // behaviors/actor/* modules, this isn't dispatched by an N64 actor id (OoT3D's En_Mag/
 // OBJECT_MAG does not spawn under SoH's hijacked title scene, see
-// debug_journal/2026-07-08-title-overlay-wrong-asset-RETRACTION.md), so it is a component the
+// ), so it is a component the
 // title-presentation module drives directly instead of the actor registry.
 #ifndef ZELDA3D_BEHAVIORS_TITLE_TITLE_LOGO_H
 #define ZELDA3D_BEHAVIORS_TITLE_TITLE_LOGO_H

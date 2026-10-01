@@ -82,7 +82,7 @@ extern "C" int Zelda3D_LinkAnimSrc(void) {
 
 // #88 "weird yawn" / wrong idle fidget — PREMISE FALSIFIED, DO NOT RE-CHASE (measured 2026-07-23,
 // live oracle vs live game at Kokiri 0xEE; oot3d-decomp/docs/player_port.md "#88", journal
-// debug_journal/2026-07-23-88-idle-fidget-premise-falsified.md).
+// ).
 //
 // The DEFAULT IDLE is not a yawn. The decomp note that started this ("default idle table @0x53a5f8
 // {0x50=yawn,...}") mis-read a raw table index: animId 0x50 is `nml_wait_free`, the neutral standing

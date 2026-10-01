@@ -57,7 +57,7 @@ p_tex08 = slingshot/sword blade (blue/grey); p_tex07 = boomerang (round); p_tex0
 # ADULT / boy link_v2.cmb mesh_id (mid) map
 # =====================================================================================
 Derived 2026-06-18 the SAME way as child: dump per-mesh material/tex/bones/posed-centroid
-(`tools/link_cmb_dump.py /actor/zelda_link_boy_new.zar`), texture id (`tools/pica_texture` ->
+(`tools/cmb.py /actor/zelda_link_boy_new.zar`), texture id (`tools/pica_texture` ->
 scratch/link_boy/tex), and an in-game `linkmid only/<mask>` render sweep on adult Link
 (scratch/link_boy/sweep* + montages). link_v2.cmb = 25 bones / 119 meshes / 36 mat / 41 tex.
 SAME rig as child: LH(sword hand)=bones 15,16; RH(shield hand)=bones 19,20; back/sheath=bone 21;

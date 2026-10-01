@@ -2,8 +2,8 @@
 //
 // These are single-header libraries: the implementation lands in whichever translation unit
 // defines DR_*_IMPLEMENTATION first. Both games did that in their own AudioSampleFactory.cpp, so
-// each game core carried its own private copy — 266 dr_* symbols duplicated per side, measured by
-// tools/core_overlap.py and recorded as claim C052. They are third-party audio decoders; they were
+// each game core carried its own private copy — 266 dr_* symbols duplicated per side. They are
+// third-party audio decoders; they were
 // never game code, and nothing about them differs between Ocarina of Time and Majora's Mask.
 //
 // So this file is the implementation, and the two AudioSampleFactory.cpp files now include the

@@ -14,12 +14,20 @@
 // behaviors/actor/gerudo_white.cpp — see gerudo_white.h for the declarations used below).
 
 // Non-const so the REPL can tune worldScale/groundOffset live.
+// Designated initializers: the struct's field order is chosen for padding, not for reading, so
+// a positional row would silently bind the wrong value to the wrong field.
 Zelda3D_ModelEntry sModelTable[4] = {
-    { ACTOR_OBJ_TSUBO, "pot", ZELDA3D_POT_WORLD_SCALE, 3, NULL, 0.0f, NULL, NULL, 0 },
-    { ACTOR_OBJ_KIBAKO2, "kibako", ZELDA3D_KIBAKO_WORLD_SCALE, 1, NULL, 0.0f, NULL, NULL, 0 },
-    { ACTOR_EN_KUSA, "kusa", 0.5f, 2, NULL, 0.0f, NULL, NULL, 0 }, // bush (scale tuned live via REPL)
-    { ACTOR_EN_GE1, "geldwoman", ZELDA3D_GELDWOMAN_WORLD_SCALE, 0, "ge1_s_wait", ZELDA3D_GELDWOMAN_GROUND_OFFSET,
-      Zelda3D_ResolveAnim_EnGe1, Zelda3D_Joints_EnGe1, 1 },
+    { .name = "pot", .worldScale = ZELDA3D_POT_WORLD_SCALE, .glModelId = 3, .actorId = ACTOR_OBJ_TSUBO },
+    { .name = "kibako", .worldScale = ZELDA3D_KIBAKO_WORLD_SCALE, .glModelId = 1, .actorId = ACTOR_OBJ_KIBAKO2 },
+    { .name = "kusa", .worldScale = 0.5f, .glModelId = 2, .actorId = ACTOR_EN_KUSA }, // scale tuned live via REPL
+    { .name = "geldwoman",
+      .anim = "ge1_s_wait",
+      .resolveAnim = Zelda3D_ResolveAnim_EnGe1,
+      .resolveJoints = Zelda3D_Joints_EnGe1,
+      .worldScale = ZELDA3D_GELDWOMAN_WORLD_SCALE,
+      .groundOffset = ZELDA3D_GELDWOMAN_GROUND_OFFSET,
+      .n64anim = 1,
+      .actorId = ACTOR_EN_GE1 },
 };
 
 // Per-ACTOR forced CMB override. Some ZARs hold multiple CMBs — one per actor sharing the
@@ -36,8 +44,6 @@ Zelda3D_ModelEntry sModelTable[4] = {
 //     `params >> 12` in N64 z_obj_syokudai.c:263 (Golden/Timed/Wooden) — the same actor draws
 //     three DIFFERENT display lists at N64 time, so on OoT3D it must pick different CMBs from
 //     zelda_syokudai.zar (syokudai_gn / syokudai_model / syokudai_ki_model) per bucket.
-//
-// Verified structurally by tools/en_tg_cmb_close_test.py + tools/syokudai_cmb_close_test.py.
 
 static Zelda3D_ActorForcedAutoSlot sActorForcedAuto[] = {
     // Dancing couple (peer EN_MU keeps marketpeople.cmb via default AUTO).

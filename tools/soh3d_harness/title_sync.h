@@ -3,7 +3,7 @@
 // DEFAULT, so the SBS window always shows the SAME title-cs instant on
 // both sides with no REPL setup needed.
 //
-// See debug_journal/2026-07-14-harness-title-sync.md for the full
+// See for the full
 // derivation, falsification history, and verification numbers.
 //
 // SYNC MECHANISM — integers derived from RE'd state, NOT pixel matching:
@@ -49,8 +49,7 @@
 //     (2026-07-14): a pixel-similarity hack compensating for not reading
 //     the integer state that already existed, and it demonstrably
 //     mislocked on low-signal (near-black) frames. content_score remains
-//     in use as a VERIFICATION metric (tools/title_sbs_verify.py) — its
-//     proper job — never as the sync mechanism.
+//     in use as a VERIFICATION metric (its proper job) — never as the sync mechanism.
 //   - Treating 0x0054CC3C as the cs cursor directly (pre-2026-07-04): it
 //     is the vblank counter; only the RATE law above makes it usable.
 #pragma once
@@ -65,7 +64,7 @@ class TitleSyncController {
     // +1 per retro_run video frame). Provenance: located by runtime
     // dump-diff scan 2026-07-04; identified as a vblank counter (NOT the
     // cs cursor) by the FUN_003fd27c reader decomp the same day
-    // (debug_journal/2026-07-04-title-cs-re-pivot.md).
+    //.
     static constexpr uint32_t kAzVblankCounterVA = 0x0054CC3C;
 
     // Emulated-memory VA of the oracle's live title camera basis

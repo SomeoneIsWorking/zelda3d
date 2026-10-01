@@ -338,10 +338,10 @@ void Interpreter::GenerateCC(ColorCombiner* comb, const ColorCombinerKey& key) {
     memcpy(comb->shader_input_mapping, shaderInputMapping, sizeof(shaderInputMapping));
 }
 
-// Render-unification Phase 0 (kanban #131): logs every DISTINCT (combine_mode, options) N64
-// color-combiner permutation the first time it's seen (the pool insertion below already
-// deduplicates repeats for free), so a scripted sweep of real content yields the authoritative
-// corpus manifest the unified-shader differential harness (tools/unified_ab_sweep.py) needs.
+// Render-unification Phase 0: logs every DISTINCT (combine_mode, options) N64 color-combiner
+// permutation the first time it's seen (the pool insertion below already deduplicates repeats for
+// free), so a scripted sweep of real content yields the authoritative corpus manifest a
+// unified-shader differential comparison needs.
 // Opt-in via ZELDA3D_CC_DUMP=<path> — zero cost/behavior change when unset (the default).
 static void Zelda3D_LogNewCombinerKey(const ColorCombinerKey& key) {
     static int state = -1; // -1 unread, 0 disabled, 1 enabled

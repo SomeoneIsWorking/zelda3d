@@ -1053,7 +1053,7 @@ extern "C" int InitOTR(int argc, char* argv[]) {
         // an asset is missing or corrupt, which is exactly the case a gate cannot arrange without
         // moving the user's ROMs around -- so without this hook the return-instead-of-exit contract
         // would ship untested, which is how it silently reverts to exit() the next time someone
-        // touches the boot chain. tools/zelda3d_sequence.sh --bootfail drives it.
+        // touches the boot chain. ZELDA3D_BOOTFAIL_TEST=1 drives it.
         if (const char* e = std::getenv("ZELDA3D_BOOTFAIL_TEST"); e != nullptr && e[0] == '1') {
             throw Zelda3D::CoreBootError("ZELDA3D_BOOTFAIL_TEST=1 -- deliberate failure, exercising the "
                                          "return-to-launcher path");
@@ -1915,7 +1915,7 @@ ImFont* OTRGlobals::CreateFontWithSize(float size, std::string fontPath) {
         // false, as this used to) leaves every font registered by this game pointing at freed memory
         // the moment a second game attaches -- and ImFontAtlas::Build() walks the ConfigData of ALL
         // fonts, dead ones included. IM_ALLOC pairs with the atlas's IM_FREE. Same fix as OoT's
-        // OTRGlobals::CreateFontWithSize; see docs/issues/0010.
+        // OTRGlobals::CreateFontWithSize.
         ImFontConfig fontConf;
         void* ownedTtf = IM_ALLOC(fontData->DataSize);
         memcpy(ownedTtf, fontData->Data, fontData->DataSize);

@@ -4,8 +4,7 @@
 THE PROBLEM THIS FIXES: SoH3D's title cutscene and the OoT3D oracle
 (Azahar, embedded in tools/soh3d_harness) each free-run their own scripted
 title-demo clock from the same save state. Their clocks are NOT 1:1 past
-roughly step 360 (see debug_journal/2026-07-08-title-sky-color.md and
-2026-07-08-title-parity-audit-ranked.md) — so "same step/frame NUMBER"
+roughly step 360 — so "same step/frame NUMBER"
 does NOT mean "same content", and comparing by number alone produced
 three false "bugs" in one session (sky-color, moon-halo, a wrong-asset
 overlay). `soh_titlecs <n>` is even worse: it's a raw cursor override
@@ -75,7 +74,7 @@ SAVESTATE = TITLE_STATE
 # the fix, SoH's ported Zelda3D_TitleCsAdvance() bumped its cs cursor once
 # per engine tick (soh_step), while the oracle's REAL title cs advances at
 # HALF that rate per Az retro_run() call — a genuine 2x RATE bug, not a
-# fixed phase offset (see debug_journal/2026-07-09-title-cs-phase-sync.md).
+# fixed phase offset.
 # That's why the old two-point ANCHORS table ((200,397),(360,449)) had a
 # non-constant, shrinking gap (197 -> 89): it was sampling two points on a
 # curve produced by two clocks running at different SPEEDS, not a single
@@ -124,8 +123,8 @@ def content_score(path_a, path_b, size=(48, 28)) -> float:
     """Normalized cross-correlation in [-1, 1] on a downsampled grayscale
     structure map. Each side is independently zero-meaned + unit-norm'd,
     so overall brightness/hue differences (the SEPARATE, already-tracked
-    lighting divergence — see debug_journal/2026-07-08-title-*.md) don't
-    move the score; position/pose/silhouette differences do. That's the
+    lighting divergence) don't move the score; position/pose/silhouette
+    differences do. That's the
     right invariance for "is this the same instant", not "does it look
     identical"."""
     a = load_gray_small(path_a, size)

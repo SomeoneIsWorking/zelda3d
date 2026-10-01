@@ -192,7 +192,7 @@ unsigned long long Zelda3D::LinkMidMask::compute(Player* player) const {
         // mid 19 (the obvious neighbour) renders a straight brown shaft with red ends, not a forked
         // slingshot frame, so remapping to it would swap one wrong item for another. Drawing the
         // ocarina for the slingshot is the PRE-EXISTING behaviour, not a new regression -- see
-        // debug_journal/2026-07-30-audit-round2b-player-animation-scene.md.
+        // .
         case PLAYER_MODELTYPE_RH_BOW_SLINGSHOT:
         case PLAYER_MODELTYPE_RH_BOW_SLINGSHOT_2:
             m |= LINK_MID(19);

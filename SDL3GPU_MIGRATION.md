@@ -45,7 +45,7 @@ SDL surface (~40 files) — project is on **SDL2 2.32**, system has **SDL3 3.4.1
 - **P1 — SDL2 → SDL3 project migration.** Swap CMake to SDL3; migrate every SDL2 API site (input,
   audio, RmlUi, imgui_impl_sdl3, crash, window). Keep the **GL** backend alive (SDL3 still does GL
   contexts) to verify the SDL swap independently. GATE: headless run (`SOH3D_HEADLESS=1
-  tools/soh3d_game.sh`) boots + REPL responds + input mapping intact.
+  tools/zelda3d_game.py`) boots + REPL responds + input mapping intact.
 - **P2 — `gfx_sdl3gpu` GfxRenderingAPI backend.** Port `gfx_vulkan.cpp`: `SDL_GPUDevice`,
   `SDL_GPUGraphicsPipeline` (cache by id0/id1/state like the VK pipeline cache), `SDL_GPUCommandBuffer`,
   `SDL_GPURenderPass`, `SDL_GPUTexture`, `SDL_GPUBuffer`, `SDL_CreateGPUShader` from the **existing

@@ -4,9 +4,10 @@
 //   FUN_002c5ba0 case 0x97 — segment select by frame range
 //   FUN_0033cb90            — per-frame camera eval (defaults + tracks)
 //   FUN_003087a4            — Grezzo keyframe curve (linear/hermite/step)
-// Reference implementation + verification: tools/oot3d_cs_camera.py
-// (byte-exact vs live Az: |d_eye|=0.00, |d_dir|<=0.0002 over 300 frames).
-// Derivation trail: debug_journal/2026-07-07-title-cs-spot99-format-solved.md
+// Verified byte-exact against the live Az oracle: |d_eye|=0.00, |d_dir|<=0.0002 over
+// 300 frames.
+// Derivation trail: the OoT3D CS records decoded from FUN_002c5ba0 and the OoT3D
+// title-demo cue table; see oot3d-decomp/docs/title_rider_cs_dispatch.md.
 // and 2026-07-07-op97-camera-decode-verified.md.
 
 #include "zelda3d_cutscene.h"
@@ -121,7 +122,7 @@ int sLightSlotCount = 0;
 // THE title palette: 4 x 28-byte entries immediately BEFORE the " BDQ" cs
 // (zsi+0x34B8; the live runtime ptr [play+0x3230] points here — verified,
 // and blended output value-matched over 5 dayTime samples). Runtime layout
-// (pinned by regression, debug_journal/2026-07-07-title-lighting-solved.md):
+// (pinned by regression):
 //   +0x00 f32 fogEnd   +0x04 f32 drawDist   +0x08 u16 fogNear-ish
 //   +0x0A u8 ambient[3]   +0x0D s8 light1Dir[3]  +0x10 u8 light1Color[3]
 //   +0x13 s8 light2Dir[3] +0x16 u8 light2Color[3] +0x19 u8 fogColor[3]
@@ -142,8 +143,8 @@ int sLoadState = 0;                      // 0 not tried, 1 ok, -1 failed
 // The title cs interpreter's own cursor tick vs the engine's per-frame call cadence:
 // OoT3D's real title cutscene runs its cs cursor at HALF the rate SoH's port previously
 // used. Verified empirically (2026-07-09) against the live Az oracle: reading Az's own
-// title camera eye (fixed VA, byte-exact against the ported OP97 spline evaluator —
-// see 2026-07-07-op97-camera-decode-verified.md) at a dozen retro_run()-step checkpoints
+// title camera eye (fixed VA, byte-exact against the OP97 spline evaluator ported below in
+// this file) at a dozen retro_run()-step checkpoints
 // and inverse-matching it against Zelda3D_TitleCsCamera's frame table gives an EXACT
 // az_cs_frame = 88 + 0.5*az_step relationship (residual < 0.1 world units, i.e. float
 // noise) across the full sampled range az_step in [0,600]. Meanwhile SoH's own ported
@@ -151,30 +152,27 @@ int sLoadState = 0;                      // 0 not tried, 1 ok, -1 failed
 // confirmed by probing Zelda3D_TitleCsFrame() at soh_step checkpoints (constant 231-tick
 // boot offset, slope exactly 1.0). So SoH's title demo was running the cutscene at TWICE
 // the real 3DS speed — a genuine RATE bug, not a fixed phase offset (this is why the
-// previously-recorded content-matched anchors, debug_journal/2026-07-08-title-*-schedule-
-// re.md / tools/title_ab.py's ANCHORS table, showed a SHRINKING soh-az gap with elapsed
+// previously-recorded content-matched anchors in the OoT3D title schedule re-analysis
+// showed a SHRINKING soh-az gap with elapsed
 // time: that shrinkage is the signature of two clocks running at different RATES, not a
-// one-time startup lag). See debug_journal/2026-07-09-title-cs-phase-sync.md for the full
-// derivation. sTickParity halves the effective advance rate; toggled every call so the
+// one-time startup lag). sTickParity halves the effective advance rate; toggled every call
+// so the
 // cursor only actually increments on every OTHER call, matching the oracle's real cadence.
 int sTickParity = 0;
 
-// Residual 1 (debug_journal/2026-07-10-title-arc-closing-measurement-v4.md): even after the
+// Residual 1: even after the
 // half-rate fix above, SoH's dayTime read a CONSTANT +6 units (== +1 cs-frame, at the
 // established +6/frame rate) BEHIND the oracle's at three content-matched points spanning
-// cs 338/588/849 (measured via `az_daytime` vs `soh_env`, scratch/task2_daytime_check.py,
-// 2026-07-10-title-arc-closing-measurement-v3.md Task 2) — exact and non-drifting across a
-// wide span, the signature of a fixed BOOT-PHASE deficit, not a per-tick rate/parity bug (a
-// parity bug would show N-call-count-parity-dependent jitter, which the clean constant rules
-// out). Root cause: `sTickParity`'s init (0) makes this cursor's very FIRST Advance() call a
-// HOLD (see below) — SoH's N64-splash/boot pre-roll before TitlePresentation first activates
-// consumes exactly one fewer effective cs-tick than the real 3DS's boot sequence needs before
-// its own title-cs interpreter's curFrame begins advancing, so SoH's cursor starts one
-// "increment slot" behind and never catches up. Fixed at the ONE shared cursor site (this
-// flag + the first-call branch in Zelda3D_TitleCsAdvance below), not per-consumer: every
-// reader of Zelda3D_TitleCsFrame() (camera, rider, dayTime, dome, lighting) inherits the same
-// +1 correction, so they stay mutually consistent — no separate +1 offsets scattered across
-// title_presentation.cpp's callers.
+// cs 338/588/849 (measured via `az_daytime` vs `soh_env`, scratch/task2_daytime_check.py) — exact and non-drifting
+// across a wide span, the signature of a fixed BOOT-PHASE deficit, not a per-tick rate/parity bug (a parity bug would
+// show N-call-count-parity-dependent jitter, which the clean constant rules out). Root cause: `sTickParity`'s init (0)
+// makes this cursor's very FIRST Advance() call a HOLD (see below) — SoH's N64-splash/boot pre-roll before
+// TitlePresentation first activates consumes exactly one fewer effective cs-tick than the real 3DS's boot sequence
+// needs before its own title-cs interpreter's curFrame begins advancing, so SoH's cursor starts one "increment slot"
+// behind and never catches up. Fixed at the ONE shared cursor site (this flag + the first-call branch in
+// Zelda3D_TitleCsAdvance below), not per-consumer: every reader of Zelda3D_TitleCsFrame() (camera, rider, dayTime,
+// dome, lighting) inherits the same +1 correction, so they stay mutually consistent — no separate +1 offsets scattered
+// across title_presentation.cpp's callers.
 bool sFirstAdvance = true;
 
 // Set by Zelda3D_TitleCsAdvance() every call: true iff sFrame actually incremented (or wrapped)
@@ -412,7 +410,7 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
             continue;
         }
         // stride rules from FUN_002c5ba0 (subset needed for spot99's stream;
-        // full table in tools/walk_oot3d_cs.py)
+        // full table in zelda3d_cutscene_oot3d_opcodes.h)
         if (op == 1 || op == 2 || op == 5 || op == 6) {
             size_t q = p + 12;
             while (q + 16 <= len && d[q] != 0xFF) q += 16;
@@ -438,7 +436,7 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
     fprintf(stderr, "[Zelda3D] title cs loaded: %zu camera segments, end_frame=%d\n",
             sSpline.segments.size(), sEndFrame);
     // Per-segment frame coverage — diagnoses camera-spline GAPS (frames covered by no segment fall
-    // back to the static default; see debug_journal/2026-07-15-epona-title-animation.md).
+    // back to the static default.
     for (size_t si = 0; si < sSpline.segments.size(); ++si)
         fprintf(stderr, "[Zelda3D]   cam seg %zu: frames (%d, %d)\n",
                 si, sSpline.segments[si].start, sSpline.segments[si].end);
@@ -513,7 +511,7 @@ extern "C" int Zelda3D_TitleCsCamera(float frame, float eye[3], float at[3],
         at[j] = a[j] * kPosScale;
     }
     // `log titlecam 1`: raw eye/at defs + evaluated + which track types the segment carries — the
-    // per-frame spline evaluation trail (debug_journal/2026-07-15-epona-title-animation.md).
+    // per-frame spline evaluation trail.
     if (Zelda3D_LogEnabled(Z3D_LOG_TITLECAM)) {
         char tks[64] = {0}; size_t tl = 0;
         for (const Track& tr : seg->tracks) tl += (size_t)snprintf(tks+tl, sizeof(tks)-tl, "%d ", tr.type);

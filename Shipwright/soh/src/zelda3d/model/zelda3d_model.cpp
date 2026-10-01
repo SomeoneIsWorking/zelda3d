@@ -538,7 +538,7 @@ static size_t vertCountGroups(const std::vector<Zelda3D::CmbDrawGroup>& groups) 
 // falls at a texel boundary, not at the quadrant's bright corner, so it doesn't reconstruct this
 // asset's specific corner-centred layout without an extra UV pre-flip). Verified against the
 // measured source texture (bright corner isolated, all others near-zero) — see
-// debug_journal/2026-07-10-moon-mirror-and-fade-attenuation.md.
+// .
 static std::vector<uint8_t> mirrorExpandQuadrant(const std::vector<uint8_t>& src, int q, int* outW, int* outH) {
     int n = 2 * q;
     std::vector<uint8_t> out(n * n * 4);

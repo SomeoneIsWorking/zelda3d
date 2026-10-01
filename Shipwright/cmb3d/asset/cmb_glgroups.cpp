@@ -24,8 +24,7 @@ static_assert(offsetof(CmbVertex, uv2) == offsetof(Zelda3DGlVtx, uv2), "uv2 offs
 
 // --- Generic TEV packing (render.multi-stage-tev) -------------------------------------------
 // GL-DMP enum -> PICA hardware code translation, done once at group build so the shader decodes
-// small fixed-width fields. Enum domains validated over the whole ROM corpus
-// (tools/tev_corpus_survey.py, 2026-07-22: zero violations).
+// small fixed-width fields. Enum domains validated over the whole ROM corpus (zero violations).
 static unsigned TevSrcCode(uint16_t gl) {
     switch (gl) {
         case 0x8577:

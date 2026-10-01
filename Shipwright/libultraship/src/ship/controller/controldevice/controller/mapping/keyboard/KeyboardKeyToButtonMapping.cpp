@@ -14,7 +14,7 @@ KeyboardKeyToButtonMapping::KeyboardKeyToButtonMapping(uint8_t portIndex, CONTRO
       ControllerButtonMapping(PhysicalDeviceType::Keyboard, portIndex, bitmask) {
 }
 
-// Poll-time half of the ZELDA3D_DBG_INPUT diagnostic (debug_journal/2026-07-15-keyboard-headed-v2.md
+// Poll-time half of the ZELDA3D_DBG_INPUT diagnostic (
 // / 2026-07-15-phase1-input-consolidation.md), extended into this mapping so a poll where
 // mKeyPressed is true can be told apart from one where the bit never reached the pad. Logs
 // on-change only (per scancode): whether the key is latched pressed, whether this poll was

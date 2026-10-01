@@ -294,11 +294,11 @@ s32 Camera_BGCheckInfo(Camera* camera, Vec3f* from, CamColChk* to) {
         toNewPos.y += 5.0f;
         floorPolyY = BgCheck_CameraRaycastFloor2(colCtx, &floorPoly, &floorBgId, &toNewPos);
 
-        // Zelda3D diagnostic for docs/issues/0022. This guard is the ONLY thing standing between a
-        // floor-less raycast and the NULL deref at the end of this function: BgCheck_RaycastFloorImpl
-        // nulls its outPoly and returns BGCHECK_Y_MIN, and the comparison below is what turns that
-        // into an early return. So when floorPoly is NULL and the comparison is FALSE, something has
-        // made the guard fail OPEN, and the next three lines dereference NULL.
+        // Zelda3D diagnostic for the Camera_BGCheckInfo crash. This guard is the ONLY thing
+        // standing between a floor-less raycast and the NULL deref at the end of this function:
+        // BgCheck_RaycastFloorImpl nulls its outPoly and returns BGCHECK_Y_MIN, and the
+        // comparison below is what turns that into an early return. So when floorPoly is NULL
+        // and the comparison is FALSE, the guard has failed OPEN and the next 3 lines deref NULL.
         //
         // The negative is what this has to print. `to->pos.y` at about -32000 means the raycast
         // legitimately found nothing far below; a NaN means the comparison is false for the reason
@@ -1834,10 +1834,10 @@ s32 Camera_Normal1(Camera* camera) {
     }
 
     Camera_Vec3fVecSphGeoAdd(eyeNext, at, &eyeAdjustment);
-    // Zelda3D diagnostic for docs/issues/0022. THIS is the write that puts the infinity into
-    // camera->eyeNext: `at` is finite and sane in the failing run, so a non-finite result here means
-    // eyeAdjustment carried it in -- and eyeAdjustment.r is camera->dist, straight out of
-    // Camera_ClampDist a few lines up.
+    // Zelda3D diagnostic for the Camera_BGCheckInfo crash. THIS is the write that puts the
+    // infinity into camera->eyeNext: `at` is finite and sane in the failing run, so a
+    // non-finite result here means eyeAdjustment carried it in -- and eyeAdjustment.r is
+    // camera->dist, straight out of Camera_ClampDist a few lines up.
     //
     // The previous probe bracketed the whole mode function and printed NOTHING, which was itself the
     // finding: the corruption and the crash happen inside the SAME Camera_Normal1 call (this line,
@@ -7102,7 +7102,7 @@ void Camera_Init(Camera* camera, View* view, CollisionContext* colCtx, PlayState
     // `Camera_LERPCeilF(distTarget, camera->dist, 1.0f / camera->rUpdateRateInv, 0.0f)` -- so a zero
     // register makes the step scale +inf, camera->dist -inf, and eyeNext non-finite. Camera_BGCheckInfo
     // then raycasts from an infinite point, gets no floor poly back, and dereferences NULL.
-    // That was the intermittent `oot,oot` SIGSEGV in docs/issues/0022.
+    // That was the intermittent `oot,oot` SIGSEGV.
     if (Zelda3D_Once(&sCameraRegsInit)) {
         for (i = 0; i < sOREGInitCnt; i++) {
             OREG(i) = sOREGInit[i];
@@ -7736,7 +7736,7 @@ Vec3s Camera_Update(Camera* camera) {
                      sCameraSettings[camera->setting].cameraModes[camera->mode].funcIdx, camera->unk_14C);
     }
 
-    // Zelda3D diagnostic for docs/issues/0022. The crash there is a NULL poly deref in
+    // Zelda3D diagnostic for the Camera_BGCheckInfo crash. That crash is a NULL poly deref in
     // Camera_BGCheckInfo, and the instrumented run showed WHY the guard that should have prevented it
     // failed: `to->pos` was (inf,-inf,-inf), and every comparison against an infinity of the wrong
     // sign is false, so the guard failed OPEN. `to->pos` is assigned `camera->eyeNext` by

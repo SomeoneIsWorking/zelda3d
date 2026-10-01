@@ -66,12 +66,12 @@ file is the failure mode; a single owner with one per-frame resolved state is th
 - **ONE soh build at a time.** This is a 16GB-RAM machine: `-j$(nproc)` or concurrent cold
   builds OOM, orphan their `cc1plus` children, and cascade-kill each other. Cap `-j4`; check
   `free -h` first; clear orphans with the safe-kill skill if starved. Do NOT give each fix its
-  own isolated cold-build worktree — **consolidate fixes into one build**. `tools/zelda3d_game.sh`
+  own isolated cold-build worktree — **consolidate fixes into one build**. `tools/zelda3d_game.py`
   honors `ZELDA3D_SOH=<dir>/zelda3d` (the single launcher binary, run as `zelda3d oot`) so one build
   serves all verification.
 - **Keep a perpetual decomp stream running** (RE → port to `oot3d-decomp`) alongside the parity
   loop — it advances a primary goal and never touches the build queue.
-- **Headless always**: `ZELDA3D_HEADLESS=1 tools/zelda3d_game.sh` (NOT the stale `SOH3D_HEADLESS`,
+- **Headless always**: `tools/zelda3d_game.py start` (NOT the stale `SOH3D_HEADLESS`,
   which silently opens a real window on `:0`); harness uses `SOH3D_HARNESS_HEADLESS=1`.
 - **Keep notes honest**: retract falsified findings in place (this session has explicit
   RETRACTION/SUPERSEDED docs). A confidently-wrong note sends the next session down a dead end.
@@ -159,7 +159,7 @@ get hi-res on one side and vanilla on the other**:
   frame; its synchronous path crashes, see `AZAHAR_PATCH.md` Patch 8), **step until the hit
   counters stop growing before capturing a frame**, or an early capture can show the oracle
   still vanilla while our side is already hi-res.
-- **The harness switch does NOT cover the standalone game.** `tools/zelda3d_game.sh` sets no
+- **The harness switch does NOT cover the standalone game.** `tools/zelda3d_game.py` sets no
   texpack env, so a game launched from the repo root (where `textures/` lives) is **hi-res** —
   and comparing that against oracle artifacts captured vanilla is the trap below.
 

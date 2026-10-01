@@ -3732,7 +3732,7 @@ void EnHorse_RandomOffset(Vec3f* src, f32 dist, Vec3f* dst) {
 
 // Resolve a hoof's dust-spawn position: compute it the native way (Skin_GetLimbPos, unchanged), then
 // let Zelda3D reconcile its Y onto the OoT3D-warped render terrain at the hoof's own XZ — see
-// oot3d-decomp/docs/en_horse_hoof_dust.md + debug_journal/2026-07-15-epona-hoof-dust-depth.md for why
+// oot3d-decomp/docs/en_horse_hoof_dust.md for why
 // the raw native Y (derived from the N64 collision mesh) doesn't match hill relief the OoT3D render
 // mesh has and the N64 one doesn't, and why that's the SAME class of fix as the title tree-grounding
 // commit (36525326), just applied to the dust effect instead of an actor model. A no-op (native

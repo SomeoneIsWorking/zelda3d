@@ -148,7 +148,7 @@ struct CmbMaterial {
     uint16_t comb_src_rgb[3] = { 0x8577, 0x84C0, 0x8576 }; // PRIMARY_COLOR, TEXTURE0, CONSTANT
     // FULL per-stage TEV chain (render.multi-stage-tev): every stage's raw GL-DMP enums as
     // stored in the file's 0x28-byte combiner entries. Layout validated corpus-wide over all
-    // 11172 materials in the ROM (tools/tev_corpus_survey.py, 2026-07-22): every field decodes
+    // 11172 materials in the ROM: every field decodes
     // to its legal enum domain with ZERO violations.
     //   ops:  0x1E01 REPLACE, 0x2100 MODULATE, 0x0104 ADD, 0x8574 ADD_SIGNED,
     //         0x8575 INTERPOLATE, 0x84E7 SUBTRACT, 0x86AE/AF DOT3, 0x6401 MULT_ADD,
@@ -204,7 +204,7 @@ struct CmbMaterial {
     // the material's combiner chain. title_logo_us.cmb's shield/sword glint materials sample
     // binding 1 through a TWO-stage sequence (not g_title.cmb's single ADD_MULT stage) — see
     // cmb.cpp parseMats for the byte-level detection, verified against title_logo_us.cmb
-    // 2026-07-10 (debug_journal/2026-07-10-shield-glint-dualtex.md).
+    // 2026-07-10.
     enum DualTexMode {
         kDualTexNone = 0,
         kDualTexAddMult = 1,                // (t0 + t1) * t0            [g_title.cmb fire-glow]

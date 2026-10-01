@@ -155,7 +155,7 @@ Context::~Context() {
     // reference -- the registry is its only owner. So when a core calls exit() (MM's RunExtract
     // does), the exit handlers run spdlog's registry destructor and free that logger, and this line
     // then reads it. ASAN names it; without ASAN the read lands in freed-but-mapped memory and says
-    // nothing. See docs/issues/0017.
+    // nothing.
     //
     // mLogger->flush() further down is a different matter and is safe: that one is a Context MEMBER,
     // so its shared_ptr keeps the object alive whatever the registry does.

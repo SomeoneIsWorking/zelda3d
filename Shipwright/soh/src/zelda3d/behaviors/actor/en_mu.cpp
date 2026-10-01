@@ -30,9 +30,6 @@
 // TODO(enmu-followup): (1) verify the palette→material mapping by decompiling OoT3D
 // EnMu_Draw (private oot3d-decomp; the RE would confirm which OoT3D material corresponds
 // to each of the N64 0x08..0x0C segments). (2) once mapped, bind palette[4] too.
-//
-// Verified by tools/enmu_close_test.py which asserts the [MATCONST] log line lands for the
-// marketpeople model at Market Day.
 #include "z64.h"
 #include "src/overlays/actors/ovl_En_Mu/z_en_mu.h"
 #include "en_mu.h"

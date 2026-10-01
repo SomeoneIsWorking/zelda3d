@@ -4,16 +4,19 @@
 
 #include "actor_model_submission.h"
 
+// Declared in padding-optimal order (pointers and floats first, then the two shorts last) so
+// the table stays 6-byte-aligned instead of wasting 14. Initialized POSITIONALLY in
+// replacement_catalog.cpp and model_table_control.cpp — keep the two in step.
 typedef struct {
-    s16 actorId;
     const char* name;
-    float worldScale;
-    int glModelId;
     const char* anim;
-    float groundOffset;
     Zelda3D_AnimResolver resolveAnim;
     Zelda3D_JointResolver resolveJoints;
+    float worldScale;
+    int glModelId;
+    float groundOffset;
     int n64anim;
+    s16 actorId;
 } Zelda3D_ModelEntry;
 
 typedef struct {

@@ -18,8 +18,7 @@
 //      has — so the dust punches through / floats above the ground. Reconcile the hoof's Y onto the
 //      render terrain at the hoof's OWN XZ (so a laterally-offset hoof lands under itself, not under
 //      the horse's center). Same class of fix as the title tree-grounding commit (36525326), applied
-//      to the dust effect. oot3d-decomp/docs/en_horse_hoof_dust.md,
-//      debug_journal/2026-07-15-epona-hoof-dust-depth.md.
+//      to the dust effect. See oot3d-decomp/docs/en_horse_hoof_dust.md.
 //
 //   2. Rider seat offset  — Zelda3D_HorseSaddleOffset (#152). GROUND TRUTH
 //      (oot3d-decomp/docs/en_horse_rider_pos.md): OoT3D's EnHorse_Update (FUN_0014a5a8) computes

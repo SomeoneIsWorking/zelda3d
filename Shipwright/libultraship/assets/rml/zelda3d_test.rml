@@ -57,8 +57,8 @@
 				     Majora's Mask with no MM code.
 
 				     Absent until 2026-08-11: its destination is a SECOND run of a core, which used to
-				     crash (docs/issues/0016). Gated by tools/zelda3d_switch_test.sh, whose third
-				     assertion drives exactly this: chooser -> MM -> back to the chooser, one pid. -->
+				     crash (docs/issues/0016). Driving chooser -> MM -> back to the chooser in one
+				     pid is exactly the round trip that exposed it. -->
 				<select-button tabindex="auto" switchgame="oot"><key>Return to Launcher</key><value>&#8617;</value></select-button>
 				<!-- Time-of-day applied to the NEXT warp below: Default (clock runs) / Day / Night. -->
 				<select-button tabindex="auto" cycle="warptime"><key>Warp Time-of-Day</key><value>Default</value></select-button>

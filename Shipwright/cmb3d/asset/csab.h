@@ -51,7 +51,7 @@ class Csab {
     int boneCount() const { return mBoneCount; }
     int animNodeCount() const { return (int)mNodes.size(); }
 
-    // VERIFICATION helper (REPL `boneinfo`, debug_journal 2026-07-15-epona-title-animation):
+    // VERIFICATION helper (REPL `boneinfo`):
     // per-bone ANIMATED LOCAL TRS at `frame`, in the SAME sampling the renderer uses
     // (sampleLocalTRS -> the exact rest-fallback + static-translation rules skinMatrices applies).
     // Lets a bone-for-bone quantitative diff against the OoT3D oracle's own live limb-pose table

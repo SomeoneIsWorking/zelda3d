@@ -1,8 +1,8 @@
 // Regression tests for the PICA texture decoder's LA4 support and its buffer-length guard.
 //
-// The gap these lock came from a corpus survey, not a crash: `tools/pica_texture_format_survey.py`
-// compares every texture format both retail games use against the formats the shipping decoder
-// handles, and it found `0x67606758` in OoT3D's content with NO handling at all -- the constant was
+// The gap these lock came from a corpus survey, not a crash: comparing every texture format both
+// retail games use against the formats the shipping decoder handles found `0x67606758` in OoT3D's
+// content with NO handling at all -- the constant was
 // declared in the table and never switched on, so `PicaDecode` returned empty and the texture was
 // dropped. The two affected textures are the Great Deku Tree's magic-fire and magic-love effects, so
 // this was visible content decoding to nothing.

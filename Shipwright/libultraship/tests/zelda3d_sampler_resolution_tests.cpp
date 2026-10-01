@@ -1,8 +1,8 @@
 // Exhaustive sampler-enum resolution checks for the 3DS texture path.
 //
-// `tools/pica_sampler_state_survey.py` measures which filter and wrap enums the retail content of BOTH
-// games actually uses, and reports that every one of them is covered here. That measurement is the
-// demand side; this file is the supply side, and it is deliberately written as a property over the
+// Measuring which filter and wrap enums the retail content of BOTH games actually uses reports that
+// every one of them is covered here. That measurement is the demand side; this file is the supply
+// side, and it is deliberately written as a property over the
 // enum SPACE rather than as a list of the values the survey happened to find. A list would go stale the
 // moment content used a sixth minification enum, and would pass while the host silently defaulted.
 //

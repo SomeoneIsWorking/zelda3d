@@ -10,8 +10,6 @@
 // (0,0,0,1) — black). Same MODULATE(PREV, CONST) → black-fragment failure mode as
 // EnMu / EnHy. The visible symptom at Market Day (ent 0xB1 dayTime 0x8001) is a pure
 // black scottie-dog silhouette next to the correctly-lit townsfolk.
-//
-// Verified by tools/endog_close_test.py.
 #include "z64.h"
 #include "src/overlays/actors/ovl_En_Dog/z_en_dog.h"
 #include "en_dog.h"

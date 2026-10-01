@@ -455,6 +455,92 @@ if(LUS_BUILD_TESTS)
     )
     target_include_directories(mm3d_player_deku_spin_material_policy_test PRIVATE ${ZELDA3D_MM_DIR})
     add_test(NAME mm3d_player_deku_spin_material_policy_test COMMAND mm3d_player_deku_spin_material_policy_test)
+
+    # The typed adapters bind the same policies to the N64 Player types, so they need MM's
+    # engine include roots and its decomp switches rather than a policy-only translation unit.
+    set(ZELDA3D_MM_PLAYER_ADAPTER_INCLUDES
+        ${ZELDA3D_MM_DIR}
+        ${ZELDA3D_MM_DIR}/include
+        ${ZELDA3D_MM_DIR}/assets
+        ${ZELDA3D_MM_DIR}/2s2h
+        ${ZELDA3D_MM_DIR}/src
+        ${ZELDA3D_ENGINE_DIR}/include)
+    set(ZELDA3D_MM_PLAYER_ADAPTER_DEFINES NON_MATCHING NON_EQUIVALENT)
+
+    # These unit tests assert their expectations. A Release configuration defines NDEBUG, which
+    # compiles every assert() away, so the executables would pass without checking anything (and
+    # clang-analyzer reports the now-dead result stores as errors). -UNDEBUG keeps them real tests.
+    set(ZELDA3D_ASSERTING_TEST_OPTIONS -UNDEBUG)
+
+    add_executable(mm3d_player_right_hand_adapter_test
+        tools/mm3d_player_right_hand_adapter_test.cpp
+        2ship/2s2h/zelda3d/mm3d_player_right_hand.cpp
+        2ship/2s2h/zelda3d/mm3d_player_right_hand_policy.cpp
+        2ship/2s2h/zelda3d/mm3d_player_model_policy.cpp
+    )
+    target_include_directories(mm3d_player_right_hand_adapter_test PRIVATE ${ZELDA3D_MM_PLAYER_ADAPTER_INCLUDES})
+    target_compile_definitions(mm3d_player_right_hand_adapter_test PRIVATE ${ZELDA3D_MM_PLAYER_ADAPTER_DEFINES})
+    target_compile_options(mm3d_player_right_hand_adapter_test PRIVATE -Wno-macro-redefined ${ZELDA3D_ASSERTING_TEST_OPTIONS})
+    add_test(NAME mm3d_player_right_hand_adapter_test COMMAND mm3d_player_right_hand_adapter_test)
+
+    add_executable(mm3d_player_left_hand_adapter_test
+        tools/mm3d_player_left_hand_adapter_test.cpp
+        2ship/2s2h/zelda3d/mm3d_player_left_hand.cpp
+        2ship/2s2h/zelda3d/mm3d_player_bottle_material_policy.cpp
+        2ship/2s2h/zelda3d/mm3d_player_left_hand_policy.cpp
+        2ship/2s2h/zelda3d/mm3d_player_sheath_policy.cpp
+        2ship/2s2h/zelda3d/mm3d_player_model_policy.cpp
+    )
+    target_include_directories(mm3d_player_left_hand_adapter_test PRIVATE ${ZELDA3D_MM_PLAYER_ADAPTER_INCLUDES})
+    target_compile_definitions(mm3d_player_left_hand_adapter_test PRIVATE ${ZELDA3D_MM_PLAYER_ADAPTER_DEFINES})
+    target_compile_options(mm3d_player_left_hand_adapter_test PRIVATE -Wno-macro-redefined ${ZELDA3D_ASSERTING_TEST_OPTIONS})
+    add_test(NAME mm3d_player_left_hand_adapter_test COMMAND mm3d_player_left_hand_adapter_test)
+
+    add_executable(mm3d_player_deku_spin_material_adapter_test
+        tools/mm3d_player_deku_spin_material_adapter_test.cpp
+        2ship/2s2h/zelda3d/mm3d_player_deku_spin_material.cpp
+        2ship/2s2h/zelda3d/mm3d_player_deku_spin_material_policy.cpp
+        2ship/2s2h/zelda3d/mm3d_player_model_policy.cpp
+    )
+    target_include_directories(mm3d_player_deku_spin_material_adapter_test PRIVATE ${ZELDA3D_MM_PLAYER_ADAPTER_INCLUDES})
+    target_compile_definitions(mm3d_player_deku_spin_material_adapter_test PRIVATE ${ZELDA3D_MM_PLAYER_ADAPTER_DEFINES})
+    target_compile_options(mm3d_player_deku_spin_material_adapter_test PRIVATE -Wno-macro-redefined ${ZELDA3D_ASSERTING_TEST_OPTIONS})
+    add_test(NAME mm3d_player_deku_spin_material_adapter_test COMMAND mm3d_player_deku_spin_material_adapter_test)
+
+    add_executable(mm3d_repl_command_test
+        tools/mm3d_repl_command_test.c
+        2ship/2s2h/zelda3d/repl/mm3d_repl_command.c
+    )
+    target_include_directories(mm3d_repl_command_test PRIVATE ${ZELDA3D_MM_DIR})
+    target_compile_options(mm3d_repl_command_test PRIVATE ${ZELDA3D_ASSERTING_TEST_OPTIONS})
+    add_test(NAME mm3d_repl_command_test COMMAND mm3d_repl_command_test)
+
+    # The oracle harness's pure falsifiers: no Azahar or engine linkage, only the owners
+    # they pin, so they run in the product gate rather than only in the Azahar superbuild.
+    add_executable(boss_fd_steering_math_test
+        tools/soh3d_harness/tests/boss_fd_steering_math_test.cpp
+        Shipwright/soh/src/zelda3d/behaviors/actor/boss_fd/steering_math.cpp
+    )
+    target_include_directories(boss_fd_steering_math_test PRIVATE ${ZELDA3D_ROOT})
+    target_compile_options(boss_fd_steering_math_test PRIVATE ${ZELDA3D_ASSERTING_TEST_OPTIONS})
+    add_test(NAME boss_fd_steering_math_test COMMAND boss_fd_steering_math_test)
+
+    add_executable(boss_fd2_mane_root_control_test
+        tools/soh3d_harness/tests/boss_fd2_mane_root_control_test.cpp
+    )
+    target_include_directories(boss_fd2_mane_root_control_test PRIVATE tools/soh3d_harness)
+    target_compile_options(boss_fd2_mane_root_control_test PRIVATE ${ZELDA3D_ASSERTING_TEST_OPTIONS})
+    add_test(NAME boss_fd2_mane_root_control_test COMMAND boss_fd2_mane_root_control_test)
+
+    add_executable(boss_fd_comparison_policy_test
+        tools/soh3d_harness/tests/boss_fd_comparison_policy_test.cpp
+        tools/soh3d_harness/boss_fd_profile_validation.cpp
+        tools/soh3d_harness/boss_fd_comparison_policy.cpp
+    )
+    target_include_directories(boss_fd_comparison_policy_test
+        PRIVATE tools/soh3d_harness ${ZELDA3D_OOT_DIR}/src)
+    target_compile_options(boss_fd_comparison_policy_test PRIVATE ${ZELDA3D_ASSERTING_TEST_OPTIONS})
+    add_test(NAME boss_fd_comparison_policy_test COMMAND boss_fd_comparison_policy_test)
 endif()
 
 ################################################################################

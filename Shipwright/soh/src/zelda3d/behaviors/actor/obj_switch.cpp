@@ -1,16 +1,19 @@
 // Zelda3D behavior: Obj_Switch (OBJ_SWITCH 0x12A) — model REPLACEMENT.
 //
 // Ground truth (N64 z_obj_switch.c + oot3d-decomp/docs/keep_objects.md): Obj_Switch draws one of
-// several switch DLs from OBJECT_GAMEPLAY_DANGEON_KEEP, selected by `type = params & 7`:
-//   0 ObjSwitch_DrawFloor       floorSwitchDLists[subType] = {gFloorSwitch1DL, gFloorSwitch3DL, gFloorSwitch2DL, gFloorSwitch2DL}
+// several switch DLs from OBJECT_GAMEPLAY_DANGEON_KEEP, selected by `type = params & 7`
+// (see oot3d-decomp/docs/keep_objects.md for every identity below):
+//   0 ObjSwitch_DrawFloor       floorSwitchDLists[subType] = {gFloorSwitch1DL, gFloorSwitch3DL,
+//     gFloorSwitch2DL, gFloorSwitch2DL}
 //   1 ObjSwitch_DrawFloorRusty  gRustyFloorSwitchDL
 //   2 ObjSwitch_DrawEye         gEyeSwitch{1,2}DL  (animated eye textures)
-//   3/4 ObjSwitch_DrawCrystal   gCrystalSwitchCore/Diamond{Opa,Xlu}DL  (translucent, env-color + tex scroll)
+//   3/4 ObjSwitch_DrawCrystal   gCrystalSwitchCore/Diamond{Opa,Xlu}DL (translucent,
+//     env-color + tex scroll)
 // where `subType = (params >> 4) & 7`.
 //
 // OoT3D keeps the same models in `/actor/zelda_dangeon_keep.zar` as `switch_{1,2,4,5,6,7,9,10,11}_model.cmb`.
-// Every switch_N identity below was established with tools/model_match.py (batch capture + ranked
-// shape/colour scoring + contact sheet), NOT by eye — see oot3d-decomp/docs/keep_objects.md:
+// Every switch_N identity below was established by batch capture with ranked shape/colour scoring
+// over a contact sheet, NOT by eye — see oot3d-decomp/docs/keep_objects.md:
 //   floor pads  switch_1 GOLD / switch_2 RED / switch_11 BLUE   (gFloorSwitch1/3/2 DL)
 //   rusty floor switch_10 (orange)                              (gRustyFloorSwitchDL)
 //   crystal     switch_6 core / switch_7 diamond                (gCrystalSwitchCore/Diamond*)
@@ -41,7 +44,7 @@ namespace {
 // N64 floorSwitchDLists[(params>>4)&7] = {gFloorSwitch1DL, gFloorSwitch3DL, gFloorSwitch2DL, gFloorSwitch2DL}
 // = colors {gold, red, blue, blue}; matched to switch_{1,2,11,11}.
 constexpr int kFloorCmb[4] = { 1, 2, 11, 11 }; // subType 0..3 -> switch_N (gold/red/blue/blue)
-// gRustyFloorSwitchDL -> switch_10. Identified by tools/model_match.py (ranked #1: shape 0.83,
+// gRustyFloorSwitchDL -> switch_10. Identified by ranked matching (ranked #1: shape 0.83,
 // colour 0.85) and confirmed by elimination: the four flat pads are colour variants of ONE mesh and
 // gold/red/blue are already taken by the three floor subtypes. An earlier by-eye pass wrongly rejected
 // switch_10 as "orange, not brown" — the OoT3D CMB renders brighter than the N64 DL (N64 subjects sit

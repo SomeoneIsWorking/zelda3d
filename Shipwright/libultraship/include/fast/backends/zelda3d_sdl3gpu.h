@@ -163,7 +163,7 @@ class Zelda3DRenderer {
     // Called from ~GfxRenderingAPISdl3Gpu. Until now nothing did: the destructor's comment said these
     // "are owned by the device and freed at SDL_DestroyGPUDevice", and the Vulkan validation layer
     // disagreed -- 409 objects still alive at vkDestroyDevice, 362 of them VkImageView, which is this
-    // renderer's per-model textures (docs/issues/0009).
+    // renderer's per-model textures.
     //
     // `note` is the backend's duplicate-release accounting, passed in because it is file-static over
     // there: it returns false for a handle already released, so a borrowed pointer (the shared dummy

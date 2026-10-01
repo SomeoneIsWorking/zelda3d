@@ -708,7 +708,7 @@ GfxRenderingAPISdl3Gpu::~GfxRenderingAPISdl3Gpu() {
     // are owned by the device and freed at SDL_DestroyGPUDevice below — same as before the fold).
     // Hand back what the model renderer owns FIRST, while the device is still alive. The comment
     // above used to claim SDL_DestroyGPUDevice would take care of it; the validation layer counted 409
-    // objects still alive at vkDestroyDevice and said otherwise (docs/issues/0009).
+    // objects still alive at vkDestroyDevice and said otherwise.
     step("mSoh3d.releaseGpuResources");
     if (mSoh3d) {
         mSoh3d->releaseGpuResources(&NoteGpuRelease);
@@ -2343,9 +2343,9 @@ void GfxRenderingAPISdl3Gpu::DrawTriangles(float bufVbo[], std::size_t bufVboLen
     op.scissor = sc;
 
     SgUboData ubo{};
-    // Test harnesses (tools/render_unify_corpus_sweep.py, tools/unified_ab_sweep.py) pin this so
-    // the frame_count-seeded alpha-dither noise (RAND_NOISE above) is bit-identical between two
-    // captures being pixel-diffed; without it, dither alone fails any raw LSB comparison.
+    // ZELDA3D_FREEZE_NOISE_FRAME pins this so the frame_count-seeded alpha-dither noise (RAND_NOISE
+    // above) is bit-identical between two captures being pixel-diffed; without it, dither alone
+    // fails any raw LSB comparison.
     static const char* freezeStr = getenv("ZELDA3D_FREEZE_NOISE_FRAME");
     ubo.frame_count = freezeStr != nullptr ? atoi(freezeStr) : (int32_t)mFrameCount;
     ubo.noise_scale = mCurrentNoiseScale;

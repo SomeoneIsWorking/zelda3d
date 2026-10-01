@@ -332,7 +332,7 @@ bool Cmb::parseMats() {
         // port carry them as float RGBA (matches the shader UBO and matches
         // Model_SetMaterialConstantColor / FUN_003688a8, which writes float[4]). Townsfolk
         // archetype CMBs bake black-opaque defaults and the game overwrites them at runtime —
-        // see debug_journal/2026-07-02-en-hy-body-colors.md.
+        // see .
         for (int k = 0; k < 6; k++) {
             uint32_t co = o + 0xB4 + k * 4;
             m.mat_constant[k][0] = b[co + 0] / 255.0f;
@@ -365,7 +365,7 @@ bool Cmb::parseMats() {
             uint16_t srcB = u16(b, co + 0x0E);
             uint16_t srcC = u16(b, co + 0x10);
             // Full per-stage capture (render.multi-stage-tev). Field layout validated over the
-            // whole ROM corpus by tools/tev_corpus_survey.py (zero enum-domain violations):
+            // whole ROM corpus (zero enum-domain violations):
             // +0x00 rgbOp, +0x02 alphaOp, +0x04 rgbScale, +0x06 alphaScale, +0x08/+0x0A buffer
             // inputs, +0x0C srcRGB[3], +0x12 modRGB[3], +0x18 srcA[3], +0x1E modA[3], +0x24 const.
             CmbMaterial::CombStage& cs = m.comb_stages[s];

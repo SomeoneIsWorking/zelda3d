@@ -72,7 +72,7 @@ recovered from git rather than re-derived.
 
 1. **Refuse to lose content.** Before writing, re-emit the file and diff it against the input; if the
    re-emission drops any non-blank line that the input had, abort and report the dropped lines.
-   This is the same non-vacuous-parse guard `tools/test_pica_lighting_registers.py` uses.
+   This is the same non-vacuous-parse guard the generators use before overwriting a table.
 2. **Extend the schema to the file's real shape**, or make `set` refuse to write a file it cannot
    round-trip losslessly. Silently narrowing the model is the defect.
 3. **Make `check` loss-aware**: it should fail when the document contains field shapes the parser
