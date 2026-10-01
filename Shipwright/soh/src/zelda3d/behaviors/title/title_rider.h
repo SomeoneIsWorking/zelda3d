@@ -1,7 +1,7 @@
 // Zelda3D title-demo cue-driven rider (Link+Epona) integrator.
 //
 // Ported verbatim out of zelda3d.c's Zelda3D_RiderStepCue as part of the title-presentation
-// module consolidation (debug_journal/2026-07-08-oot3d-title-module-design.md, migration table
+// module consolidation (migration table
 // row "Zelda3D_RiderStepCue() + Zelda3D_ActorTurnToPoint/Zelda3D_PathFollowUpdate/
 // Zelda3D_ActorMoveXZByYawSpeed"). This is a pure relocation: the integration math and cue
 // semantics are UNCHANGED, only the storage (file-scope statics -> class members) and call site
@@ -21,7 +21,7 @@
 // HORSE ATTRIBUTION (2026-07-10, oot3d-decomp/docs/title_rider_port_spec.md): the oracle's rider
 // is Epona (a real EN_HORSE actor the cue track drives) with Link mounted on her via the native
 // gameplay mount mechanism — NOT Link's bare Player actor teleported along the path (that was the
-// pre-existing SoH3D gap: debug_journal/2026-07-10-oracle-horse-attribution.md). TitleRider now
+// pre-existing SoH3D gap). TitleRider now
 // OWNS the title-scoped EN_HORSE instance: spawns it once per title entry (Actor_Spawn, the same
 // call z_horse.c's own spawn sites use), mounts Link onto it via the literal
 // z_player.c ~7158-7193 field set + Actor_MountHorse(), and force-drives the horse's native
@@ -71,8 +71,7 @@ class TitleRider {
     //     binang, speed 8.0, 3D arrive-snap at 8.0); CsRearing/CsWarpRearing hold speed 0.
     //   There is NO distance heuristic anywhere — the pre-2026-07-14 "teleport when the new cue's
     //   p0 is >100u away" rule was a guess and diverged ~170-200u from the oracle on every plain
-    //   0x24 cue-chain boundary the rider couldn't reach in time (cs 750, 1108; RED table in
-    //   debug_journal/2026-07-14-title-rider-cs-dispatch-port.md).
+    //   0x24 cue-chain boundary the rider couldn't reach in time (cs 750, 1108).
     //
     // `outDiscontinuity`, if non-null, is set true the exact frame a warp init (or the first-cue
     // seed) teleports the rider.

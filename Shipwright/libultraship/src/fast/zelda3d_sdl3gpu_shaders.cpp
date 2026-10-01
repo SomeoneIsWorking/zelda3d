@@ -273,15 +273,15 @@ float fog3dNode(float t) {
     // Source codes: 0 Primary (the vertex-lit output color), 1 FragPrimary, 2 FragSecondary,
     // 3..5 Texture0..2, 6 Texture3 (no unit; falls back to tex0), 13 PreviousBuffer,
     // 14 Constant (per-stage slot from uTevConst), 15 Previous.
-    // KNOWN APPROXIMATION (tools/cmb_fragment_lighting_survey.py): for the 197 enabled materials
+    // KNOWN APPROXIMATION: for the 197 enabled materials
     // that consume a fragment output, FragPrimary still uses vertex PRIMARY and FragSecondary
     // remains zero until the PICA fixed-function light/LUT calculation is ported. The five
     // consumers with IsFragmentLighting=false take the exact PICA zero/zero disabled branch.
     //  - the INITIAL combiner-buffer color (PICA tev_combiner_buffer_color) is not parsed from
     //    the CMB and is taken as vec4(0). This is exact for every material in this ROM: all 14
     //    that read PREVBUF latch exactly one stage before the read, so the read always returns a
-    //    latched stage output and never the initial value (tools/tev_corpus_survey.py reports
-    //    both columns). FALSIFIER: a material that reads PREVBUF with no preceding latch.
+    //    latched stage output and never the initial value (corpus-wide, both columns agree).
+    //    FALSIFIER: a material that reads PREVBUF with no preceding latch.
 {{ generic_tev_functions }}
 void main() {
     vec4 t = texture(uTex, vUv);

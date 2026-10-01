@@ -1,13 +1,12 @@
 // mm3d_collision — see mm3d_collision.h.
 //
 // The MM3D collision layout is parsed by the SHARED asset/zcol parser (it version-gates OoT3D vs
-// MM3D off the ZSI magic; the MM3D layout was derived and verified in
-// tools/zelda3d_collision_layout.cpp + tools/zelda3d_collision_test.cpp — 110/111 scenes at 100%
-// plane identity / 99.9% face-normal agreement). This module only converts that into MM's runtime
-// CollisionHeader and hands it to BgCheck.
+// MM3D off the ZSI magic; the MM3D layout was derived and verified over the retail
+// corpus — 110/111 scenes at 100% plane identity / 99.9% face-normal agreement). This module only converts that into
+// MM's runtime CollisionHeader and hands it to BgCheck.
 //
 // MM3D scene coordinates are IDENTICAL to N64 coordinates — verified by matching the room ZSI's
-// actor list against the live N64 actor list (see debug_journal/2026-07-21-mm-scene-room-pipeline.md).
+// actor list against the live N64 actor list.
 // So NO placement transform is applied here, deliberately.
 #include "mm3d_collision.h"
 
@@ -167,7 +166,12 @@ extern "C" CollisionHeader* Zelda3D_MM_BuildSceneCollision(PlayState* play, Coll
         // stays as close to the authored one as the runtime type allows.
         sPoly[k].dist = (s16)lroundf(P[k].dist);
     }
-    for (size_t i = 0; i < S.size(); i++) {
+    for (size_t i = 0; i < nSurf; i++) {
+        // A scene with no parsed surfaces still gets one writable slot; calloc already zeroed it,
+        // and the runtime always reads surface 0, so the synthetic entry stays the zeroed default.
+        if (i >= S.size()) {
+            break;
+        }
         sSurf[i].data[0] = S[i].data0;
         sSurf[i].data[1] = S[i].data1;
     }

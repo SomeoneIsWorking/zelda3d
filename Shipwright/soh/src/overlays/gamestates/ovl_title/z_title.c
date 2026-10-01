@@ -162,7 +162,7 @@ void Title_Destroy(GameState* thisx) {
 // SoH "Skip Logo" / BootSequence enhancement (CustomLogoTitle.cpp, Warping.cpp's
 // BOOTSEQUENCE_DEBUGWARPSCREEN/WARPPOINT) drove its skip through titleContext->state.main, which
 // no longer runs — that enhancement code is now dead in this fork (see
-// debug_journal/2026-07-14-boot-logo-skip.md).
+// ).
 void Title_Init(GameState* thisx) {
     TitleContext* this = (TitleContext*)thisx;
 

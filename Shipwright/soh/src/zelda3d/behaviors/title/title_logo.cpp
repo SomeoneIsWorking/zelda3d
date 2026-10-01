@@ -1,7 +1,7 @@
 // Zelda3D title-logo overlay — port of OoT3D's title-demo "THE LEGEND OF ZELDA / OCARINA OF
 // TIME 3D" fire-glow wordmark, composited over the field/rider scene. This was the biggest
 // confirmed title-parity gap (SoH3D rendered none of it) — see
-// debug_journal/2026-07-08-title-overlay-wrong-asset-RETRACTION.md for the prior failed
+// oot3d-decomp/docs/title_2d_overlay_logo.md for the prior failed
 // attempt (a misidentified opaque `common_bg01` parchment card) and why this module instead
 // draws only the real logo asset.
 //
@@ -27,8 +27,8 @@
 // runs cs-frames 2310..2460 straddling the 2400-frame loop restart. N64's En_Mag state
 // machine (z_en_mag.c) gates exactly the same way on the same two env flags; OoT3D kept that
 // mechanism structurally even though the assets changed (3D animated wordmark vs N64 sprites).
-// SoH3D's title-cs cursor may lag the oracle's by a phase offset
-// (debug_journal/2026-07-08-title-daytime-schedule-re.md), but the TRIGGERS are absolute
+// SoH3D's title-cs cursor may lag the oracle's by a phase offset,
+// but the TRIGGERS are absolute
 // against this engine's own cs cursor — so reading them here is faithful regardless of the
 // cursor-phase divergence against Az.
 //
@@ -109,7 +109,7 @@ namespace {
 // the oracle's scene-composited elements do. VERIFIED against the oracle at az=1000 (cs display
 // phase, fov-derived pxPerUnit ~8.2-8.3): predicted copyright ink-center y-frac 0.8725 vs
 // measured 0.875, predicted copyright ink extent 30.7px vs measured 29.5, predicted wordmark
-// height 159px vs measured gold-mask 161 (debug_journal/2026-07-10 measurement notes).
+// height 159px vs measured gold-mask 161 (mask measurement on the title frame).
 constexpr float kOverlayComposeDepth = 34.0f;   // §6.4 placement literal 0x001da8a4 = -34.0f
 constexpr float kCopyrightLocalOffsetY = 11.0f; // §6.4 copyright local translate (0,-11.0,-34.0)
 
@@ -288,8 +288,8 @@ LogoPhaseState resolveLogoPhase(int csFrame) {
 // (Copyright placement/scale: fully derived from the shared-basis compose above — see
 // Zelda3D_TitleOverlayPxPerUnit and the Zelda3D_TryDrawTitleCopyright call site. The former
 // fitted constants — kCopyrightHeightFrac 0.117 from a screenshot mask, and the
-// kHeightFrac-chained center fraction — are gone; a bbox A/B (tools/title_copyright_bbox.py,
-// 2026-07-10) measured the fitted version at width 0.913x / off-center vs oracle.)
+// kHeightFrac-chained center fraction — are gone; a bbox A/B measured the fitted version at
+// width 0.913x / off-center vs oracle.)
 
 // Press-START skip state (title_logo_actor.md §7). Advanced once per frame by
 // Zelda3D_TitleLogoStepSkip (called from Zelda3D_Title_Update); consulted by
@@ -497,8 +497,8 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     // The trigger only fires the 40-frame lead-in delay (state 0->1); nothing about the wordmark
     // (alpha or assembly) actually starts until that delay elapses, so holding the csab at frame 0
     // (bind pose) through the delay and starting the fly-in exactly when the alpha ramp starts is
-    // the decomp-faithful timing (previously flagged as a gap in
-    // debug_journal/2026-07-10-title-fireglow-copyright.md's "Gaps" section).
+    // the decomp-faithful timing (previously flagged as a gap in the OoT3D wordmark
+    // fade schedule).
     const int wordmarkStart = (ps.fadeInFrame >= 0) ? (ps.fadeInFrame + kFadeInDelayFrames) : -1;
     if (wordmarkStart >= 0) {
         const float csabFrame = std::clamp(csFrame - wordmarkStart, 0, kLogoCsabDuration - 1);
@@ -574,7 +574,7 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     // (e.g. csFrame=438 → wordmarkStart=fadeIn+40, elapsed=54, alpha=54*3=162/255=0.635).
     // The alpha value reaches the draw correctly on paper (zelda3d_sdl3gpu.cpp threads uExtra.x =
     // a8/255 into the fragment shader's alpha), but a measured composite-axis residual
-    // (debug_journal/2026-07-11-attr-cs438-composite.md, gap 0.141) shows SoH's mid-fade letters are
+    // (the retail cs438 capture) shows SoH's mid-fade letters are
     // ~0% dimmed vs the oracle's ~15% — so confirming the runtime alpha here is step 1 of ruling
     // alpha-value-correctness in or out before chasing the blend destination.
     Z3D_LOG(WORDMARK, "csFrame=%d phase=%d wordmarkAlpha=%.2f alphaU8=%u\n", csFrame, (int)ps.phase, ps.wordmarkAlpha,

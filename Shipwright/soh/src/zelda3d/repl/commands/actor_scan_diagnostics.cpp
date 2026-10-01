@@ -137,8 +137,7 @@ bool Zelda3D_ActorScanDiagnosticsReplCommand(PlayState* play, const char* comman
     } else if (strcmp(command, "asample") == 0) {
         // BEHAVIORAL motion-parity sampler: `asample <n> [path]` streams the selected actor's
         // pos/rot/vel for the next n game frames to a CSV (default scratch/motion/zelda3d.csv), then
-        // closes. Pair with the oracle side (tools/oracle_motion_sample.py) + tools/motion_parity.py.
-        // Do NOT afreeze the actor if you want to observe its real motion.
+        // closes. Do NOT afreeze the actor if you want to observe its real motion.
         int n = 0;
         char path[256] = "scratch/motion/zelda3d.csv";
         int got = sscanf(line, "%*s %d %255s", &n, path);

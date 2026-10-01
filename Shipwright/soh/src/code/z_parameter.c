@@ -5421,7 +5421,7 @@ void Interface_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
 void Interface_DrawActionButton(PlayState* play, f32 x, f32 y, Color_RGB8 prim) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
 
-    // #205 — native HUD: this quad is the black-bar corruption the user reported (docs/issues/0004).
+    // #205 — native HUD: this quad is the black-bar corruption the user reported.
     // The #31 HD-disc path below keeps the N64 flip quad and rescales its baked 32-texel texcoords by
     // discW/32; with the OoT3D texture pack loaded the disc is far bigger than 32 texels and that
     // ratio is a magic constant over a tile the N64 path cannot describe, so the row stride breaks

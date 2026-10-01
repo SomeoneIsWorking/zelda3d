@@ -671,8 +671,8 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         //   act on the ground draw, which now measures 0.99. The "non-monotonic depth banding"
         //   (0.92/0.69/0.83/0.77/...) that motivated all three was the pack's per-texture darkening
         //   sampled at different distances, not a depth-dependent shading error.
-        // tools/tev_mask_ratio.py now HARD-FAILS on a pack asymmetry so this cannot recur.
-        // See debug_journal/2026-07-22-zora-ground-deficit-was-texpack-asymmetry.md.
+        // The channel writer now HARD-FAILS on a pack asymmetry so this cannot recur.
+        // See .
         // OoT3D scene-vertex-lit path (task #16): feed uAmbient.xyz = sceneAmb * matAmb.
         // Per LIGHTDIAG at pinned title cursor=650: grass room groups have
         // matAmb=(1,1,1) matDif=(0,0,0), combScale=2. So the diffuse term contributes
@@ -681,7 +681,7 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         // SCENE-AMBIENT mismatch (SoH forces midnight → sceneAmb=(0.16,0.14,0.30)
         // blue-heavy), not a shader defect. The Az-matching fix is to use OoT3D's
         // actual title-demo lightSettings values, not to change the shader math. See
-        // debug_journal/2026-07-04-title-parity-pinned650.md.
+        // .
         // forceUnlit (title logo / self-illuminated overlays, ZELDA3D_HANDLE_FORCE_UNLIT): ignore
         // this material's own vertex_lighting flag so the scene ambient never darkens the draw.
         bool ambGroup = (grp.vertexLighting && gZelda3dWorldLit && !forceUnlit);

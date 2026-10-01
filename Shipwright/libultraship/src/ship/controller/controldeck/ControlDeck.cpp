@@ -13,7 +13,7 @@
 
 namespace Ship {
 
-// Headed-keyboard-input diagnostic (debug_journal/2026-07-15-keyboard-headed-v2.md). Physical
+// Headed-keyboard-input diagnostic. Physical
 // keyboard input reaching the game cannot be reproduced headless (the REPL injects pad state
 // directly, bypassing the real SDL event -> ControlDeck path), so this is the tool a user runs
 // in a real windowed session to pinpoint where a keypress is getting dropped: it logs the

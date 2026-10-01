@@ -43,8 +43,7 @@ int gZelda3dLogicFrame = 0;
 }
 
 // Last CSAB name + resolved playhead the AUTO path drove each model with, so REPL `boneinfo` can
-// dump the live per-bone pose at the exact clip/frame currently on screen (verification tooling —
-// debug_journal 2026-07-15-epona-title-animation). Keyed by modelId.
+// dump the live per-bone pose at the exact clip/frame currently on screen. Keyed by modelId.
 static std::unordered_map<int, std::pair<std::string, float>> sLastAuto;
 extern "C" void Zelda3D_RecordLastAuto(int modelId, const char* csab, float frame) {
     if (csab && *csab)
@@ -141,7 +140,7 @@ extern "C" void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float 
         // MEASURED walk_free@φ -> end@0 max-bone gap (kWalkStopGapR/L, a rig pose property — measured, not
         // tuned), pick the actually-reachable end (the smaller gap => ~always endL), and size the cross-
         // fade to keep each rendered frame under the oracle's stop ceiling (18.3 deg/frame; ours measures
-        // 14.2 worst across 8 phases — tools/walk_stop_phase_sweep.py).
+        // 14.2 worst across 8 phases).
         int i0 = (int)phi % kWalkStopPhaseCount;
         int i1 = (i0 + 1) % kWalkStopPhaseCount;
         float t = phi - (float)i0;

@@ -301,7 +301,7 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     // for the differing constants — verified by direct computation, not by guessing). This port
     // still removes the gameplay function's unverified stick/PlayerCanMove coupling and the small
     // per-frame speed jitter it caused, matching the real cs dispatcher exactly instead of
-    // approximating it. See debug_journal/2026-07-15-epona-title-animation.md.
+    // approximating it. See .
     if (funcIdx == 1 || funcIdx == 4) {
         // `log rider 1`: catch who stomps animationIdx between our per-frame calls (the mounted-Link
         // stand-pose diagnosis: Player reads idx=REARING while this branch sets GALLOP).

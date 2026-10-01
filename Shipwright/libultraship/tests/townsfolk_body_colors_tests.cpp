@@ -16,7 +16,7 @@
 //   - a BOB row with a distinct non-white colorB (type 3 blue-tinted dress)
 //   - a BOB row with a distinct non-white colorA (type 5 dark-green dress)
 // The exact colors come from the extracted table (see the .inc file and
-// tools/dump_enhy_body_table.py --human output).
+// oot3d-decomp/tools/dump_enhy_body_table.py --human output).
 
 #include "gtest/gtest.h"
 #include "actor/townsfolk_body_colors.h"

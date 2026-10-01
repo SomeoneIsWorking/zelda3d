@@ -1,8 +1,8 @@
 // OoT3D cutscene opcodes — enumerated from FUN_002c5ba0 (the OoT3D CS
 // interpreter) via oot3d-decomp/build/decomp/002c5ba0.c case blocks.
 //
-// See debug_journal/2026-07-04-cs-interpreter-located.md and
-// debug_journal/2026-07-04-cs-format-is-n64-shape.md.
+// The opcode set and the 48-byte N64-shaped record stride are read directly from
+// oot3d-decomp/build/decomp/002c5ba0.c.
 //
 // Encoding (CORRECTED 2026-07-07): the stream starts at the " BDQ"
 // header {magic, u16 ver, u16 0, s32 cmd_count, s32 end_frame}; most
@@ -10,7 +10,7 @@
 // the N64 CsCmdActorAction shape) but strides are OPCODE-SPECIFIC:
 // cam cmds 1/2/5/6 = 12B hdr + 16B atoms, 7/8 = 28B, 0x8c = 12B recs,
 // 0x97 = length-prefixed "ccb" camera-spline block, 1000 = 16B.
-// Full walker: tools/walk_oot3d_cs.py; port: zelda3d_cutscene.cpp.
+// The stream walker that applies these opcodes is zelda3d_cutscene.cpp.
 //
 // The 0x0B..0x50 range mirrors N64 z_demo opcodes semantically; where
 // the semantics match, the port reuses SoH's existing handlers. The

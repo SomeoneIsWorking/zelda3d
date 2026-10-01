@@ -283,7 +283,7 @@ on the `SoH3D_DoRetarget` auto branch (`soh3d.c:2148`+, `SetMidMask` at 2244):
 - Live: drive En_Ko (Kokiri Forest) and En_Sa (Lost Woods / Meadow) headless, hold the actor with
   `asel`/`afreeze`, force-drive the eye/mouth index, and capture before/after screenshots showing the
   eye/mouth texture actually changing and (En_Sa, Meadow) the ocarina appearing. Attach via
-  `tools/kanban.py evidence`. A frozen-cam single-frame harness is NOT sufficient (project rule:
+  the oracle capture tools. A frozen-cam single-frame harness is NOT sufficient (project rule:
   verify the full user-facing path).
 
 ---

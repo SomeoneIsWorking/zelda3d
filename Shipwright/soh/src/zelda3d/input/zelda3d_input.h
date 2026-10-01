@@ -1,7 +1,7 @@
 // Zelda3D input module — ONE home for the input-adjacent free functions/globals that used to be
 // scattered across zelda3d.c (locomotion/button-hold REPL harness, Xbox/keyboard glyph-device
 // state) and zelda3d_model.cpp (headless keyboard-inject verification shim). Pure
-// code-motion pass (Phase 1 reorg, debug_journal/2026-07-15-phase1-input-consolidation.md) — no
+// code-motion pass (Phase 1 reorg) — no
 // behavior change to any of the moved logic.
 //
 // This does NOT yet own the whole input path (event-time SDL->ControlDeck, poll-time
@@ -55,7 +55,7 @@ extern int gZelda3dInputDevice;
 extern int gZelda3dXboxBtn;
 
 // Consolidated input diagnostic gate (`log input 1`) — the single source of truth for "is the headed
-// keyboard-input diagnostic enabled" (debug_journal/2026-07-15-keyboard-headed-v2.md). Read once,
+// keyboard-input diagnostic enabled". Read once,
 // cached. libultraship's two ControlDeck.cpp files (Ship:: event-time, LUS:: poll-time) each
 // forward-declare this locally and call it instead of keeping their own private copy.
 // Seed gZelda3dInputDevice from ZELDA3D_INPUTDEV. Called once from Zelda3D_RegisterHostHooks at

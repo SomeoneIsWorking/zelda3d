@@ -49,7 +49,7 @@ struct SgUbo {
     // fragment output; <0.5 is a no-op so materials that don't use CONSTANT are unchanged).
     // Default upload sets a=0 (no-op preserving today's rendering); the per-actor override
     // channel (EnHy Step 2c) flips a=1 when an actor wants the constant applied. See
-    // debug_journal/2026-07-02-en-hy-body-colors.md.
+    // .
     float uMatConst[4];
     // Wordmark "sheen" — the CmbVShader vertex-lit color term for a per-draw light-direction
     // override (title wordmark, title_logo_actor.md §6.3/§6.6: actor field +0x1DC sweeps the

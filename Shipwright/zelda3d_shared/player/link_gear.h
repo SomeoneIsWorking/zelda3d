@@ -63,7 +63,7 @@ struct LinkGear {
     LinkShield    shield    = LinkShield::None;
     // Strength upgrade, 0..3 (none / Goron bracelet / silver gauntlets / gold). The gauntlet PLATES
     // are separate meshes gated on >= 2, so gear that omits this cannot draw them at all — which is
-    // exactly the bug this field was added for (debug_journal/2026-07-29-adult-gauntlet-plates-...).
+    // exactly the bug this field was added for (the plates were never drawn at all before).
     // MM has its own strength upgrade in the same slot, so this stays game-agnostic.
     int strengthUpgrade = 0;
     // Equipped boots: 0 normal, 1 iron, 2 hover. Iron and hover each add their own pair of meshes,

@@ -513,7 +513,7 @@ void Cutscene_Command_Terminator(PlayState* play, CutsceneContext* csCtx, CsCmdB
     // the ported OoT3D title cs (spot99_info.zsi, 2400-frame loop, driven independently by
     // Zelda3D::TitlePresentation/Zelda3D_TitleCsAdvance) has run its course. Measured: SoH's
     // ported cs cursor froze at cs frame 811 and the game fell into N64 attract gameplay with a
-    // visible HUD (debug_journal/2026-07-10-title-arc-closing-measurement.md residual 1).
+    // visible HUD.
     //
     // OoT3D's title is a self-owned scripted-playback gamestate that loops its own 2400-frame cs
     // forever until a confirm press (oot3d-decomp/docs/title_gamestate_driver.md) — TitlePresentation

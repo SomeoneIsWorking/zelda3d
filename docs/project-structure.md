@@ -41,7 +41,7 @@ zelda   (base: N64-asset PC ports)          zelda3d  (our layer: 3DS-asset rende
 | reference | MM3D decomp (ground truth for 2ship3d) | `mm3d-decomp/` (submodule) | — |
 
 Shipping target: `zelda3d_app` builds the one launcher plus `soh_core` and `mm_core`; there are no
-per-game executables. Run via `./run.sh`; headless managers are `tools/zelda3d_game.sh` (soh) and
+per-game executables. Run via `./run.sh`; headless managers are `tools/zelda3d_game.py` (soh) and
 `tools/mm_game.py` (mm).
 
 Desktop release setup belongs to `Shipwright/zelda3d_shared/platform/`: the launcher validates and

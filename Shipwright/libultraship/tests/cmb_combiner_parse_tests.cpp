@@ -208,7 +208,7 @@ TEST(CmbCombinerParse, TitleGlowDualTexAddMultAndConstScale) {
 namespace {
 
 // Load title_logo_us.cmb (the title wordmark model, /actor/zelda_mag.zar) — the shield/sword
-// dark-square glint bug (debug_journal/2026-07-10-shield-glint-dualtex.md). Unlike g_title.cmb's
+// dark-square glint bug. Unlike g_title.cmb's
 // single-stage ADD_MULT dual-texture combine, this asset's shield/sword materials spread the
 // dual-texture combine across TWO combiner stages, which the pre-fix parser (only recognizing
 // the single-stage ADD_MULT shape) never classified as dual-texture — and the pre-fix SgGroup

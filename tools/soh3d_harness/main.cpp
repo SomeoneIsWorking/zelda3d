@@ -9,7 +9,7 @@
 // just a REPL that exposes retro_run + Azahar's Memory::MemorySystem +
 // save-state I/O — so warp injection, actor-table dumps, and SoH3D
 // side-by-side compare can live as Python scripts in tools/ instead of
-// being baked into the binary. Matches how tools/soh3d_repl.py drives
+// being baked into the binary. Matches how tools/zelda3d_repl.py drives
 // the SoH3D game today.
 //
 // Protocol: newline-delimited text on stdin/stdout. Two tiers:

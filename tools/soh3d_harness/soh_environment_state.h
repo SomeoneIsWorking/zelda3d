@@ -14,7 +14,7 @@ int SohState_ShrinkWindowVal(void);
 //   saturated blue.
 //
 // The submitted value is `gZelda3dAmbient`, which Zelda3D_GL_SetLightParams writes; at the title that
-// is the 3DS title-palette blend, verified against the oracle (see tools/title_ambient_parity.py).
+// is the 3DS title-palette blend, verified against the oracle.
 // The out-param is named `n64Ambient` for continuity but carries gZelda3dWorldAmbColor; see the
 // implementation comment.
 int SohState_Zelda3DLive(float* ambient, float* light1Color, float* light2Color, float* n64Ambient);

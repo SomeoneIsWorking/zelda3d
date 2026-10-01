@@ -153,10 +153,9 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
     // Zelda3D_CmabSampleTranslationV/ConstColorRGB clamp internally per the cmab's own loopMode
     // (Once: hold frame-300's value past duration; see file header).
     //
-    // FRAME-DOMAIN FIX (2026-07-14, cs1093 fireglow-extent residual, debug_journal entry same
-    // date): `g_title_fire.cmab`'s `duration=300`/keyframe timestamps are authored in the H3D
-    // material-animation's native tick domain, which every other CMAB/CSAB player in this port
-    // runs at the REAL, per-engine-tick rate (confirmed for the title screen specifically —
+    // FRAME-DOMAIN FIX (2026-07-14, cs1093 fireglow-extent residual): `g_title_fire.cmab`'s `duration=300`/keyframe
+    // timestamps are authored in the H3D material-animation's native tick domain, which every other CMAB/CSAB player in
+    // this port runs at the REAL, per-engine-tick rate (confirmed for the title screen specifically —
     // `zelda3d_cutscene.cpp`'s `Zelda3D_TitleCsAdvance()` is called once per real engine update
     // from `Zelda3D_Title_Update()`, and only advances its OWN returned cursor,
     // `Zelda3D_TitleCsFrame()`, every OTHER call (`sTickParity`) — i.e. `csFrame` is a HALF-RATE
@@ -188,7 +187,7 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
     // Verification aid (`log fireglow 1`): print the sampled curve values so the CMAB player can
     // be confirmed live-varying quantitatively, independent of screen-capture timing (camera pan/
     // attract-mode cuts make screenshot diffing an unreliable isolation of the material-anim's own
-    // contribution — see debug_journal/2026-07-10-title-fireglow-copyright.md).
+    // contribution).
     Z3D_LOG(FIREGLOW, "csFrame=%d cmabFrame=%.1f rgb=(%.4f,%.4f,%.4f) uvV=%.4f alpha=%.1f\n", csFrame, cmabFrame,
             rgb[0], rgb[1], rgb[2], uvV, alpha);
 
@@ -202,7 +201,7 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
     // geometry (taller than the wordmark: it's authored to wash over it) through the SAME
     // pxPerUnit. The previous fitted version squeezed g_title into the wordmark's own pixel
     // height, shrinking the glow footprint ~31% — a measured contributor to the fire-glow
-    // coverage residual (debug_journal/2026-07-10).
+    // coverage residual.
     const float pxPerUnit = Zelda3D_TitleOverlayPxPerUnit(play);
     Zelda3D_Overlay2D_PlaceModel(play, 0.5f * refW, 0.5f * refH, pxPerUnit * localHeight, localHeight);
 

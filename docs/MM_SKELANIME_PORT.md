@@ -199,7 +199,7 @@ Once actors pose correctly:
 > REMOVED.** MM3D actor GARs ship the actor's OWN 3DS animations (`.csab`) next to the `.cmb`
 > (`zelda2_dog.gar.lzs` → `dog_wait/walk/run/bark/sit/...`). There is nothing to retarget: play the
 > 3DS clip on the 3DS rig, exactly as OoT's soh3d layer does. See
-> `debug_journal/2026-07-17-mm-skinned-csab-architecture.md`.
+> .
 
 **Landed + verified (dog renders posed by its own `dog_wait`, scratch/screenshots/mm_dog_csab_mapped.png):**
 - **CSAB parser** — the shared `cmb3d/asset/csab.cpp` now parses MM3D **subversion 5** ("Majora")

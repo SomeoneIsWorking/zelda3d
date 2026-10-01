@@ -104,7 +104,7 @@ unsigned long long linkAdultMidMask(const LinkGear& gear) {
 
     // GAUNTLET PLATES, forearms. Silver/gold gauntlets add plate geometry that the Goron bracelet
     // (upgrade 1) does not, so the gate is `>= 2` — the plates are their own meshes, and before this
-    // existed they were simply never drawn (debug_journal/2026-07-29-adult-gauntlet-plates-never-drawn.md).
+    // existed they were simply never drawn.
     //
     // Ported from OoT3D `Player_DrawImpl` (0x004c11f4), which corresponds line-for-line with N64
     // `z_player_lib.c:1114-1141`: plate 1 on both arms unconditionally, then an open/closed variant

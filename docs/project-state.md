@@ -35,3 +35,4 @@ original hardware or through Azahar. User-visible deltas versus that baseline:
 | S009 | macOS arm64 CI | partial | seam job only; the launcher hardcodes ELF `.so` names and Linux `/proc/self/exe` |
 | S010 | Windows x86_64 CI | partial | seam job only; the launcher uses `dlfcn.h`/`dlopen`/`realpath` unconditionally and MM applies GNU flags unguarded |
 | S011 | Android delivery | missing | no Android target, package or runtime integration exists |
+| S012 | Product diagnostics reach one logger on both games | missing | SoH routes through `ZELDA3D_LOG`; MM's `2ship/2s2h/zelda3d/` has 45 direct `fprintf(stderr, ...)` calls across 11 files and no logger owner, which also leaves 7 `insecureAPI` clang-tidy errors the gate never reached (issue 0027) |

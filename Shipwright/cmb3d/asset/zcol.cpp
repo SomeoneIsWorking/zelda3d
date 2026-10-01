@@ -113,8 +113,8 @@ uint16_t nPoly = u16le(d, cnt + 2);
         // normal starts at +0x06 instead of +0x08. Everything else is shared: same -2 array anchor,
         // same f32 plane distance at +0x0E, same s16/32767 normal encoding.
         //
-        // Derived against the format's own plane identity (n . vA == -dist), swept over anchors and
-        // field offsets by tools/zelda3d_collision_layout.cpp. The sweep recovers OoT3D's documented
+        // Derived against the format's own plane identity (n . vA == -dist), swept over anchors
+        // and field offsets. The sweep recovers OoT3D's documented
         // layout (anchor -2, normal +0x8, dist +0xE -> 100%, 2844/2844) before being trusted on MM3D
         // (anchor -2, normal +0x6, dist +0xE -> 100%, 730/730). A wrong offset scores ~0%, not
         // "slightly worse", so this is a derivation rather than a fit.

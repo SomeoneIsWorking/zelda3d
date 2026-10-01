@@ -5,7 +5,7 @@
 // `itemAction == 4 || itemAction == 3` — i.e. only the two swords are trimmed. The explicit two-way
 // branch below is behaviorally identical to that guarded table read.
 //
-// DELIBERATELY NOT PORTED HERE (see debug_journal / the port spec): OoT3D also selects one of 11
+// DELIBERATELY NOT PORTED HERE: OoT3D also selects one of 11
 // weapon-specific trail MATERIALS from a 5-entry table at VA 0x004dc3c4. Those indices are 3DS
 // resource slots in the blure's own GAR, NOT SoH `TrailType` values, so assigning them into
 // EffectBlure.trailType would be meaningless and would regress SoH's existing trail enhancement.

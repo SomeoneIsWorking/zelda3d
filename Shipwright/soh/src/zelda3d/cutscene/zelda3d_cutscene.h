@@ -3,9 +3,8 @@
 // Ground truth: OoT3D FUN_002c5ba0 (cs interpreter) + FUN_0033cb90 (OP97
 // camera spline evaluator) + FUN_003087a4 (Grezzo keyframe curve).
 // Format + field roles verified byte-exact against the live Az oracle
-// (|d_eye|=0.00 over 300 frames) — see debug_journal/
-// 2026-07-07-op97-camera-decode-verified.md and tools/oot3d_cs_camera.py
-// (the reference Python implementation this is a port of).
+// (|d_eye|=0.00 over 300 frames); the OP97 camera spline evaluator is ported
+// in zelda3d_cutscene.cpp.
 #ifndef ZELDA3D_CUTSCENE_H
 #define ZELDA3D_CUTSCENE_H
 
@@ -38,7 +37,7 @@ int Zelda3D_TitleCsCamera(float frame, float eye[3], float at[3],
 // CsCmdActorAction shape). p0/p1 = segment start/end world pos, yaw =
 // authored facing (binang). outAction (may be NULL) receives the cue's raw
 // action field (0x40/0x41/0x24 per the 15-cue itinerary,
-// oot3d-decomp/docs/2026-07-07-rider-cue-port.md) for CSAB selection
+// oot3d-decomp/docs/title_rider_cs_dispatch.md) for CSAB selection
 // (title_rider_port_spec.md step 4). Returns 0 when no cue covers the frame.
 int Zelda3D_TitleCsRiderCue(int frame, int* cueIndex,
                             float p0[3], float p1[3],

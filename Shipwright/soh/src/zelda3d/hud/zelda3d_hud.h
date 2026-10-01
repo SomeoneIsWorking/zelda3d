@@ -51,7 +51,7 @@ enum {
     ZELDA3D_HUD_ITEM_BUTTONS = 0,
     // The do-action prompt: the A-button disc and its label ("Open" / "Speak" / "Put Away"). One
     // group because they share the flip animation and the label draws over the disc. This is what
-    // the black-bar stack was (docs/issues/0004-*): unlike every other element these are not
+    // the black-bar stack was: unlike every other element these are not
     // texrects but flip-animated quads whose texcoords are baked for a 32-texel tile, and the HD
     // disc rescales those baked coords by discW/32 — a ratio the N64 tile cannot express, so the
     // row stride breaks into horizontal bands.

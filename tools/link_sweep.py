@@ -485,8 +485,7 @@ STATE_MATRIX = [
              "from ForceSwim's surface sw_swim_wait; ground truth func_8083D12C's A-press branch "
              "(z_player.c ~6797) + func_8083D330 (~6861)"},
     {"name": "mount_dismount", "group": "action", "kind": "prior",
-     "note": "Epona/En_Horse 3DS mount render already ported+verified prior session — see "
-             "debug_journal/2026-07-15-epona-en-horse-3ds-render.md; not re-driven by this sweep"},
+     "note": "Epona/En_Horse 3DS mount render already ported+verified prior session; not re-driven by this sweep"},
     # NOTE 2026-07-15 (backwalk/sidestep/turn_in_place task): a Z-target hold primitive (REPL
     # `ztarget <0|1>`, zelda3d.c) now exists — it was added as a PREREQUISITE for the
     # locomotion-cluster states above and is reused by their "ztarget_move" driver. This row is

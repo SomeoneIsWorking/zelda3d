@@ -27,8 +27,8 @@ extern "C" void Zelda3D_Overlay2D_Begin(PlayState* play, float refW, float refH)
     // Y-up->Y-down convention flip below) also negates model Z, which INVERTS the authored depth
     // sense: a sub-mesh modeled BEHIND (more negative local z — title_logo_us.cmb's shield at z
     // -6.3..-9.7 vs the ZELDA letters at -5.0..-5.6) came out NEARER, so the shield depth-tested
-    // in FRONT of the letters — the occlusion inversion measured in
-    // debug_journal/2026-07-10-shield-sword-attribution.md §5. Passing the ortho near/far
+    // in FRONT of the letters — the occlusion inversion measured on the retail title logo.
+    // Passing the ortho near/far
     // REVERSED (near=+1000, far=-1000) re-flips clip z so the authored order is restored
     // (modeled-behind maps farther, matching the oracle's own projection). Range stays wide
     // enough that any caller z never clips.
@@ -41,7 +41,7 @@ extern "C" void Zelda3D_Overlay2D_Begin(PlayState* play, float refW, float refH)
     // through the unified Zelda3D SG renderer (gSPZelda3DDrawA -> DrawModel), whose depth test is
     // always on and whose depth WRITE is a static per-material flag baked from the CMB. For
     // title_logo_us.cmb specifically that leaves intra-model ordering (shield/sword vs the "ZELDA"
-    // letters — see debug_journal/2026-07-10-shield-sword-attribution.md) to raw draw-call
+    // letters) to raw draw-call
     // submission order, which is wrong: the model's own vertex depth places the shield/sword
     // BEHIND the letters, but SoH shows it unoccluded.
     //

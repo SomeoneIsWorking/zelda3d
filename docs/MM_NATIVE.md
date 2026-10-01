@@ -74,8 +74,7 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > dlopen boundary — a single libultraship-owned global written by both cores — is not solved by
 > RTLD_LOCAL and needs an explicit owner.
 >
-> **MEASURED, then FIXED (2026-08-05 — claims C054, C050 amended).** `tools/shared_state_probe.py`:
-> both cores reference 444 libultraship FUNCTIONS (harmless — duplicate code behaves identically)
+> **MEASURED, then FIXED (2026-08-05).** Both cores reference 444 libultraship FUNCTIONS (harmless — duplicate code behaves identically)
 > and only **2 DATA** objects, `GImGui` and `Fast::g_exec_stack`. That 2 is a floor, not the answer:
 > `nm` finds **59 function-local statics** in `libultraship.a`, and accessor-hidden singletons
 > (`Context::GetInstance()` over a file-static) are how this codebase actually writes its state, so a
@@ -342,8 +341,7 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > and deliberately reused, because destroying the window is the teardown that crashes in driver code
 > (C057).
 >
-> The acceptance test this section asked for, run and passed. `tools/zelda3d_sequence.sh mm,oot`
-> (new — see below) on `--run-sequence mm,oot`:
+> The acceptance test this section asked for, run and passed. `--run-sequence mm,oot`:
 >
 > | | Before the split | After |
 > |---|---|---|
@@ -361,9 +359,7 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > print the same nothing. There is now a positive counterpart (`installed a FRESH X for this game`)
 > and the skip message is split by lifetime — an ENGINE skip is logged as the design working, a
 > PER-GAME skip as an error, because after the split the latter must not happen. The verdict block in
-> `zelda3d_sequence.sh` prints all four categories every run, including the empty ones.
->
-> **TOOLING: `tools/zelda3d_sequence.sh`.** The sequence run had been hand-assembled twice, and both
+> **TOOLING: `--run-sequence`.** The sequence run had been hand-assembled twice, and both
 > times the hard part was not the launch. A core only returns when its frame loop ends, and the only
 > headless way to end it is the per-game REPL's `quit` — so a run without both FIFOs wired looks like
 > a hang and gets killed. (It also starts its own Xvfb unconditionally: the first attempt this session
@@ -424,7 +420,7 @@ This question does NOT block N1/N2 — faithful-first means "get native MM booti
 > also included std/nlohmann statics that were harmlessly shared (read-only tables, RTTI tags) and are
 > now per-core.
 >
-> **`tools/unique_symbol_collisions.py`** is the durable check, and it was validated against BOTH
+> **`nm` over both core binaries is the durable check**, and it was validated against BOTH
 > classes rather than reasoned about: run on the pre-fix binaries it reported 303 core-owned collisions
 > and exited 1; on the post-fix binaries, 0 and exit 0. A build-system flag is exactly what a refactor
 > drops without noticing. It errors out rather than reporting "no collisions" when a core binary is
@@ -1027,7 +1023,7 @@ measured in the falsifier below, and it stays the launcher's to run once, at pro
 cores own archives and heaps" design the section below kept arriving at — reached by never tearing
 down, rather than by making teardown work.
 
-**Evidence.** `tools/zelda3d_sequence.sh oot,mm` — the direction that could not run before, since OoT
+**Evidence.** `--run-sequence oot,mm` — the direction that could not run before, since OoT
 always `_exit`ed — reports both cores returning 0, MM attaching with all five per-game subsystems
 FRESH, INHERITED `(none)`, UNFINISHED `(none reported)`, no crashes. And the real chooser path was
 driven end to end: `launcher pick mm` leaves the **pid unchanged**, `/proc/<pid>/exe` still the

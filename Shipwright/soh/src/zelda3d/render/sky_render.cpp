@@ -88,7 +88,7 @@ static int Zelda3D_SkyStarModelId(int idx) {
 // that NULL and crash (#16 early-load first-person SIGSEGV in guMtxF2L). Callers MUST skip the N64
 // SkyboxDraw_UpdateMatrix when this returns 1 (its result is dead work anyway — we draw our own sky).
 // Mirrors exactly the accept conditions of Zelda3D_TryDrawSky.
-// #135 (debug_journal/2026-07-02-market-day-parity-sweep.md): Map non-NORMAL_SKY skyboxIds to a
+// #135: Map non-NORMAL_SKY skyboxIds to a
 // BlueSky.zar tenkyu dome variant so the visible-sky scenes (Market Day/Night, Market Adult,
 // Overcast Sunset) don't render as a black void. The N64 handles these via a full-screen prerender
 // image drawn AFTER the room (which paints over Zelda3D room geometry — see Zelda3D_ShouldSuppress-

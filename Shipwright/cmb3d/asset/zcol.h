@@ -5,15 +5,13 @@
 //     (the bbox preceding it is at +0x12, not +0x10). The POINTERS at +0x28/+0x2c/+0x30 do NOT move.
 //   * CollisionPoly omits OoT3D's 2-byte flags word at +0x06, so the normal starts at +0x06, not
 //     +0x08. Stride is still 20, the array is still anchored at polyList-2, dist is still f32 @+0x0e.
-// Derived with tools/zelda3d_collision_layout.cpp and guarded by tools/zelda3d_collision_test.cpp:
 // 110/111 MM3D scenes parse with plane identity 100% and face-normal agreement 99.9%.
-// Port of tools/oot3d_collision.py. Pure C++ (no SoH/LUS deps).
+// Pure C++ (no SoH/LUS deps).
 //
 // noclip has the `Collision = 0x03` enum but never parses it — this layout was
 // reverse-engineered from the USA decrypted ROM (verified across 6 scenes: the plane
 // identity n.vA == -dist holds ~100%, stored normal == geometric face normal 99.9%).
-// See tools/oot3d_collision.py / PROGRESS.md for the full derivation.
-//
+
 // CollisionHeader (at the cmd-0x03 file offset; command addresses are PLAIN file offsets):
 //   +0x1c u16 nVtx, +0x1e u16 nPoly, +0x28 u32 vtxList, +0x2c u32 polyList,
 //   +0x30 surfaceTypeList, +0x34 camData, +0x38 waterBox.

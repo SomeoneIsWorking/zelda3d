@@ -614,7 +614,7 @@ When that draw triggers, Azahar writes one JSON object containing:
   and distance attenuation tables when enabled.
 
 The latch clears after one attempt, so later frames cannot silently overwrite the capture. The
-committed owner `tools/cmb_fragment_lighting_oracle_probe.py` checks `OracleCache` before spawning,
+committed owner `tools/title_oracle_probe.py` checks `OracleCache` before spawning,
 uses one process for discovery plus capture on a miss, selects and validates a draw through `picaLit=1`
 from the authoritative `regs.lighting.disable` register (not the independent CmbVShader `fLit`
 boolean), and stores raw artifacts and any structured probe under the complete
@@ -624,7 +624,7 @@ bounded PICA-disabled negative control, not a claim that it reaches Navi or the 
 
 **Why**: the Patch-5 uniform log says WHAT lighting state a draw used but not WHICH surface it
 painted. Skipping one draw and diffing the frame against the unmodified one yields that draw's
-exact screen footprint — the oracle-side draw→material mapping. Driver: `tools/oracle_draw_isolate.py`.
+exact screen footprint — the oracle-side draw-to-material mapping.
 
 The Patch-5 log line also gained draw IDENTITY, which is what ties an oracle draw to one of our
 CMB material groups: `tex0=<paddr>/<w>x<h>/f<fmt> en=<n> nv=<vertexCount>`,
@@ -800,7 +800,7 @@ Every Patch-5 `vsuni_log` line now includes `cmdList=<physical-address>/<word-in
 `PicaCore::cmd_list` owns these values while processing a command list, so the field identifies the
 exact PICA packet stream that produced a logged draw without exposing a guessed CPU renderer function.
 The cache-owned `tools/pica_command_provenance_oracle_probe.py` persists both that draw log and the raw
-physical command list. `tools/pica_command_writer_oracle_probe.py` first reuses that cached provenance
+physical command list. A writer-side probe first reuses that cached provenance
 (or captures it without memory logging), decodes the selected register packet offline, then launches a
 trace harness with the direct `SOH3D_MEMLOG_RANGES` logger armed for only that packet's four-byte guest
 writer address. It rejects a traced frame whose command-list provenance or selected packet differs from
@@ -834,7 +834,7 @@ write record. At the recovered direct template store `0x0040cfe4` in `FUN_0040cd
 
 This is explicitly synchronous: transient renderer input objects may be cleared or reused by the end
 of a frame, so a post-run memory dump is not evidence of the state which produced a template word.
-`pica_command_writer_oracle_probe.py` accepts these fields only at the exact store PC, verifies the
+The writer-side probe accepts these fields only at the exact store PC, verifies the
 derived base, rejects divergent inputs, and persists the decoded state beside the already-selected
 compact memory records. Its optional second exact state-address watch preserves the bounded writes
 that construct that input, rather than a post-frame dump. It does not infer an object type or
@@ -929,7 +929,7 @@ the recovered binder store `PC=0x004c6374` in `FUN_004c6364`, `r1` is the live n
 descriptor. The offsets `+0x10..+0x28` cover every field this binder reads. The observer is bounded
 by the existing exact state-address watch and does not alter emulation or render output.
 
-`pica_command_writer_oracle_probe.py` decodes those words only for that exact PC, requires every
+The writer-side probe decodes those words only for that exact PC, requires every
 field, and rejects multiple distinct descriptors. Its state-watch trace version is 2, so this single
 new observation has a distinct cache key while all prior provenance and render observations remain
 cache hits. `AZAHAR_RENDER_CONTRACT` remains unchanged because this is capture-only instrumentation.

@@ -47,7 +47,7 @@ static int Zelda3D_MoonModelId(void) {
 // corner, black at the other three) — the "~MIRROR" tag mirror-expands the quadrant 2x2 into a
 // full centred halo at load (see loadBillboard's mirrorExpandQuadrant, zelda3d_model.cpp). Without
 // it the raw quadrant painted the whole quad: halo invisible at some camera angles, a hard-edged
-// bright rectangle at others (debug_journal/2026-07-10-moon-epona-fade-attribution.md §1).
+// bright rectangle at others.
 static int Zelda3D_MoonInnerHaloId(void) {
     return Zelda3D_AutoModelId("BILLBOARDADD:/kankyo/BlueSky.zar|tex/fine_moon1.ctxb~MIRROR");
 }
@@ -163,17 +163,6 @@ int Zelda3D_TryDrawSunMoon(PlayState* play) {
         // Moon: 3-layer disc+halo composite at eye - sunPos. `alpha` (the N64
         // night fade-in, clamp(min(-y/80,1)*255)) is used ONLY as the night
         // VISIBILITY gate here — see kMoonDiscAlpha/full-white below for opacity.
-        // modulate the draw. color/scale kept for the N64-derived base scale.
-        color = -y / 120.0f;
-        if (color < 0.0f)
-            color = 0.0f;
-        if (Zelda3D_Title_IsActive()) {
-            // Title: the N64 dayTime scale curve below is superseded by the RE'd parametric
-            // transform (kMoonRay* constants at the draw) — scale is unused on this path.
-            scale = 0.0f;
-        } else {
-            scale = (-15.0f * color) + 25.0f;
-        }
         temp = -y / 80.0f;
         if (temp > 1.0f)
             temp = 1.0f;
