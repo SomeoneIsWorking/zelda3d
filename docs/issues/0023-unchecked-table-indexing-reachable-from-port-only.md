@@ -1,7 +1,21 @@
 # 0023 — unchecked table indexing reachable from port-only callers (audit)
 
-status: OPEN — 20 of 31 fixed as of 2026-10-04 (9 in the original 2026-08-13 pass, 11 since);
-the rest catalogued here, unfixed. Four original claims were REFUTED on evidence rather than fixed.
+status: PAUSED by user directive 2026-10-04 — the randomizer is not the product and this line
+is closed as unfixed rather than finished. 20 of 31 were fixed before the pause (9 in the
+original 2026-08-13 pass, 11 since) and four original claims were REFUTED on evidence rather
+than fixed; both results stand and neither is being pursued further. Everything below is
+parked deliberately, not overlooked. Remaining rows, if the line is ever reopened:
+  * EnPst_FollowSchedule, and the three randomizer save-JSON edge cases (GetDungeon's
+    dungeonId >= 2^32 truncation; EntranceHints/hint trial-name forwarding; Trials'
+    uninitialised nameKey on non-trial entries).
+  * libultraship DisplayListFactory: an uninitialised Gfx pushed as a display command when
+    ClipRatio N is outside 1..6, LightColor N outside 1..8, or LoadTextureBlock Size outside
+    0..3 -- stack garbage becomes a render command, so it is silent rather than a crash; and
+    std::string constructed from a null Attribute() at four sites.
+  * EnBoom_Destroy leaks its blure effect and quad collider when GET_PLAYER is NULL, because
+    the cleanup sits inside the player check.
+  * Boss06_UpdateDamage and the curtain cutscene still dereference sIgosInstance, which is
+    only safe because Init now refuses a non-EnKnight parent before assigning it.
 found by: a 33-agent audit run after the SAME bug was found twice in one day by accident
 
 ## The category
