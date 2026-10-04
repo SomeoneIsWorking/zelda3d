@@ -27,6 +27,14 @@ Subcommands:
   cam <yaw> [dist] [h]   shorthand for `query cam ...` — persistent side framing
   cam off                releases the persistent cam framing
   info                   shorthand for `query linkinfo`
+  state <token>          shorthand for `query linkstate <token>` — force one Link action state.
+                         Each token is named after the action it installs:
+                         idle locomotion ztargetlocomotion turn roll goronroll throw attack jump
+                         shield getitem talk putdown death damage hang carry climb swimidle
+                         swimunderwater swingbottle targetbackpedal sidestep.
+                         Pre-rename spellings still work and are reported as aliases:
+                         walk=locomotion run=ztargetlocomotion swim=swimidle
+                         swimdive=swimunderwater itemuse=swingbottle backwalk=targetbackpedal
   form <name>            request human/deku/goron/zora/fd through the real mask item-use path
   equip <slot> <ItemId>  equip a numeric MM ItemId on c-left/c-down/c-right
   item <ItemId>          request a numeric MM ItemId through the real item-use path
@@ -39,6 +47,7 @@ Examples:
   tools/mm_control.py actors 5
   tools/mm_control.py tp 1200 60 -500  # teleport Link to (1200, 60, -500)
   tools/mm_control.py cam 90 200 60    # side-profile from Link's right
+  tools/mm_control.py state goronroll   # requires PLAYER_FORM_GORON and A held to keep rolling
   tools/mm_control.py form goron       # requires the Goron Mask in the active save
   tools/mm_control.py equip c-left 0x12 # equip an empty bottle on C-left
   tools/mm_control.py item 0x12        # request the empty bottle ItemId
@@ -105,6 +114,12 @@ def main(argv):
         query("cam " + " ".join(argv[1:]))
     elif cmd == "info":
         query("linkinfo")
+    elif cmd == "state":
+        if len(argv) != 2:
+            sys.exit(
+                "usage: tools/mm_control.py state <linkstate token> (see --help)"
+            )
+        query("linkstate " + argv[1])
     elif cmd == "form":
         if len(argv) != 2:
             sys.exit("usage: tools/mm_control.py form <human|deku|goron|zora|fd>")

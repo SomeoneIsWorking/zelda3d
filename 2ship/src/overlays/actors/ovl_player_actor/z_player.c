@@ -8676,9 +8676,9 @@ s32 Zelda3D_PlayerForceIdle(Player* this, PlayState* play) {
     return 1;
 }
 
-// Walk: func_8083A794's body with the Z-target branch pinned to Player_Action_Run (the
-// non-Z-target ground locomotion action) instead of reading Player_IsZTargeting live.
-s32 Zelda3D_PlayerForceWalk(Player* this, PlayState* play) {
+// Free locomotion: func_8083A794 with the Z-target branch pinned to Player_Action_Run. Not "Walk":
+// MM has no separate walk action -- see mm3d_player_force.h's NAMING RULE.
+s32 Zelda3D_PlayerForceLocomotion(Player* this, PlayState* play) {
     if ((Player_Action_Run != this->actionFunc) && (Player_Action_ZTargetRun != this->actionFunc)) {
         this->unk_B70 = 0;
         this->unk_B34 = 0.0f;
@@ -8689,9 +8689,9 @@ s32 Zelda3D_PlayerForceWalk(Player* this, PlayState* play) {
     return 1;
 }
 
-// Run: same body, pinned to Player_Action_ZTargetRun (the Z-targeting ground locomotion action) —
-// the branch func_8083A794 takes when Player_IsZTargeting(this) is true.
-s32 Zelda3D_PlayerForceRun(Player* this, PlayState* play) {
+// Z-target locomotion: same body, pinned to Player_Action_ZTargetRun — the branch func_8083A794
+// takes when Player_IsZTargeting(this) is true.
+s32 Zelda3D_PlayerForceZTargetLocomotion(Player* this, PlayState* play) {
     if ((Player_Action_Run != this->actionFunc) && (Player_Action_ZTargetRun != this->actionFunc)) {
         this->unk_B70 = 0;
         this->unk_B34 = 0.0f;
@@ -8911,29 +8911,28 @@ s32 Zelda3D_PlayerForceClimb(Player* this, PlayState* play) {
 
 // --- Extended force-state hooks batch 3 (2026-07-17) — same OoT-Rosetta + decomp-verify method. ---
 
-// func_8083E404 (backwalk decode gate) + func_8083AF8C (backwalk installer) are defined below this
-// block; forward-decl so ForceBackwalk drives the REAL decode + installer rather than bypassing them.
 s32 func_8083E404(Player* this, f32 arg1, s16 arg2);
 void func_8083AF8C(Player* this, s16 yaw, PlayState* play);
 // func_8083B030 (sidestep installer: Player_Action_Sidestep + side_walkR loop anim) is defined below too.
 void func_8083B030(Player* this, PlayState* play);
 
-// Swim (treading water on the surface): func_808353DC's body (z_player.c:6452) — the surface-swim
+// Swim idle (treading on the surface): func_808353DC's body (z_player.c:6452)
 // action Player_Action_SwimIdle + swimer_swim_wait anim (MM analog of OoT's func_80838F18/ForceSwim).
 // Player_Action_SwimIdle only reads always-valid Actor fields (depthInWater/floorPoly/ageProperties), so no
 // water precondition is forced — MM has no PLAYER_STATE1_IN_WATER-style bit for OoT's hook to fake.
-s32 Zelda3D_PlayerForceSwim(Player* this, PlayState* play) {
+// NOT generic swim: Player_Action_Swim is a different action this never installs.
+s32 Zelda3D_PlayerForceSwimIdle(Player* this, PlayState* play) {
     Player_SetAction(play, this, Player_Action_SwimIdle, 0);
     Player_Anim_PlayLoopSlowMorph(play, this, &gPlayerAnim_link_swimer_swim_wait);
     return 1;
 }
 
-// Swim dive (settled underwater): the settled-dive state Player_Action_SwimUnderwater (z_player.c:17774) — mirrors
+// Swim underwater (settled deep-dive state): Player_Action_SwimUnderwater (z_player.c:17774) mirrors
 // OoT's ForceSwimDive. Installs its OWN water flags (PLAYER_STATE1_8000000 = IN_WATER, PLAYER_STATE2_400
 // = UNDERWATER, confirmed via the func_8083B930/func_8083B3B4 water-entry path) + the swim loop anim +
-// the settled-loop field sets (unk_AAA=0x3E80, av2.actionVar2=1) that Action_59's actionVar1==1 branch
+// the settled-loop fields (unk_AAA=0x3E80, av2.actionVar2=1) its actionVar1==1 branch
 // (z_player.c:17815) uses. The action force-zeros gravity every tick, so no water invariant must pre-exist.
-s32 Zelda3D_PlayerForceSwimDive(Player* this, PlayState* play) {
+s32 Zelda3D_PlayerForceSwimUnderwater(Player* this, PlayState* play) {
     this->stateFlags1 |= PLAYER_STATE1_8000000;
     this->stateFlags2 |= PLAYER_STATE2_400;
     Player_SetAction(play, this, Player_Action_SwimUnderwater, 0);
@@ -8943,26 +8942,27 @@ s32 Zelda3D_PlayerForceSwimDive(Player* this, PlayState* play) {
     return 1;
 }
 
-// Item-use (bottle raise/swing): func_8083A6C0's held-bottle dispatch (z_player.c:8637) — Player_Action_SwingBottle
+// Bottle swing: func_8083A6C0's held-bottle dispatch (z_player.c:8637) -- Player_Action_SwingBottle
 // + D_8085D200[0]'s dry-land miss anim (gPlayerAnim_link_bottle_bug_miss). Forces av2.actionVar2=0 for the
 // dry-land swing family (index 1 is the water-scoop variant), mirroring OoT's ForceItemUse forcing
-// inWater=false. Action_68's body only COMPARES bottle state (never unconditionally derefs), so it is
+// inWater=false. Its body only COMPARES bottle state (never derefs), so it is
 // safe to force without a real held bottle — same fidelity as OoT's own hook.
-s32 Zelda3D_PlayerForceItemUse(Player* this, PlayState* play) {
+s32 Zelda3D_PlayerForceSwingBottle(Player* this, PlayState* play) {
     this->av2.actionVar2 = 0;
     Player_SetAction(play, this, Player_Action_SwingBottle, 0);
     Player_Anim_PlayOnceAdjusted(play, this, D_8085D200[this->av2.actionVar2].unk_0);
     return 1;
 }
 
-// Backward walk: MM analog of OoT's ForceBackwalk (soh z_player.c:7920). Drives the REAL decode gate
+// Back-pedal (the Z-targeting backward-braking action): MM analog of OoT's ForceBackwalk
+// (soh z_player.c:7920). Drives the REAL decode gate
 // func_8083E404 (byte-identical dual-threshold curve to OoT's func_8083FC68) with a dead-behind stick
 // (yaw = shape.rot.y + 0x8000 → the s16 subtraction wraps to -32768 so |Δ|=1.0 exactly, collapsing the
 // backward threshold to speedTarget>6.8); speedTarget 8.0 (the speedXZ func_8083AF8C itself installs) is
 // unambiguously the backward branch. On decision<0 the real installer func_8083AF8C (z_player.c:9105)
-// installs Player_Action_TargetBackPedal + gPlayerAnim_link_anchor_back_walk, speedXZ=8, yaw. Returns 0 if the decode
-// surface changed (shouldn't, given these inputs) rather than force a stale state.
-s32 Zelda3D_PlayerForceBackwalk(Player* this, PlayState* play) {
+// installs Player_Action_TargetBackPedal + gPlayerAnim_link_anchor_back_walk, speedXZ=8, yaw. Returns 0 if
+// the decode surface changed rather than force a stale state. NOT Player_Action_TargetBackWalk.
+s32 Zelda3D_PlayerForceTargetBackPedal(Player* this, PlayState* play) {
     s16 yawTarget = (s16)(this->actor.shape.rot.y + 0x8000);
     f32 speedTarget = 8.0f;
 

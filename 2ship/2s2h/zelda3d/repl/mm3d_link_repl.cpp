@@ -89,6 +89,86 @@ static s32 Zelda3D_MmLinkParseEquipSlot(const char* name, EquipSlot* outSlot) {
     return 1;
 }
 
+// `linkstate` state tokens. Each token names the action its entry installs. Every token renamed when
+// the actions got their decomp names keeps its OLD spelling as a working alias, so an existing script
+// keeps working; the alias reply names both spellings and why they differ.
+static const char* const kZelda3DMmLinkStateTokens[] = {
+    "idle",
+    "locomotion",
+    "ztargetlocomotion",
+    "turn",
+    "roll",
+    "goronroll",
+    "throw",
+    "attack",
+    "jump",
+    "shield",
+    "getitem",
+    "talk",
+    "putdown",
+    "death",
+    "damage",
+    "hang",
+    "carry",
+    "climb",
+    "swimidle",
+    "swimunderwater",
+    "swingbottle",
+    "targetbackpedal",
+    "sidestep",
+};
+
+// old spelling, canonical token, and why the old spelling disagreed with the action it installed.
+static const char* const kZelda3DMmLinkStateAliases[][3] = {
+    { "walk", "locomotion", "MM has no walk action; Player_Action_Run is the walk/run blend action" },
+    { "run", "ztargetlocomotion", "installed Player_Action_ZTargetRun, not a running gait" },
+    { "swim", "swimidle", "installed Player_Action_SwimIdle, not MM's generic Player_Action_Swim" },
+    { "swimdive", "swimunderwater", "installed Player_Action_SwimUnderwater, the whole state, not just its entry" },
+    { "itemuse", "swingbottle", "installed Player_Action_SwingBottle specifically" },
+    { "backwalk", "targetbackpedal", "installed Player_Action_TargetBackPedal; TargetBackWalk is a different action" },
+};
+
+// Resolve a typed token to its canonical spelling, or NULL when it is neither a token nor an alias.
+// *outAlias / *outAliasWhy describe a rename, so the reply can say so rather than silently changing
+// what an existing script does. Every canonical spelling is a table literal, so the returned pointer
+// stays valid after the caller's token buffer goes away.
+static const char* Zelda3D_MmLinkCanonicalState(const char* token, const char** outAlias, const char** outAliasWhy) {
+    *outAlias = NULL;
+    *outAliasWhy = NULL;
+    for (size_t i = 0; i < ARRAY_COUNTU(kZelda3DMmLinkStateAliases); i++) {
+        if (strcmp(token, kZelda3DMmLinkStateAliases[i][0]) == 0) {
+            *outAlias = kZelda3DMmLinkStateAliases[i][0];
+            *outAliasWhy = kZelda3DMmLinkStateAliases[i][2];
+            return kZelda3DMmLinkStateAliases[i][1];
+        }
+    }
+    for (size_t i = 0; i < ARRAY_COUNTU(kZelda3DMmLinkStateTokens); i++) {
+        if (strcmp(token, kZelda3DMmLinkStateTokens[i]) == 0) {
+            return kZelda3DMmLinkStateTokens[i];
+        }
+    }
+    return NULL;
+}
+
+static std::string Zelda3D_MmLinkStateUsage(void) {
+    std::string out = "usage: linkstate <";
+    for (size_t i = 0; i < ARRAY_COUNTU(kZelda3DMmLinkStateTokens); i++) {
+        if (i != 0) {
+            out += "|";
+        }
+        out += kZelda3DMmLinkStateTokens[i];
+    }
+    out += "> (aliases: ";
+    for (size_t i = 0; i < ARRAY_COUNTU(kZelda3DMmLinkStateAliases); i++) {
+        if (i != 0) {
+            out += ", ";
+        }
+        out += fmt::format("{}={}", kZelda3DMmLinkStateAliases[i][0], kZelda3DMmLinkStateAliases[i][1]);
+    }
+    out += ")";
+    return out;
+}
+
 static void Zelda3D_MmLinkInfo(PlayState* play, const Zelda3DMmLinkReplOutput* output) {
     Player* player = (play != NULL) ? GET_PLAYER(play) : NULL;
     if (player == NULL) {
@@ -206,98 +286,108 @@ static void Zelda3D_MmLinkState(PlayState* play, Zelda3DMmReplArgs* args, const 
     char state[32] = { 0 };
     std::string out;
     if (!Zelda3D_MmReplNextToken(args, state, sizeof(state)) || !Zelda3D_MmReplArgsEnd(args)) {
-        Zelda3D_MmLinkReply(output,
-                            "usage: linkstate <idle|walk|run|turn|roll|goronroll|throw|attack|jump|shield|getitem|talk|"
-                            "putdown|death|damage|hang|carry|climb|swim|swimdive|itemuse|backwalk|sidestep>");
+        Zelda3D_MmLinkReply(output, Zelda3D_MmLinkStateUsage());
         return;
     }
-    if (strcmp(state, "idle") == 0) {
+    const char* alias = NULL;
+    const char* aliasWhy = NULL;
+    const char* canonical = Zelda3D_MmLinkCanonicalState(state, &alias, &aliasWhy);
+    if (canonical == NULL) {
+        Zelda3D_MmLinkReply(output, Zelda3D_MmLinkStateUsage());
+        return;
+    }
+    std::string aliasNote =
+        (alias != NULL) ? fmt::format(" [alias '{}' -> '{}': {}]", alias, canonical, aliasWhy) : std::string();
+    if (strcmp(canonical, "idle") == 0) {
         Zelda3D_PlayerForceIdle(player, play);
-        out = fmt::format("linkstate idle -> Player_Action_Idle (actionVar1={})", player->av1.actionVar1);
-    } else if (strcmp(state, "walk") == 0) {
-        Zelda3D_PlayerForceWalk(player, play);
-        out = fmt::format("linkstate walk -> Player_Action_Run (speedXZ={:.2f})", player->speedXZ);
-    } else if (strcmp(state, "run") == 0) {
-        Zelda3D_PlayerForceRun(player, play);
-        out = fmt::format("linkstate run -> Player_Action_ZTargetRun (speedXZ={:.2f})", player->speedXZ);
-    } else if (strcmp(state, "turn") == 0) {
+        out = fmt::format("linkstate idle -> Player_Action_Idle (actionVar1={}){}", player->av1.actionVar1, aliasNote);
+    } else if (strcmp(canonical, "locomotion") == 0) {
+        Zelda3D_PlayerForceLocomotion(player, play);
+        out = fmt::format("linkstate locomotion -> Player_Action_Run (speedXZ={:.2f}){}", player->speedXZ, aliasNote);
+    } else if (strcmp(canonical, "ztargetlocomotion") == 0) {
+        Zelda3D_PlayerForceZTargetLocomotion(player, play);
+        out = fmt::format("linkstate ztargetlocomotion -> Player_Action_ZTargetRun (speedXZ={:.2f}){}", player->speedXZ,
+                          aliasNote);
+    } else if (strcmp(canonical, "turn") == 0) {
         Zelda3D_PlayerForceTurnInPlace(player, play);
         out = fmt::format("linkstate turn -> Player_Action_TurnInPlace (turnRate={})", player->turnRate);
-    } else if (strcmp(state, "roll") == 0) {
+    } else if (strcmp(canonical, "roll") == 0) {
         Zelda3D_PlayerForceRoll(player, play);
         out = fmt::format("linkstate roll -> Player_Action_Roll (curFrame={:.2f})", player->skelAnime.curFrame);
-    } else if (strcmp(state, "goronroll") == 0) {
+    } else if (strcmp(canonical, "goronroll") == 0) {
         s32 ok = Zelda3D_PlayerForceGoronRoll(player, play);
         out = fmt::format("linkstate goronroll -> {} (actionVar1={} speedXZ={:.2f})",
                           ok ? "Player_Action_GoronRoll" : "requires PLAYER_FORM_GORON", player->av1.actionVar1,
                           player->speedXZ);
-    } else if (strcmp(state, "throw") == 0) {
+    } else if (strcmp(canonical, "throw") == 0) {
         Zelda3D_PlayerForceThrow(player, play);
         out = "linkstate throw -> Player_Action_Throwing (PLAYER_ANIMGROUP_throw)";
-    } else if (strcmp(state, "attack") == 0) {
+    } else if (strcmp(canonical, "attack") == 0) {
         Zelda3D_PlayerForceAttack(player, play);
         out = fmt::format("linkstate attack -> Player_Action_MeleeAttack (meleeWeaponAnimation={})",
                           player->meleeWeaponAnimation);
-    } else if (strcmp(state, "jump") == 0) {
+    } else if (strcmp(canonical, "jump") == 0) {
         Zelda3D_PlayerForceJump(player, play);
         out = fmt::format("linkstate jump -> Player_Action_Airborne (velocityY={:.2f})", player->actor.velocity.y);
-    } else if (strcmp(state, "shield") == 0) {
+    } else if (strcmp(canonical, "shield") == 0) {
         Zelda3D_PlayerForceShield(player, play);
         out = fmt::format("linkstate shield -> Player_Action_Shielding (stateFlags1=0x{:08X})", player->stateFlags1);
-    } else if (strcmp(state, "getitem") == 0) {
+    } else if (strcmp(canonical, "getitem") == 0) {
         Zelda3D_PlayerForceGetItem(player, play);
         out = fmt::format("linkstate getitem -> Player_Action_WaitForPutAway (stateFlags1=0x{:08X})",
                           player->stateFlags1);
-    } else if (strcmp(state, "talk") == 0) {
+    } else if (strcmp(canonical, "talk") == 0) {
         s32 id = Zelda3D_PlayerForceTalk(player, play, 600.0f);
         out = fmt::format("linkstate talk -> {} (talkActor textId=0x{:x} st1=0x{:08X})",
                           id ? "talking" : "NO NPC within 600u", static_cast<unsigned>(player->actor.textId),
                           player->stateFlags1);
-    } else if (strcmp(state, "putdown") == 0) {
+    } else if (strcmp(canonical, "putdown") == 0) {
         Zelda3D_PlayerForcePutDown(player, play);
         out = "linkstate putdown -> Player_Action_PutDownObject (PLAYER_ANIMGROUP_put)";
-    } else if (strcmp(state, "death") == 0) {
+    } else if (strcmp(canonical, "death") == 0) {
         Zelda3D_PlayerForceDeath(player, play);
         out = fmt::format("linkstate death -> health=0 (Player_Action_Dying entry on a later frame, st1=0x{:08X})",
                           player->stateFlags1);
-    } else if (strcmp(state, "damage") == 0) {
+    } else if (strcmp(canonical, "damage") == 0) {
         Zelda3D_PlayerForceDamage(player, play);
         out = fmt::format("linkstate damage -> Player_Action_Damage (curFrame={:.2f})", player->skelAnime.curFrame);
-    } else if (strcmp(state, "hang") == 0) {
+    } else if (strcmp(canonical, "hang") == 0) {
         Zelda3D_PlayerForceHang(player, play);
         out = fmt::format("linkstate hang -> Player_Action_HangOffLedge (stateFlags1=0x{:08X})", player->stateFlags1);
-    } else if (strcmp(state, "carry") == 0) {
+    } else if (strcmp(canonical, "carry") == 0) {
         s32 ok = Zelda3D_PlayerForceCarry(player, play);
         out = fmt::format("linkstate carry -> {} (stateFlags1=0x{:08X})",
                           ok ? "Player_UpperAction_CarryActor" : "NO heldActor (needs a lifted actor)",
                           player->stateFlags1);
-    } else if (strcmp(state, "climb") == 0) {
+    } else if (strcmp(canonical, "climb") == 0) {
         s32 entered = Zelda3D_PlayerForceClimb(player, play);
         out = fmt::format("linkstate climb -> Player_Action_Climb ({}, av1={} st1=0x{:08X})",
                           entered == 1   ? "entered"
                           : entered == 0 ? "declined"
                                          : "no wallPoly",
                           player->av1.actionVar1, player->stateFlags1);
-    } else if (strcmp(state, "swim") == 0) {
-        Zelda3D_PlayerForceSwim(player, play);
-        out = fmt::format("linkstate swim -> Player_Action_SwimIdle (depthInWater={:.2f})", player->actor.depthInWater);
-    } else if (strcmp(state, "swimdive") == 0) {
-        Zelda3D_PlayerForceSwimDive(player, play);
-        out = fmt::format("linkstate swimdive -> Player_Action_SwimUnderwater (av2={} st1=0x{:08X} st2=0x{:08X})",
-                          player->av2.actionVar2, player->stateFlags1, player->stateFlags2);
-    } else if (strcmp(state, "itemuse") == 0) {
-        Zelda3D_PlayerForceItemUse(player, play);
-        out = fmt::format("linkstate itemuse -> Player_Action_SwingBottle (av2.actionVar2={})", player->av2.actionVar2);
-    } else if (strcmp(state, "backwalk") == 0) {
-        s32 ok = Zelda3D_PlayerForceBackwalk(player, play);
-        out = fmt::format("linkstate backwalk -> {} (speedXZ={:.2f})",
-                          ok ? "Player_Action_TargetBackPedal" : "decode declined", player->speedXZ);
-    } else if (strcmp(state, "sidestep") == 0) {
+    } else if (strcmp(canonical, "swimidle") == 0) {
+        Zelda3D_PlayerForceSwimIdle(player, play);
+        out = fmt::format("linkstate swimidle -> Player_Action_SwimIdle (depthInWater={:.2f}){}",
+                          player->actor.depthInWater, aliasNote);
+    } else if (strcmp(canonical, "swimunderwater") == 0) {
+        Zelda3D_PlayerForceSwimUnderwater(player, play);
+        out =
+            fmt::format("linkstate swimunderwater -> Player_Action_SwimUnderwater (av2={} st1=0x{:08X} st2=0x{:08X}){}",
+                        player->av2.actionVar2, player->stateFlags1, player->stateFlags2, aliasNote);
+    } else if (strcmp(canonical, "swingbottle") == 0) {
+        Zelda3D_PlayerForceSwingBottle(player, play);
+        out = fmt::format("linkstate swingbottle -> Player_Action_SwingBottle (av2.actionVar2={}){}",
+                          player->av2.actionVar2, aliasNote);
+    } else if (strcmp(canonical, "targetbackpedal") == 0) {
+        s32 ok = Zelda3D_PlayerForceTargetBackPedal(player, play);
+        out = fmt::format("linkstate targetbackpedal -> {} (speedXZ={:.2f}){}",
+                          ok ? "Player_Action_TargetBackPedal" : "decode declined", player->speedXZ, aliasNote);
+    } else if (strcmp(canonical, "sidestep") == 0) {
         Zelda3D_PlayerForceSidestep(player, play);
         out = "linkstate sidestep -> Player_Action_Sidestep (side_walkR; Z-target-gated)";
     } else {
-        out = "usage: linkstate <idle|walk|run|turn|roll|goronroll|throw|attack|jump|shield|getitem|talk|"
-              "putdown|death|damage|hang|carry|climb|swim|swimdive|itemuse|backwalk|sidestep>";
+        out = Zelda3D_MmLinkStateUsage();
     }
     Zelda3D_MmLinkReply(output, out);
 }
