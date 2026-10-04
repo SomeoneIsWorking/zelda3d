@@ -169,6 +169,23 @@ void Boss06_Init(Actor* thisx, PlayState* play) {
         return;
     }
 
+    // sIgosInstance below is this actor's parent cast to EnKnight*, and ten sites dereference it
+    // unguarded: Boss06_UpdateDamage, most of the curtain-burning cutscene, SetupCloseCurtain,
+    // CloseCurtain, and the light-ray half of Draw. Retail only ever spawns these two curtains as
+    // children of Igos (z_en_knight.c, two Actor_SpawnAsChild calls), and Actor_Spawn assigns both
+    // actor->parent and parent->id before Actor_Init runs, so a parentless -- or non-Knight --
+    // parent is reachable only from ActorViewer / the console `spawn`. It was dereferenced on the
+    // very first update, because Init's default actionFunc is Boss06_SetupCloseCurtain, which
+    // increments sIgosInstance->roomLightingState before anything else runs. Refused here rather
+    // than at each reader: eleven NULL tests would leave the static clobbered with NULL anyway,
+    // breaking the real EnKnight's curtains. Audited 2026-08-12 (docs/issues/0023).
+    if ((this->actor.parent == NULL) || (this->actor.parent->id != ACTOR_EN_KNIGHT)) {
+        LUSLOG_ERROR("Boss06_Init: parent %p is not an EnKnight (Igos), params %d -- REFUSED", this->actor.parent,
+                     ENBOSS06_GET_PARAMS(&this->actor));
+        Actor_Kill(&this->actor);
+        return;
+    }
+
     sIgosInstance = (EnKnight*)this->actor.parent;
     this->actor.colChkInfo.damageTable = &sDamageTable;
 

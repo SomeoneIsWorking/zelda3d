@@ -8,6 +8,7 @@
 #include "z64quake.h"
 #include "objects/object_goroiwa/object_goroiwa.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
+#include "libultraship/log/luslog.h"
 
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 
@@ -954,7 +955,16 @@ void EnGoroiwa_Init(Actor* thisx, PlayState* play) {
     EnGoroiwa* this = (EnGoroiwa*)thisx;
     f32 temp_f0;
     s32 pathIndex = ENGOROIWA_GET_PATH_INDEX(&this->actor);
-    Path* path = &play->setupPathList[pathIndex];
+    // SubS_GetPathByIndex, not &play->setupPathList[pathIndex]: forming the pointer by hand skipped
+    // both guards the helper already has. setupPathList is nullptr in every scene that declares no
+    // path list, and &NULL[pathIndex] is a small NON-NULL address, so the ENGOROIWA_PATH_INDEX_NONE
+    // test below cannot catch it and path->count reads off the end of nothing. ActorViewer and the
+    // console `spawn` pass a raw s16 Params, which ENGOROIWA_GET_PATH_INDEX masks to 0..255, so
+    // every one of those is reachable; ENGOROIWA_PATH_INDEX_NONE stays the "none" sentinel handed to
+    // the helper, and the range stays 0..254 (0 is a legal setupPathList row). The three other
+    // lookups of the same path -- func_8093EB74, func_8093EDD8, func_8093EE18 -- all run after this
+    // kill, so they inherit it. Audited 2026-08-12 (docs/issues/0023).
+    Path* path = SubS_GetPathByIndex(play, pathIndex, ENGOROIWA_PATH_INDEX_NONE);
 
     Actor_ProcessInitChain(&this->actor, sInitChain);
     this->actor.world.rot.x = 0;
@@ -967,7 +977,9 @@ void EnGoroiwa_Init(Actor* thisx, PlayState* play) {
     func_8093E91C(this);
     func_8093E9B0(this, play);
 
-    if (pathIndex == ENGOROIWA_PATH_INDEX_NONE) {
+    // A NULL path is the old ENGOROIWA_PATH_INDEX_NONE kill plus the helper's two refusals, which
+    // the helper has already logged with the scene's real path count.
+    if (path == NULL) {
         Actor_Kill(&this->actor);
         return;
     }
@@ -1440,8 +1452,12 @@ void EnGoroiwa_Update(Actor* thisx, PlayState* play) {
     FloorType floorType;
     CollisionPoly* tmp;
 
-    if (!(player->stateFlags1 &
-          (PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD | PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000))) {
+    // GET_PLAYER is nullptr in every scene with no Player actor, which ActorViewer and the console
+    // `spawn` can both produce. The read below gates the whole actor, and func_80941A10 /
+    // func_80941FA4 / func_809420F0 deref player as well once dispatched, so with no player there is
+    // nobody to roll away from and the frame is skipped whole. Audited 2026-08-12 (docs/issues/0023).
+    if ((player == NULL) || !(player->stateFlags1 & (PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD |
+                                                     PLAYER_STATE1_10000000 | PLAYER_STATE1_20000000))) {
         if (this->unk_1CC > 0) {
             this->unk_1CC--;
         }
@@ -1611,6 +1627,18 @@ void EnGoroiwa_Draw(Actor* thisx, PlayState* play) {
     };
     EnGoroiwa* this = (EnGoroiwa*)thisx;
     s32 params = ENGOROIWA_GET_C000(&this->actor);
+
+    // params indexes D_80942EB4, one display list per rock type, and ENGOROIWA_GET_C000 masks to
+    // 0..3 while the table has three rows -- so only the top half of the bound can be reached and
+    // only that half is tested here. Retail uses 1 and 2 (EnGoroiwaParamC000); a port-only spawn
+    // reaching 3 handed gDPSetDListOpa whatever followed the table. No OPEN_DISPS in this Draw and
+    // the frame-interpolation record below is balanced inside the branch, so returning here is
+    // free. Audited 2026-08-12 (docs/issues/0023).
+    if (params >= ARRAY_COUNT(D_80942EB4)) {
+        LUSLOG_ERROR("EnGoroiwa_Draw: c000 params %d is not 0..%d -- draw skipped", params,
+                     (int)ARRAY_COUNT(D_80942EB4) - 1);
+        return;
+    }
 
     // #region 2S2H [Interpolation] Track when a boulder resets back to its "home" position and mark
     // interpolation to be skipped that frame
