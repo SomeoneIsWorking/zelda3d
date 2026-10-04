@@ -11,6 +11,11 @@ extern "C" {
 extern int gZelda3dFreeze;
 void Play_Update(PlayState* play);
 
+// Advance exactly one logic frame: inject the held REPL input, then update. Every REPL command that
+// steps frames under `freeze` goes through this, so a per-frame trace and `step N` see the same frame
+// boundary.
+void Zelda3D_StepLogicFrame(PlayState* play);
+
 #ifdef __cplusplus
 }
 #endif

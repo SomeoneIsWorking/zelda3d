@@ -22,6 +22,16 @@ constexpr f32 kCameraScale = -0.01f;
 struct AtDefaultPlayerState {
     bool active = false;
     s32 authoredUpdateNumerator = 0;
+    // Last-update record. Kept so the threshold-timing discriminator reads the producer's OWN
+    // inputs and decisions instead of re-deriving them from engine state.
+    s32 seen = 0;
+    s32 branchOwned = 0;
+    f32 rise = 0.0f;
+    s32 walkRunAction = 0;
+    s32 getItemAction = 0;
+    s32 floorType = 0;
+    s32 staticFloor = 0;
+    s32 authoredUpdates = 0;
 };
 
 static ObjectExtension::Register<AtDefaultPlayerState> AtDefaultPlayerStateRegister;
@@ -56,10 +66,18 @@ extern "C" int Zelda3D_CameraAtDefaultUpdatePlayer(PlayState* play, Player* play
 
     AtDefaultPlayerState& state = playerState(player);
     const s32 authoredUpdates = authoredUpdatesThisHostUpdate(state);
+    state.seen = 1;
+    state.authoredUpdates = authoredUpdates;
+    state.walkRunAction = isWalkRunAction != 0;
+    state.getItemAction = isGetItemAction != 0;
+    state.floorType = floorType;
+    state.staticFloor = -1;
+    state.rise = player->actor.world.pos.y - player->actor.prevPos.y;
 
     // OoT3D normally leaves slope floors to the stock accumulator. Its get-item action is the
     // explicit exception: even on those floors it enters this extra-Y branch and resets/decays it.
-    if (!Zelda3D::CameraAtDefaultUsesExtraYBranch(floorType, isGetItemAction != 0)) {
+    state.branchOwned = Zelda3D::CameraAtDefaultUsesExtraYBranch(floorType, isGetItemAction != 0) ? 1 : 0;
+    if (state.branchOwned == 0) {
         return 0;
     }
 
@@ -73,13 +91,41 @@ extern "C" int Zelda3D_CameraAtDefaultUpdatePlayer(PlayState* play, Player* play
         }
     }
 
-    const f32 rise = player->actor.world.pos.y - player->actor.prevPos.y;
+    const f32 rise = state.rise;
     const bool isStaticFloor = DynaPoly_GetActor(&play->colCtx, player->actor.floorBgId) == nullptr;
+    state.staticFloor = isStaticFloor ? 1 : 0;
     if (isWalkRunAction && rise >= kMinimumRise && isStaticFloor) {
         state.active = true;
         player->unk_6C4 += rise * kRiseScale;
     }
 
+    return 1;
+}
+
+extern "C" int Zelda3D_CameraAtDefaultReadSample(const Player* player, Zelda3D_CameraAtDefaultSample* sample) {
+    if (sample == nullptr) {
+        return 0;
+    }
+    *sample = Zelda3D_CameraAtDefaultSample{};
+    if (player == nullptr) {
+        return 0;
+    }
+
+    const AtDefaultPlayerState* state = ObjectExtension::GetInstance().Get<AtDefaultPlayerState>(player);
+    if (state == nullptr || !state->seen) {
+        return 0;
+    }
+
+    sample->active = state->active ? 1 : 0;
+    sample->accumulator = player->unk_6C4;
+    sample->branchOwned = state->branchOwned;
+    sample->rise = state->rise;
+    sample->walkRunAction = state->walkRunAction;
+    sample->getItemAction = state->getItemAction;
+    sample->floorType = state->floorType;
+    sample->staticFloor = state->staticFloor;
+    sample->authoredUpdates = state->authoredUpdates;
+    sample->yBias = Zelda3D_CameraAtDefaultYBias(player);
     return 1;
 }
 
