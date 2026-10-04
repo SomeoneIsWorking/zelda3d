@@ -43,10 +43,19 @@ ResourceFactoryXMLVertexV0::ReadResource(std::shared_ptr<Ship::File> file,
         return nullptr;
     }
 
-    auto vertex = std::make_shared<Vertex>(initData);
+    // The root element is what ReadResourceInitDataXml keyed the resource type off, but a document
+    // can still reach here with nothing under it, so it is checked rather than dereferenced. An
+    // element with no children is not rejected: the loop below simply emits no vertices for it,
+    // which is the behaviour an empty (but well formed) vertex list already had.
+    auto document = std::get<std::shared_ptr<tinyxml2::XMLDocument>>(file->Reader);
+    auto root = document != nullptr ? document->FirstChildElement() : nullptr;
+    if (root == nullptr) {
+        SPDLOG_ERROR("Failed to load resource: XML Vertex at {} has no root element", initData->Path);
+        return nullptr;
+    }
 
-    auto child =
-        std::get<std::shared_ptr<tinyxml2::XMLDocument>>(file->Reader)->FirstChildElement()->FirstChildElement();
+    auto vertex = std::make_shared<Vertex>(initData);
+    auto child = root->FirstChildElement();
 
     while (child != nullptr) {
         std::string childName = child->Name();

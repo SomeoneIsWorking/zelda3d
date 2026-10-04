@@ -229,9 +229,19 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
         return nullptr;
     }
 
+    // The root element is what ReadResourceInitDataXml keyed the resource type off, but a document
+    // can still reach here with nothing under it, so it is checked rather than dereferenced. An
+    // element with no children is not rejected: the loop below simply emits no instructions for it,
+    // which is the behaviour an empty (but well formed) display list already had.
+    auto document = std::get<std::shared_ptr<tinyxml2::XMLDocument>>(file->Reader);
+    auto root = document != nullptr ? document->FirstChildElement() : nullptr;
+    if (root == nullptr) {
+        SPDLOG_ERROR("Failed to load resource: XML DisplayList at {} has no root element", initData->Path);
+        return nullptr;
+    }
+
     auto dl = std::make_shared<DisplayList>(initData);
-    auto child =
-        std::get<std::shared_ptr<tinyxml2::XMLDocument>>(file->Reader)->FirstChildElement()->FirstChildElement();
+    auto child = root->FirstChildElement();
 
     while (child != nullptr) {
         std::string childName = child->Name();
@@ -311,14 +321,11 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
 
             if (param == "G_MTX_PUSH") {
                 paramInt = G_MTX_PUSH;
-            } else if (param == "G_MTX_NOPUSH") {
+            } else if (param == "G_MTX_NOPUSH" || param == "G_MTX_MUL" || param == "G_MTX_MODELVIEW") {
+                // These three all encode 0x00, so one branch covers them.
                 paramInt = G_MTX_NOPUSH;
             } else if (param == "G_MTX_LOAD") {
                 paramInt = G_MTX_LOAD;
-            } else if (param == "G_MTX_MUL") {
-                paramInt = G_MTX_MUL;
-            } else if (param == "G_MTX_MODELVIEW") {
-                paramInt = G_MTX_MODELVIEW;
             } else if (param == "G_MTX_PROJECTION") {
                 paramInt = G_MTX_PROJECTION;
             }
@@ -334,7 +341,7 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
                 char* str = (char*)malloc(fName.size() + 1);
                 g.words.w1 = (uintptr_t)str;
                 dl->Strings.push_back(str);
-                strcpy((char*)g.words.w1, fName.data());
+                memcpy((char*)g.words.w1, fName.data(), fName.size() + 1);
             }
         } else if (childName == "SetCycleType") {
             uint32_t param = 0;
@@ -480,7 +487,7 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
 
             char* str = (char*)malloc(fName.size() + 1);
             dl->Strings.push_back(str);
-            strcpy((char*)str, fName.data());
+            memcpy((char*)str, fName.data(), fName.size() + 1);
 
             g = GsSpVertexOtR2P1(str);
 
@@ -509,14 +516,13 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
             std::string siz = child->Attribute("Size");
             uint32_t sizVal = G_IM_SIZ_32b;
 
-            if (siz == "G_IM_SIZ_8b_LOAD_BLOCK") {
-                sizVal = G_IM_SIZ_8b_LOAD_BLOCK;
+            if (siz == "G_IM_SIZ_8b_LOAD_BLOCK" || siz == "G_IM_SIZ_16b" || siz == "G_IM_SIZ_16b_LOAD_BLOCK") {
+                // The two LOAD_BLOCK sizes are aliases of G_IM_SIZ_16b, so all three share one branch.
+                sizVal = G_IM_SIZ_16b;
             } else if (siz == "G_IM_SIZ_4b") {
                 sizVal = G_IM_SIZ_4b;
             } else if (siz == "G_IM_SIZ_8b") {
                 sizVal = G_IM_SIZ_8b;
-            } else if (siz == "G_IM_SIZ_16b" || siz == "G_IM_SIZ_16b_LOAD_BLOCK") {
-                sizVal = G_IM_SIZ_16b;
             } else if (siz == "G_IM_SIZ_32b") {
                 sizVal = G_IM_SIZ_32b;
             } else if (siz == "G_IM_SIZ_DD") {
@@ -537,7 +543,7 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
                 char* str = (char*)malloc(fName.size() + 1);
                 dl->Strings.push_back(str);
                 g.words.w1 = (uintptr_t)str;
-                strcpy((char*)g.words.w1, fName.data());
+                memcpy((char*)g.words.w1, fName.data(), fName.size() + 1);
             }
 
             dl->Instructions.push_back(g);
@@ -575,14 +581,13 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
             std::string siz = child->Attribute("Size");
             uint32_t sizVal = G_IM_SIZ_32b;
 
-            if (siz == "G_IM_SIZ_8b_LOAD_BLOCK") {
-                sizVal = G_IM_SIZ_8b_LOAD_BLOCK;
+            if (siz == "G_IM_SIZ_8b_LOAD_BLOCK" || siz == "G_IM_SIZ_16b" || siz == "G_IM_SIZ_16b_LOAD_BLOCK") {
+                // The two LOAD_BLOCK sizes are aliases of G_IM_SIZ_16b, so all three share one branch.
+                sizVal = G_IM_SIZ_16b;
             } else if (siz == "G_IM_SIZ_4b") {
                 sizVal = G_IM_SIZ_4b;
             } else if (siz == "G_IM_SIZ_8b") {
                 sizVal = G_IM_SIZ_8b;
-            } else if (siz == "G_IM_SIZ_16b" || siz == "G_IM_SIZ_16b_LOAD_BLOCK") {
-                sizVal = G_IM_SIZ_16b;
             } else if (siz == "G_IM_SIZ_32b") {
                 sizVal = G_IM_SIZ_32b;
             } else if (siz == "G_IM_SIZ_DD") {
@@ -982,7 +987,7 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
             char* str = (char*)malloc(fName.size() + 1);
             dl->Strings.push_back(str);
             g.words.w1 = (uintptr_t)str;
-            strcpy((char*)g.words.w1, fName.data());
+            memcpy((char*)g.words.w1, fName.data(), fName.size() + 1);
 
             dl->Instructions.push_back(g);
 
@@ -1041,7 +1046,7 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
             } else {
                 char* dlPath2 = (char*)malloc(strlen(dlPath.c_str()) + 1);
                 dl->Strings.push_back(dlPath2);
-                strcpy(dlPath2, dlPath.c_str());
+                memcpy(dlPath2, dlPath.c_str(), strlen(dlPath.c_str()) + 1);
 
                 g = gsSPBranchListOTRFilePath(dlPath2);
             }
@@ -1053,7 +1058,7 @@ ResourceFactoryXMLDisplayListV0::ReadResource(std::shared_ptr<Ship::File> file,
             } else {
                 char* dlPath2 = (char*)malloc(strlen(dlPath.c_str()) + 1);
                 dl->Strings.push_back(dlPath2);
-                strcpy(dlPath2, dlPath.c_str());
+                memcpy(dlPath2, dlPath.c_str(), strlen(dlPath.c_str()) + 1);
 
                 g = gsSPDisplayListOTRFilePath(dlPath2);
             }
