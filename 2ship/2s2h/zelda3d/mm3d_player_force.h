@@ -10,7 +10,15 @@
 // to func_80839E74/func_8083A794); new controls live in mm3d_player_force.c and call the same
 // non-static decomp entry points without growing that 22,000-line overlay.
 //
-// REPL surface: repl/mm3d_link_repl.cpp `linkstate <idle|walk|run>` and `linkitem <ItemId>`.
+// NAMING RULE (2026-10-04, after mm.action-func-naming named 82 of MM's 83 Player_Action_NN):
+// an entry here is named after the action it installs, never after the button that would
+// trigger it and never after the OoT hook it mirrors. MM has no separate walk action —
+// Player_Action_Run is the single walk/run blend action — so a "walk" name promised a gait
+// distinction the game does not have. Every comment below states the installed action by its
+// current decomp name; that is the audit that keeps this file honest, and it is mechanical.
+//
+// REPL surface: repl/mm3d_link_repl.cpp `linkstate <state>` (see that file for the token
+// table) and `linkitem <ItemId>`.
 #pragma once
 #include "global.h" // PlayState, Player
 
@@ -22,14 +30,18 @@ extern "C" {
 // Safe reset out of any forced locomotion state. Returns 1.
 s32 Zelda3D_PlayerForceIdle(Player* player, PlayState* play);
 
-// Walk: installs Player_Action_Run (the non-Z-target ground locomotion action) + the
-// run/walk blend-tree anim (D_8085BE84[PLAYER_ANIMGROUP_run]) — literally
-// func_8083A794's body with the Z-target branch pinned to walk. Returns 1.
-s32 Zelda3D_PlayerForceWalk(Player* player, PlayState* play);
+// Free ground locomotion: installs Player_Action_Run, MM's single non-Z-target walk/run
+// blend action, + the run/walk blend-tree anim (D_8085BE84[PLAYER_ANIMGROUP_run]) —
+// literally func_8083A794's body with the Z-target branch pinned to the free branch.
+// (Called Zelda3D_PlayerForceWalk before the actions were named: MM has no separate walk
+// action, so "Walk" promised a gait distinction this action does not have.) Returns 1.
+s32 Zelda3D_PlayerForceLocomotion(Player* player, PlayState* play);
 
-// Run: installs Player_Action_ZTargetRun (the Z-targeting ground locomotion action) + the same
-// blend-tree anim — func_8083A794's body pinned to the Z-target branch. Returns 1.
-s32 Zelda3D_PlayerForceRun(Player* player, PlayState* play);
+// Z-targeting ground locomotion: installs Player_Action_ZTargetRun, the Z-target sibling of
+// Player_Action_Run — func_8083A794's body pinned to the Z-target branch. (Called
+// Zelda3D_PlayerForceRun; the pair used to read as a walk/run gait split when the only
+// difference between the two installers is Z-targeting.) Returns 1.
+s32 Zelda3D_PlayerForceZTargetLocomotion(Player* player, PlayState* play);
 
 // --- Extended states (2026-07-17, RE'd via OoT Rosetta + adversarial decomp verify) ---
 
@@ -41,6 +53,8 @@ s32 Zelda3D_PlayerForceRoll(Player* player, PlayState* play);
 
 // Goron roll/dash: runs the real func_80836B3C Goron installer -> Player_Action_GoronRoll. Requires
 // PLAYER_FORM_GORON; the action owns movement, charge buildup, magic consumption, and spike mode.
+// Player_Action_GoronRoll's own exit gate (func_80857950) requires BTN_A still held, so a caller
+// must hold A to keep rolling — the same hold the vanilla A-press leaves in place.
 s32 Zelda3D_PlayerForceGoronRoll(Player* player, PlayState* play);
 
 typedef enum Zelda3DPlayerFormRequestResult {
@@ -55,6 +69,8 @@ typedef enum Zelda3DPlayerFormRequestResult {
 // or completed it; poll the link-state diagnostics and Player::transformation to observe those states.
 // Changing back to human uses the mask for the live transformed form. No form, mask, save, or object
 // state is mutated directly. The required transformation mask must be present in the inventory.
+// Re-requesting while Player_Action_StartMaskTransformation is already running restarts the same
+// animation, so wait for the transition to finish before requesting another form.
 Zelda3DPlayerFormRequestResult Zelda3D_PlayerRequestForm(Player* player, PlayState* play, PlayerTransformation form);
 
 // Request any byte-sized ItemId through Player_UseItem, the same asynchronous path used by normal
@@ -103,8 +119,8 @@ s32 Zelda3D_PlayerForceDamage(Player* player, PlayState* play);
 // (func_80837CEC's non-poly core). Needs a real ledge to hold beyond the install frame.
 s32 Zelda3D_PlayerForceHang(Player* player, PlayState* play);
 
-// Carry-idle: CarryActor upper action + carryB_wait (func_808313F0's true branch). Needs a live
-// heldActor to persist beyond the install frame (Player_UpperAction_CarryActor drops carry otherwise).
+// Carry-idle: Player_UpperAction_CarryActor upper action + carryB_wait (func_808313F0's true branch). Needs a
+// live heldActor to persist beyond the install frame (Player_UpperAction_CarryActor drops carry otherwise).
 s32 Zelda3D_PlayerForceCarry(Player* player, PlayState* play);
 
 // Climb (ladder/wall): runs the real func_8083D860 gate (-> Player_Action_Climb). Returns 1 entered,
@@ -113,18 +129,26 @@ s32 Zelda3D_PlayerForceClimb(Player* player, PlayState* play);
 
 // --- Extended states batch 3 (2026-07-17) ---
 
-// Swim (treading water): Player_Action_SwimIdle + swimer_swim_wait anim. No water precondition needed.
-s32 Zelda3D_PlayerForceSwim(Player* player, PlayState* play);
+// Swim idle (treading on the surface): Player_Action_SwimIdle + swimer_swim_wait anim. No water
+// precondition needed. (Named Zelda3D_PlayerForceSwim; "Swim" read backwards against the action,
+// which is the idle/tread state — MM's generic Player_Action_Swim is a different action entirely.)
+s32 Zelda3D_PlayerForceSwimIdle(Player* player, PlayState* play);
 
-// Swim dive (settled underwater): Player_Action_SwimUnderwater + swim anim + own water flags. No precondition.
-s32 Zelda3D_PlayerForceSwimDive(Player* player, PlayState* play);
+// Swim underwater (settled deep dive): Player_Action_SwimUnderwater + swim anim + its own water flags.
+// No precondition. (Named Zelda3D_PlayerForceSwimDive; "Dive" named only the entry flourish, not
+// the whole state this establishes.)
+s32 Zelda3D_PlayerForceSwimUnderwater(Player* player, PlayState* play);
 
 // Item-use (bottle raise/swing): Player_Action_SwingBottle + bottle miss anim (func_8083A6C0's dispatch).
-s32 Zelda3D_PlayerForceItemUse(Player* player, PlayState* play);
+// (Called Zelda3D_PlayerForceItemUse; the installed action is the bottle swing specifically.)
+s32 Zelda3D_PlayerForceSwingBottle(Player* player, PlayState* play);
 
-// Backward walk: drives the real func_8083E404 decode -> func_8083AF8C (Player_Action_TargetBackPedal + back_walk
-// anim). Returns 1, or 0 if the decode surface changed.
-s32 Zelda3D_PlayerForceBackwalk(Player* player, PlayState* play);
+// Backward walk while Z-targeting: drives the real func_8083E404 decode -> func_8083AF8C, which
+// installs Player_Action_TargetBackPedal (decelerating link_anchor_back_walk) + the back_walk anim.
+// Returns 1, or 0 if the decode surface changed. (Named Zelda3D_PlayerForceBackwalk; that name
+// describes Player_Action_TargetBackWalk, action 6, a DIFFERENT action this never installs — 6 is
+// installed by func_8083AECC and has no entry in this layer yet.)
+s32 Zelda3D_PlayerForceTargetBackPedal(Player* player, PlayState* play);
 
 // Sidestep (side-walk while Z-targeting): the real func_8083B030 installer -> Player_Action_Sidestep +
 // side_walkR loop anim. Context-gated on Z-targeting (faithful, like Carry/Climb). Returns 1.
