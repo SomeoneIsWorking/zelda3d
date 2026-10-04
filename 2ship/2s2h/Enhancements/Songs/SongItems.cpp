@@ -14,7 +14,7 @@ char* ResourceMgr_LoadTexOrDListByName(const char* filePath);
 void Message_ResetOcarinaButtonAlphas(void);
 void func_80836A5C(Player* player, PlayState* play);
 void Player_Anim_PlayOnceAdjustedReverse(PlayState* play, Player* player, PlayerAnimationHeader* anim);
-void Player_Action_63(Player* player, PlayState* play);
+void Player_Action_PlayOcarina(Player* player, PlayState* play);
 }
 
 #define CVAR_NAME "gEnhancements.Songs.SongItems"
@@ -218,7 +218,10 @@ static void HandleSongEquip(PauseContext* pauseCtx) {
     s16 cursorPoint = pauseCtx->cursorPoint[PAUSE_QUEST];
     bool isHoveringSong = false;
 
-    bool isDpadEquipsEnabled = CVarGetInteger("gEnhancements.Dpad.DpadEquips", 0);
+    // The DpadEquips CVar used to be read here into a local that was never used again. Removed:
+    // an unread local cannot affect behaviour, so deleting it is provably inert. If the intent was
+    // to gate the per-button status update below on that setting, that gate is still missing and is
+    // a product decision rather than a lint fix -- see docs/issues/0029 for the same shape.
 
     if ((cursorPoint >= QUEST_SONG_SONATA && cursorPoint <= QUEST_SONG_SUN) ||
         cursorPoint == QUEST_SONG_LULLABY_INTRO) {
@@ -310,7 +313,7 @@ static void HandleSongEquip(PauseContext* pauseCtx) {
     Audio_PlaySfx(NA_SE_SY_DECIDE);
 }
 
-// Mirrors Player_Action_63 OCARINA_MODE_END teardown
+// Mirrors Player_Action_PlayOcarina OCARINA_MODE_END teardown
 static void FinishOcarinaPlay(PlayState* play) {
     Player* player = GET_PLAYER(play);
 
@@ -331,7 +334,7 @@ static void FinishOcarinaPlay(PlayState* play) {
     Message_CloseTextbox(play);
     play->msgCtx.ocarinaMode = OCARINA_MODE_NONE;
 
-    if (player->actionFunc == Player_Action_63) {
+    if (player->actionFunc == Player_Action_PlayOcarina) {
         player->av2.actionVar2 = 1;
         func_80836A5C(player, play);
         Player_Anim_PlayOnceAdjustedReverse(play, player, D_8085D17C[player->transformation]);
@@ -349,7 +352,7 @@ static bool NeedsOcarinaCleanup(EnGs* enGs, PlayState* play) {
 
     return (player->actor.flags & ACTOR_FLAG_OCARINA_INTERACTION) ||
            (player->stateFlags2 & PLAYER_STATE2_USING_OCARINA) || (play->msgCtx.ocarinaMode != OCARINA_MODE_NONE) ||
-           (player->actionFunc == Player_Action_63);
+           (player->actionFunc == Player_Action_PlayOcarina);
 }
 
 static void RegisterSongItems() {

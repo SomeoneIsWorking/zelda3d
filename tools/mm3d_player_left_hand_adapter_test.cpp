@@ -16,7 +16,7 @@ Gfx* gPlayerLeftHandOneHandSwordDLs[2 * PLAYER_FORM_MAX]{};
 Gfx* gPlayerLeftHandTwoHandSwordDLs[2 * PLAYER_FORM_MAX]{};
 Gfx* gPlayerLeftHandBottleDLs[2 * PLAYER_FORM_MAX]{};
 
-void Player_Action_11(Player*, PlayState*) {}
+void Player_Action_BremenMarch(Player*, PlayState*) {}
 
 void Player_Action_ExchangeItem(Player*, PlayState*) {}
 
@@ -78,7 +78,7 @@ int main() {
     player.actor.speed = 3.0F;
     assert(Zelda3D_MM_PlayerLeftHandMeshMask(&player, EQUIP_VALUE_SWORD_NONE, &mask));
     assert(mask == Mask({ 20 }));
-    player.actionFunc = Player_Action_11;
+    player.actionFunc = Player_Action_BremenMarch;
     assert(Zelda3D_MM_PlayerLeftHandMeshMask(&player, EQUIP_VALUE_SWORD_NONE, &mask));
     assert(mask == Mask({ 21 }));
 
