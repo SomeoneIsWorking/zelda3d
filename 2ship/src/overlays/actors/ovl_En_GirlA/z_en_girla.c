@@ -5,6 +5,7 @@
  */
 
 #include "z_en_girla.h"
+#include "libultraship/log/luslog.h"
 
 #define FLAGS (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY | ACTOR_FLAG_UPDATE_CULLING_DISABLED)
 
@@ -157,8 +158,13 @@ void EnGirlA_SetupAction(EnGirlA* this, EnGirlAActionFunc action) {
 void EnGirlA_InitObjIndex(EnGirlA* this, PlayState* play) {
     s16 params = this->actor.params;
 
-    if ((params >= SI_MAX) && (params < SI_POTION_RED_1)) {
-        //! @bug: Impossible to reach, && should be an ||
+    //! @bug: `&&` is impossible to reach -- it should be an `||`. Harmless on a console, where shop
+    //! actors only come from scene data, but ActorViewer and the console `spawn` pass a raw s16
+    //! Params, so an unknown shop id read past sShopItemEntries. Killing here also covers the later
+    //! sShopItemEntries[this->actor.params] sites: this actor never gets a draw or update func.
+    //! Audited 2026-08-12 (docs/issues/0023).
+    if ((params >= SI_MAX) || (params < SI_POTION_RED_1)) {
+        LUSLOG_ERROR("EnGirlA_InitObjIndex: shop item id %d is not 0..%d -- REFUSED", params, SI_MAX - 1);
         Actor_Kill(&this->actor);
         return;
     }
@@ -179,8 +185,7 @@ void EnGirlA_Init(Actor* thisx, PlayState* play) {
     EnGirlA_InitObjIndex(this, play);
 }
 
-void EnGirlA_Destroy(Actor* thisx, PlayState* play) {
-}
+void EnGirlA_Destroy(Actor* thisx, PlayState* play) {}
 
 s32 EnGirlA_CanBuyPotionRed(PlayState* play, EnGirlA* this) {
     if (!Inventory_HasEmptyBottle()) {
@@ -532,8 +537,7 @@ void EnGirlA_BuyFanfare(PlayState* play, EnGirlA* this) {
     Rupees_ChangeBy(-play->msgCtx.unk1206C);
 }
 
-void EnGirlA_DoNothing(EnGirlA* this, PlayState* play) {
-}
+void EnGirlA_DoNothing(EnGirlA* this, PlayState* play) {}
 
 void EnGirlA_InitItem(PlayState* play, EnGirlA* this) {
     ShopItemEntry* shopItem = &sShopItemEntries[this->actor.params];
