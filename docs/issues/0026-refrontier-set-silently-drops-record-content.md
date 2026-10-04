@@ -1,12 +1,12 @@
 ---
 id: 26
 title: tools/re_frontier.py set silently deletes 149 lines of docs/re-frontier.md on a no-op edit
-status: open
+status: fixed
 symptom: Running `python3 tools/re_frontier.py set <id> notes=...` on docs/re-frontier.md rewrote the file from 801 lines to 653 and reported success. `re_frontier.py check` still reported "re-frontier OK" afterwards. Whole measurement tables and annotated sub-fields were gone, including the unified-vs-native fog A/B table, the `render.per-draw-uniform-carriage` audit notes, and the MM3D oracle/fog A/B notes.
 state_items: none
 tags: tooling,re-frontier,data-loss,docs
 created: 2026-09-29
-updated: 2026-09-29
+updated: 2026-10-04
 ---
 
 ## Reproduction
@@ -86,3 +86,41 @@ recovered from git rather than re-derived.
 * A fixture entry carrying a sub-field (`- notes (x): ...`) and a multi-line table must survive a
   `set` of a *different* field byte-for-byte.
 * `re_frontier.py check` must fail on a document containing an unmodelled field shape.
+
+## Resolution (2026-10-04)
+
+All four parts are implemented in `tools/re_frontier.py`. The writer is now **in-place surgery**
+rather than a regeneration: `load()` builds a `Document` whose spans tile every line of the file
+(header, area sections, per-entry field spans with their own continuation lines, preludes, tail),
+and `render()` rebuilds the document from that tiling.
+
+The model was extended to the document's real shape rather than narrowed: a field bullet is
+`- <label>[(<qualifier>)]: <value>` with a balanced-paren qualifier, and a field's value carries
+every continuation line after it. `docs/re-frontier.md`'s 32 qualified sub-fields and its
+multi-line `lighting.pica-fog` table are both first-class now.
+
+**`check` now fails on the CURRENT `docs/re-frontier.md`** (`CHECK_RC=1`, 3 problems). This is
+part 3 working, not a regression. Three bullets there are shapes the grammar cannot own:
+
+| line | entry | shape |
+|---|---|---|
+| 483 | `lighting.pica-fog` | `- gap (…)`: the qualifier's own text contains `(`…`)` pairs, so no balanced qualifier is followed by `:` |
+| 733 | `render.cmb-fragment-lighting` | `- resolved 2026-09-28, **item (3)**: …` — a multi-word label, no `:` after the first token |
+| 805 | `render.cmb-texcoord-mapping` | `- current static boundary: …` — a multi-word label |
+
+All three were among the 149 lines the old writer deleted, so the tool refusing to edit around
+them is the correct outcome. **A human must decide what they are** — most likely reworded as
+`- notes (<date>): …` sub-fields, which the schema owns — and this file must NOT be edited to make
+`check` pass. The recovery of the 149 previously-deleted lines is still outstanding and is a
+separate human job from git.
+
+Refusal is scoped to the entry being edited, not the whole document: a `set` on a clean entry
+still works (verified: `set title.oot3d-not-play notes=PROBE2` rewrites exactly one line), so the
+fix is not `set`-as-no-op and needs no `--force`.
+
+Two notes on the guards, both non-vacuous by construction:
+* The round-trip guard re-emits field bullets **from their parsed parts**, never by copying, so a
+  parse mistake shows up as a diff instead of a rewritten bullet. It caught a real bug in the new
+  parser (a dropped space before a qualifier) during this work.
+* `tools/test_re_frontier.py::RoundTripTests::test_a_narrowed_model_is_caught_not_written`
+  narrows the model exactly as issue 0026's parser did and asserts the guard sees it.
