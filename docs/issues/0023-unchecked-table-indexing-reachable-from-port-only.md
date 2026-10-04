@@ -1,6 +1,7 @@
 # 0023 — unchecked table indexing reachable from port-only callers (audit)
 
-status: OPEN — 9 of 22 fixed 2026-08-13; the rest catalogued here, unfixed
+status: OPEN — 20 of 31 fixed as of 2026-10-04 (9 in the original 2026-08-13 pass, 11 since);
+the rest catalogued here, unfixed. Four original claims were REFUTED on evidence rather than fixed.
 found by: a 33-agent audit run after the SAME bug was found twice in one day by accident
 
 ## The category
@@ -86,15 +87,71 @@ zelda3d-layer 42, libultraship 28.
   index. Init now refuses invalid armor types before setting up actor state; valid scene values retain
   their exact old mapping.
 
+### Fixed since the 2026-08-13 pass
+
+All four MM actor param indexes in the table below were closed by `345d6af8`, `3b8165c8` and
+`bb3015c8`:
+
+- `EnGirlA_InitObjIndex` — the decomp's own guard was already written but unreachable: `params >=
+  SI_MAX && params < SI_POTION_RED_1` is unsatisfiable, and its comment already said `&&` should be
+  `||`. Fixing the operator turned the dead branch into the live guard. It also covers two later
+  sShopItemEntries lookups, because mainActionFunc is only assigned on the success path.
+- `BgCtowerRot_Draw` / `EnBoom_Draw` — draw-time, rejected by returning before OPEN_DISPS, which
+  BgCtowerRot_Draw does not even have. EnBoom's params is a full s16, so the original "Params>=2"
+  framing missed that negative values walk off the bottom of the table too.
+- `Boss06_Init` — refused in Init, specifically BEFORE `sIgosInstance` is assigned: that is a file
+  static with eleven deref sites, so a reader guard would leave the real EnKnight's curtains
+  running through NULL. The guard also checks the parent's actor id, since the EnKnight* cast is
+  unchecked.
+- `EnOssan_Init` (`z_en_ossan.c:271`) — the same dead-`&&` shape, and it covers eleven later
+  params-indexed lookups because EnOssan_SetupAction is only reached on success.
+
+Four NULL-deref sites of the same category closed by `bb3015c8`, none of which was in the original
+table because the original audit only looked for table indexes:
+
+- `EnGoroiwa_Init` — formed `&play->setupPathList[pathIndex]` by hand and read `path->count`. The
+  sentinel test could not catch it because `&NULL[i]` is a small NON-NULL address. Now routed
+  through `SubS_GetPathByIndex`, which ~40 sites already use.
+- `BgCtowerRot_Init` and its two per-frame actions, `EnBoom_Update`, `EnGoroiwa_Update` — all
+  dereference `GET_PLAYER`, which is NULL in any scene with no Player actor.
+- `EnGoroiwa_Draw` — `(params >> 0xE) & 3` into a THREE-row table, handing a wild `Gfx*` to the GPU,
+  reachable without needing a path list at all.
+
+Randomizer save-JSON indexes closed by `5f3d7f6c` and `cb3537b6`: `Entrance_Init`,
+`Dungeons::GetDungeon`, `Trials::GetTrial`, `Rando::StaticData::RetrieveItem`,
+`Rando::Context::GetSeedTexture`, and `Plandomizer`'s `file_hash` column. Two of these had no
+possible local refusal and so were guarded at their producers instead. `cb3537b6` also fixed a
+`std::terminate` (a non-numeric entry threw `nlohmann::type_error` past a `catch (parse_error)`) and
+a `std::vector::operator[]` out-of-range read on a short or absent `file_hash`.
+
+Three libultraship XML loaders closed by `8ff99edb` — see the REFUTED section, because the original
+claim named the wrong defect.
+
+### REFUTED — the original claim was wrong about the mechanism
+
+Recording these because a refuted row is a result, not a gap, and because each one looked actionable:
+
+- All three XML loaders (`ResourceLoader.cpp`, `DisplayListFactory.cpp`, `VertexFactory.cpp`) were
+  filed as unchecked TABLE indexing. Every table lookup in the three functions is `contains`-guarded
+  or a linear scan; what is actually unchecked is the NULL from tinyxml2's `FirstChildElement()`. The
+  fix is the same place, but the audit's method would not have found it. `VertexFactory` was filed as
+  REFUTED on the grounds that the `.meta` route is unfetchable — that is protection by coincidence,
+  not design, and these are first-party assets in `soh.o2r`, not mods-only.
+- `z_en_dnp.c:171` — not a table lookup at all. The operands are two distinct anim enum constants,
+  so there is no bound and no out-of-bounds read. Flipping `&&` to `||` would have added a footstep
+  SFX at frames 7 and 15 of `DEKU_PRINCESS_ANIM_WALK`, a valid retail value.
+- `z_en_goroiwa.c:980` — already fixed upstream, with 2S2H's own port note about a rolling snowball
+  in Snowhead. Verified sufficient, not merely present: `path->count >= 2` is rejected earlier, so
+  the clamp leaves `home.rot.y` in `[0, count-2]` and every `pathPoints` read derives from it.
+- `EnBoom`'s two draw-time `GET_PLAYER` sites — a second guard inside the action func would have been
+  DEAD code, since `actionFunc` is invoked only from `EnBoom_Update`. A dead guard is exactly what
+  EnGirlA's `&&`-should-be-`||` bug was.
+
 ### Confirmed, NOT yet fixed
 
 | site | symbol | severity | confidence | reachability |
 | --- | --- | --- | --- | --- |
 | `2ship/src/overlays/actors/ovl_En_Pst/z_en_pst.c:643` | EnPst_FollowSchedule | crash | high | ActorViewer / DebugConsole `spawn` of ACTOR_EN_PST with any Params outside 0..4. |
-| `2ship/src/overlays/actors/ovl_En_GirlA/z_en_girla.c:166` | EnGirlA_InitObjIndex | crash | high | ActorViewer / DebugConsole `spawn` of ACTOR_EN_GIRLA with arbitrary Params; also any shop-actor param supplied by a mod or hand-edited scene. |
-| `2ship/src/overlays/actors/ovl_Bg_Ctower_Rot/z_bg_ctower_rot.c:145` | BgCtowerRot_Draw | crash | high | ActorViewer / DebugConsole `spawn` of ACTOR_BG_CTOWER_ROT with Params>=3 in the Clock Tower scene. |
-| `2ship/src/overlays/actors/ovl_En_Boom/z_en_boom.c:337` | EnBoom_Draw | crash | high | ActorViewer / DebugConsole `spawn` of ACTOR_EN_BOOM with Params>=2 (gameplay_keep object, so it is resident in every scene). |
-| `2ship/src/overlays/actors/ovl_Boss_06/z_boss_06.c:168` | Boss06_Init | wrong-behaviour | high | ActorViewer / DebugConsole `spawn` of ACTOR_BOSS_06 with Params>=2 in Majora's/Twinmold's lair. |
 | `Shipwright/soh/soh/Enhancements/randomizer/SeedContext.cpp:554` | Rando::Context::GetSeedTexture | crash | medium | Port-only file-select seed-hash display. soh/src/overlays/gamestates/ovl_file_choose/z_file_choose.c:327-328 calls `GetSeedTexture(Save_GetSaveMetaInfo(this->selectedFileIndex)->seedHash[i])` — every  |
 | `Shipwright/soh/soh/Enhancements/randomizer/randomizer_entrance.c:244` | Entrance_Init | corruption | high | `entranceOverrides` is `Randomizer_GetEntranceOverrides()`, i.e. `entranceCtx->entranceOverrides`, which SaveManager.cpp:195-204 fills field-by-field from the save JSON: `LoadData("index", entranceCtx |
 | `Shipwright/soh/soh/Enhancements/randomizer/dungeon.cpp:199` | Dungeons::GetDungeon | corruption | medium | SaveManager.cpp:243-247 — `LoadArray("masterQuestDungeons", mqDungeonCount, [&](size_t i) { size_t dungeonId; LoadData("", dungeonId); randoContext->GetDungeon(dungeonId)->SetMQ(); })`. Both `dungeonI |
