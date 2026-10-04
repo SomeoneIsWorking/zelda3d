@@ -251,6 +251,11 @@ SgModel* Fast::Zelda3DRenderer::ensureUploaded(int modelId) {
         for (int k = 0; k < 4; k++) {
             g.matDiffuse[k] = groups[i].matDiffuse[k];
         }
+        for (int k = 0; k < 3; k++) {
+            g.matEmission[k] = groups[i].matEmission[k];
+            g.matSpecular0[k] = groups[i].matSpecular0[k];
+            g.matSpecular1[k] = groups[i].matSpecular1[k];
+        }
         for (int s = 0; s < 6; s++)
             for (int k = 0; k < 4; k++)
                 g.matConstant[s][k] = groups[i].matConstant[s][k];

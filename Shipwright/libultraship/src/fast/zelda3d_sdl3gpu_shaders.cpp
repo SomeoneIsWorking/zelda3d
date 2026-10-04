@@ -2,6 +2,7 @@
 
 #include "zelda3d_sdl3gpu_shaders.h"
 
+#include "fast/zelda3d_fragment_lighting.h"
 #include "fast/zelda3d_model_types.h"
 
 #include <cstdio>
@@ -50,45 +51,52 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
 // differ (Vulkan put everything in set 0).
 // Stringify ZELDA3D_GL_MAX_BONES so the GLSL `uBones[N]` array size has a SINGLE source of truth
 // (the macro in zelda3d_model_types.h) shared by the shader, the C++ SgUbo struct, and the upload loops below.
+// Three levels, not two: two stringifies a bare identifier after one expansion, but an EXPRESSION
+// argument (`ZELDA3D_FRAG_LIGHT_SLOTS * 4`) needs its macro expanded before the `#`, and GLSL accepts
+// the resulting `2 * 4` as an array size.
+#define SG_STR3(x) SG_STR2(x)
 #define SG_STR2(x) #x
-#define SG_STR(x) SG_STR2(x)
+#define SG_STR(x) SG_STR3(x)
 // The UBO is pushed in TWO blocks because SDL3 GPU's Vulkan backend binds each pushed uniform block
 // with a descriptor range capped at MAX_UBO_SECTION_SIZE = 4096 bytes (SDL_gpu_vulkan.c): any field
 // past offset 4096 reads OUTSIDE the bound range -> 0. The 64-bone array alone is 4096 bytes, so a
 // single combined block (4416 B) silently zeroed uLightDir/uParams/uTintSkin/... -> black scene +
 // T-posed (skin-enable lives in uTintSkin.w). SG_UBO_COMMON_BODY (the small per-draw state, ~320 B)
 // is bound at binding 0 for both stages; the bone matrices go in their own block at vertex binding 1.
-#define SG_UBO_COMMON_BODY       \
-    "    mat4 uMP;\n"            \
-    "    mat4 uMV;\n"            \
-    "    vec4 uLightDir;\n"      \
-    "    vec4 uParams;\n"        \
-    "    vec4 uTintSkin;\n"      \
-    "    vec4 uExtra;\n"         \
-    "    mat4 uLightVP;\n"       \
-    "    vec4 uShadow;\n"        \
-    "    vec4 uFog;\n"           \
-    "    vec4 uFog2;\n"          \
-    "    vec4 uAmbient;\n"       \
-    "    vec4 uMatDiffuse;\n"    \
-    "    vec4 uPrimaryCtl;\n"    \
-    "    vec4 uMatConst;\n"      \
-    "    vec4 uSheen;\n"         \
-    "    vec4 uTex0Xf;\n"        \
-    "    vec4 uTex1Xf;\n"        \
-    "    vec4 uFog3d0;\n"        \
-    "    vec4 uFog3d1;\n"        \
-    "    vec4 uSphNrm0;\n"       \
-    "    vec4 uSphNrm1;\n"       \
-    "    vec4 uSphNrm2;\n"       \
-    "    vec4 uLitDif1;\n"       \
-    "    vec4 uLitDif2;\n"       \
-    "    vec4 uLightDir2;\n"     \
-    "    uvec4 uTevStages[6];\n" \
-    "    uvec4 uTevConst[2];\n"  \
-    "    vec4 uTex2Xf;\n"        \
-    "    vec4 uTevCtl;\n"        \
-    "    vec4 uDebug;\n"
+#define SG_UBO_COMMON_BODY                                                                    \
+    "    mat4 uMP;\n"                                                                         \
+    "    mat4 uMV;\n"                                                                         \
+    "    vec4 uLightDir;\n"                                                                   \
+    "    vec4 uParams;\n"                                                                     \
+    "    vec4 uTintSkin;\n"                                                                   \
+    "    vec4 uExtra;\n"                                                                      \
+    "    mat4 uLightVP;\n"                                                                    \
+    "    vec4 uShadow;\n"                                                                     \
+    "    vec4 uFog;\n"                                                                        \
+    "    vec4 uFog2;\n"                                                                       \
+    "    vec4 uAmbient;\n"                                                                    \
+    "    vec4 uMatDiffuse;\n"                                                                 \
+    "    vec4 uPrimaryCtl;\n"                                                                 \
+    "    vec4 uFragCtl;\n"                                                                    \
+    "    vec4 uFragGlobalAmbient;\n"                                                          \
+    "    vec4 uFragLight[" SG_STR(ZELDA3D_FRAG_LIGHT_SLOTS * 16) "];\n"                       \
+                                                                 "    vec4 uMatConst;\n"      \
+                                                                 "    vec4 uSheen;\n"         \
+                                                                 "    vec4 uTex0Xf;\n"        \
+                                                                 "    vec4 uTex1Xf;\n"        \
+                                                                 "    vec4 uFog3d0;\n"        \
+                                                                 "    vec4 uFog3d1;\n"        \
+                                                                 "    vec4 uSphNrm0;\n"       \
+                                                                 "    vec4 uSphNrm1;\n"       \
+                                                                 "    vec4 uSphNrm2;\n"       \
+                                                                 "    vec4 uLitDif1;\n"       \
+                                                                 "    vec4 uLitDif2;\n"       \
+                                                                 "    vec4 uLightDir2;\n"     \
+                                                                 "    uvec4 uTevStages[6];\n" \
+                                                                 "    uvec4 uTevConst[2];\n"  \
+                                                                 "    vec4 uTex2Xf;\n"        \
+                                                                 "    vec4 uTevCtl;\n"        \
+                                                                 "    vec4 uDebug;\n"
 #define SG_UBO_BONES_BODY "    mat4 uBones[" SG_STR(ZELDA3D_GL_MAX_BONES) "];\n"
 
 // The varyings, declared ONCE. `{{ q }}` renders as `out` for the vertex stage and `in` for the
@@ -303,10 +311,11 @@ float fog3dNode(float t) {
     // Source codes: 0 Primary (the vertex-lit output color), 1 FragPrimary, 2 FragSecondary,
     // 3..5 Texture0..2, 6 Texture3 (no unit; falls back to tex0), 13 PreviousBuffer,
     // 14 Constant (per-stage slot from uTevConst), 15 Previous.
-    // KNOWN APPROXIMATION: for the 197 enabled materials
-    // that consume a fragment output, FragPrimary still uses vertex PRIMARY and FragSecondary
-    // remains zero until the PICA fixed-function light/LUT calculation is ported. The five
-    // consumers with IsFragmentLighting=false take the exact PICA zero/zero disabled branch.
+    // KNOWN APPROXIMATION: for the 197 enabled materials that consume a fragment output, FragPrimary
+    // still uses vertex PRIMARY and FragSecondary is still zero, because the per-light bank that
+    // feeds the reduced PICA form has no producer yet (see the `uFragCtl` block below and
+    // fast/zelda3d_fragment_lighting.h). The five consumers with IsFragmentLighting=false take the
+    // exact PICA zero/zero disabled branch.
     //  - the INITIAL combiner-buffer color (PICA tev_combiner_buffer_color) is not parsed from
     //    the CMB and is taken as vec4(0). This is exact for every material in this ROM: all 14
     //    that read PREVBUF latch exactly one stage before the read, so the read always returns a
@@ -415,6 +424,44 @@ void main() {
         vec4 t2s = texture(uTex2, vUv2);
         vec4 fragPrimary = ubo.uPrimaryCtl.y > 0.5 ? prim : vec4(0.0);
         vec4 fragSecondary = vec4(0.0);
+        // PICA's fixed-function FRAGMENT colours, reduced exactly (render.cmb-fragment-lighting;
+        // oot3d-decomp/docs/fragment_lighting.md). ComputeFragmentsColors at the baseline
+        // configuration every captured draw uses (config0 = 0x80000400, config1 = 0xff7fffff) has
+        // NO optional term left: bump and shadow off, spot and distance attenuation disabled, the
+        // Fresnel and reflect LUTs disabled, and `disable_lut_d0` SET -- which leaves `d0_lut_value`
+        // at its initial 1.0f, so specular_0 is added with NO N·H term and the specular is FLAT. A
+        // textbook Blinn-Phong port would be wrong on 75-88% of MM3D's materials and would look
+        // plausible, which is exactly why this is gated rather than guessed: uFragCtl.x is 0 until a
+        // producer for the 0x60-byte runtime light records publishes a bank (see
+        // fast/zelda3d_fragment_lighting.h). With 0 slots the two sources keep the values above,
+        // which is the behaviour every existing parity row was measured against.
+        //   FRAGMENT_PRIMARY   = clamp(globalAmbient + SUM_i (diffuse_i * max(dot(N, pos_i), 0)
+        //                                       + ambient_i), 0, 1)
+        //   FRAGMENT_SECONDARY = clamp(SUM_i (specular0_i + specular1_i), 0, 1)
+        // Both alpha lanes are 1.0: `diffuse_sum`/`specular_sum` start at alpha 1.0, every per-slot
+        // addend is rgb-only, and config0's enable_primary_alpha/enable_secondary_alpha are clear.
+        // The normal is the QUATERNION-rotated one, i.e. view space, which is vNrmView here.
+        if (ubo.uFragCtl.x > 0.5) {
+            vec3 fragNormal = normalize(vNrmView);
+            vec3 diffuseSum = ubo.uFragGlobalAmbient.rgb;
+            vec3 specularSum = vec3(0.0);
+            int slots = int(ubo.uFragCtl.x + 0.5);
+            for (int i = 0; i < slots; ++i) {
+                int b = i * 16;
+                vec4 ambient = ubo.uFragLight[b];
+                vec4 diffuse = ubo.uFragLight[b + 1];
+                vec4 spec0 = ubo.uFragLight[b + 2];
+                vec4 spec1 = ubo.uFragLight[b + 3];
+                // `config.directional` is set with the slot-enable byte on the retail path, so
+                // light_vector IS position (no `+ view`), then normalised exactly as the hardware
+                // does. Directional-only is a transport precondition, not an approximation.
+                vec3 lightVector = normalize(vec3(diffuse.w, spec0.w, spec1.w));
+                diffuseSum += diffuse.rgb * max(dot(fragNormal, lightVector), 0.0) + ambient.rgb;
+                specularSum += spec0.rgb + spec1.rgb;
+            }
+            fragPrimary = vec4(clamp(diffuseSum, 0.0, 1.0), 1.0);
+            fragSecondary = vec4(clamp(specularSum, 0.0, 1.0), 1.0);
+        }
         vec4 tev = tevRun(prim, fragPrimary, fragSecondary, t, t1s, t2s);
         int afn2 = int(ubo.uTevCtl.w + 0.5);
         if (afn2 > 0 && !alphaPass(tev.a, ubo.uParams.z, afn2 - 1)) discard;

@@ -195,6 +195,16 @@ Zelda3DGlGroup MakeGlGroup(const Cmb& cmb, const CmbDrawGroup& g, const CmbVerte
     for (int k = 0; k < 4; k++) {
         cg.matDiffuse[k] = mat ? mat->mat_diffuse[k] : 1.0f;
     }
+    // The rest of the CMB colour block, needed by the PICA fixed-function FRAGMENT path
+    // (render.cmb-fragment-lighting): FUN_003fa5d0 multiplies the per-light colours by these to
+    // form the four PICA LightSrc colour triples, and FUN_003fa34c writes the emission colour to
+    // PICA's `global_ambient` register. They stopped at the parser before, which is why the host
+    // had no specular anywhere and FRAGMENT_SECONDARY could only be black.
+    for (int k = 0; k < 3; k++) {
+        cg.matEmission[k] = mat ? mat->mat_emission[k] : 0.0f;
+        cg.matSpecular0[k] = mat ? mat->mat_specular_0[k] : 0.0f;
+        cg.matSpecular1[k] = mat ? mat->mat_specular_1[k] : 0.0f;
+    }
     // PICA200 TEV constant palette + stage-0 selector. Base defaults from the CMB file; the
     // per-actor override channel (Zelda3D_GL_SetMatConstOverride in Step 2c) rewrites the
     // affected slot(s) before submit for actors like EnHy townsfolk.

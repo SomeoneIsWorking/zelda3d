@@ -1,7 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include "fast/zelda3d_sg_ubo.h" // Zelda3DSg::kCommonBytes/kBonesBytes, ZELDA3D_GL_MAX_BONES
+#include "fast/zelda3d_fragment_lighting.h" // ZELDA3D_FRAG_LIGHT_SLOTS
+#include "fast/zelda3d_sg_ubo.h"            // Zelda3DSg::kCommonBytes/kBonesBytes, ZELDA3D_GL_MAX_BONES
 
 // Render-unification effort (kanban #131), Phase 2. CPU-side mirror of the combined UBO declared
 // in unified_shader.cpp's kCommonUboBody — MUST stay byte-identical (same field order/sizes; every
@@ -33,6 +34,13 @@ struct CommonUbo {
     float uMatAmbient[4];
     float uMatDiffuse[4];
     float uPrimaryCtl[4]; // x=CmbVShader HasColor; remaining lanes reserved
+    // Mirror of SgUbo::uFragCtl/uFragGlobalAmbient/uFragLight (PICA fixed-function FRAGMENT
+    // lighting, render.cmb-fragment-lighting). Field-for-field the same vec4 blocks, so the
+    // unified fragment shader evaluates the identical closed form on the identical payload; see
+    // fast/zelda3d_fragment_lighting.h for the slot layout and the producer contract.
+    float uFragCtl[4];
+    float uFragGlobalAmbient[4];
+    float uFragLight[ZELDA3D_FRAG_LIGHT_SLOTS * 16];
     // PICA constant-color fallback plus a byte-identical mirror of SgUbo::uMatConst. Generic-TEV
     // draws use the full palette below; simple unified CMB draws retain this selected-slot value.
     float uMatConst[4];

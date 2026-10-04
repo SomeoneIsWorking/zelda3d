@@ -85,6 +85,97 @@ TEST(Zelda3DShaderTemplate, DisabledFragmentLightingSuppliesZeroTevSources) {
     EXPECT_NE(fragmentSource.find("tevRun(prim, fragPrimary, fragSecondary"), std::string::npos);
 }
 
+// The reduced PICA fragment-lighting form, on both routes, pinned as SHADER SOURCE because the
+// formula lives in the generated GLSL and nowhere else. Four properties are load-bearing and each
+// one is a trap this port has already been caught by once:
+//
+//  * the specular is FLAT -- `spec0.rgb + spec1.rgb` with no half vector anywhere, because the
+//    captured configurations set `disable_lut_d0` and `d0_lut_value` therefore stays at 1.0. A
+//    Blinn-Phong term here would be wrong on 75-88% of MM3D's materials and look plausible;
+//  * the diffuse term is `dot(normal, normalize(position))` against PICA's `LightSrc.position`,
+//    not the negated `uLightDir` convention the VERTEX path uses (FUN_003fa5d0 already negates);
+//  * the normal is the view-space quaternion-rotated one (vNrmView), not the raw model normal;
+//  * both colours clamp to [0,1] and both alphas are 1.0, because `diffuse_sum`/`specular_sum`
+//    start at alpha 1.0 and enable_primary_alpha/enable_secondary_alpha are clear.
+//
+// The gate itself (`uFragCtl.x > 0.5`) is asserted to stay: it is what makes this transport inert
+// until a producer for the 0x60-byte runtime light records exists. Do not remove it to make a
+// material look lit.
+TEST(Zelda3DShaderTemplate, ReducedFragmentLightingIsFlatAndGated) {
+    std::string vertexSource;
+    std::string fragmentSource;
+    std::string error;
+    ASSERT_TRUE(Fast::Zelda3DSdl3GpuShaders::BuildSources("", "", "", vertexSource, fragmentSource, error)) << error;
+
+    EXPECT_NE(fragmentSource.find("if (ubo.uFragCtl.x > 0.5) {"), std::string::npos);
+    EXPECT_NE(fragmentSource.find("vec3 fragNormal = normalize(vNrmView);"), std::string::npos);
+    EXPECT_NE(fragmentSource.find("vec3 diffuseSum = ubo.uFragGlobalAmbient.rgb;"), std::string::npos);
+    EXPECT_NE(fragmentSource.find("vec3 lightVector = normalize(vec3(diffuse.w, spec0.w, spec1.w));"),
+              std::string::npos);
+    EXPECT_NE(fragmentSource.find("diffuseSum += diffuse.rgb * max(dot(fragNormal, lightVector), 0.0) + ambient.rgb;"),
+              std::string::npos);
+    EXPECT_NE(fragmentSource.find("specularSum += spec0.rgb + spec1.rgb;"), std::string::npos);
+    EXPECT_NE(fragmentSource.find("fragPrimary = vec4(clamp(diffuseSum, 0.0, 1.0), 1.0);"), std::string::npos);
+    EXPECT_NE(fragmentSource.find("fragSecondary = vec4(clamp(specularSum, 0.0, 1.0), 1.0);"), std::string::npos);
+
+    // The falsifiers, each a plausible-looking port of the WRONG model. They target executable GLSL
+    // rather than prose (the templates legitimately mention "half-Lambert" in comments about a
+    // removed model): a half vector is the normal+view vector added to the light vector, a negated
+    // direction is the vertex path's convention, and a model-space normal would use `vNrm`.
+    EXPECT_EQ(fragmentSource.find("halfVector"), std::string::npos);
+    EXPECT_EQ(fragmentSource.find("normalize(fragNormal + "), std::string::npos);
+    EXPECT_EQ(fragmentSource.find("normalize(fragNormal + lightVector)"), std::string::npos);
+    EXPECT_EQ(fragmentSource.find("-lightVector"), std::string::npos);
+    EXPECT_EQ(fragmentSource.find("spec0.rgb * max(dot"), std::string::npos);
+    EXPECT_EQ(fragmentSource.find("normalize(vNrm)"), std::string::npos);
+}
+
+// The two generated sources above are only ever STRING-matched by the rest of this file, and a
+// malformed UBO declaration or a mistyped `@{}` interpolation survives every one of those checks
+// and only fails at pipeline creation, i.e. as a black frame. Compile them for real instead. This
+// covers the whole block: the fragment-lighting UBO fields, the SG_STR/prism array-size
+// interpolations that spell the slot count, and the closed form itself.
+TEST(Zelda3DShaderTemplate, ReducedFragmentLightingSourcesCompile) {
+    std::string vertexSource;
+    std::string fragmentSource;
+    std::string error;
+    ASSERT_TRUE(Fast::Zelda3DSdl3GpuShaders::BuildSources(Fast::Zelda3DTev::kGenericFunctions, "", "", vertexSource,
+                                                          fragmentSource, error))
+        << error;
+    // The slot count must reach the GLSL as a NUMBER in both templates. A bare macro name here
+    // compiles nowhere and used to be silently accepted by every string-based assertion.
+    EXPECT_NE(fragmentSource.find("vec4 uFragLight["), std::string::npos);
+    EXPECT_EQ(fragmentSource.find("ZELDA3D_FRAG_LIGHT_SLOTS"), std::string::npos);
+    const std::string arrayDeclaration = fragmentSource.substr(fragmentSource.find("vec4 uFragLight["));
+    EXPECT_NE(arrayDeclaration.find(']'), std::string::npos);
+    EXPECT_NE(arrayDeclaration.substr(0, arrayDeclaration.find(']')).find_first_not_of("0123456789"),
+              std::string::npos);
+
+    std::vector<uint32_t> spirv;
+    ASSERT_TRUE(Fast::Zelda3DSdl3GpuShaders::Compile(EShLangVertex, vertexSource.c_str(), spirv))
+        << "native vertex template failed to compile";
+    spirv.clear();
+    ASSERT_TRUE(Fast::Zelda3DSdl3GpuShaders::Compile(EShLangFragment, fragmentSource.c_str(), spirv))
+        << "native fragment template failed to compile";
+}
+
+TEST(Zelda3DUnifiedShader, ReducedFragmentLightingSourcesCompile) {
+    std::string log;
+    ASSERT_TRUE(Fast::Unified::SelfTestUnifiedShaderVariants(log)) << log;
+    EXPECT_EQ(log.find("@{"), std::string::npos) << "an unconsumed prism interpolation reached the GLSL";
+    EXPECT_EQ(Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kGenericTev).find("ZELDA3D_FRAG_LIGHT"),
+              std::string::npos);
+}
+
+TEST(Zelda3DUnifiedShader, ReducedFragmentLightingIsFlatAndGated) {
+    const std::string source = Fast::Unified::BuildFragmentSource(Fast::Unified::Variant::kGenericTev);
+    EXPECT_NE(source.find("if (ubo.uFragCtl.x > 0.5) {"), std::string::npos);
+    EXPECT_NE(source.find("specularSum += spec0.rgb + spec1.rgb;"), std::string::npos);
+    EXPECT_NE(source.find("fragSecondary = vec4(clamp(specularSum, 0.0, 1.0), 1.0);"), std::string::npos);
+    EXPECT_EQ(source.find("halfVector"), std::string::npos);
+    EXPECT_EQ(source.find("normalize(fragNormal + lightVector)"), std::string::npos);
+}
+
 TEST(Zelda3DDrawIsolation, SkipComposesWithExistingDrawAndModelSelection) {
     gZelda3dSgModelOnly = -1;
     gZelda3dSgDrawOnly = -1;
@@ -364,26 +455,31 @@ TEST(Zelda3DUboLayout, CommonFieldOffsetsMatchStd140) {
     EXPECT_EQ(offsetof(SgUbo, uAmbient), 304u);
     EXPECT_EQ(offsetof(SgUbo, uMatDiffuse), 320u);
     EXPECT_EQ(offsetof(SgUbo, uPrimaryCtl), 336u);
-    EXPECT_EQ(offsetof(SgUbo, uMatConst), 352u);
-    EXPECT_EQ(offsetof(SgUbo, uSheen), 368u);
-    EXPECT_EQ(offsetof(SgUbo, uTex0Xf), 384u);
-    EXPECT_EQ(offsetof(SgUbo, uTex1Xf), 400u);
-    EXPECT_EQ(offsetof(SgUbo, uFog3d0), 416u);
-    EXPECT_EQ(offsetof(SgUbo, uFog3d1), 432u);
-    EXPECT_EQ(offsetof(SgUbo, uSphNrm0), 448u);
-    EXPECT_EQ(offsetof(SgUbo, uSphNrm1), 464u);
-    EXPECT_EQ(offsetof(SgUbo, uSphNrm2), 480u);
-    EXPECT_EQ(offsetof(SgUbo, uLitDif1), 496u);
-    EXPECT_EQ(offsetof(SgUbo, uLitDif2), 512u);
-    EXPECT_EQ(offsetof(SgUbo, uLightDir2), 528u);
+    // PICA fixed-function FRAGMENT lighting (render.cmb-fragment-lighting): vec4 + vec4 + a vec4[8].
+    // std140 array stride of vec4 is 16 bytes, so the flat float array matches exactly.
+    EXPECT_EQ(offsetof(SgUbo, uFragCtl), 352u);
+    EXPECT_EQ(offsetof(SgUbo, uFragGlobalAmbient), 368u);
+    EXPECT_EQ(offsetof(SgUbo, uFragLight), 384u);
+    EXPECT_EQ(offsetof(SgUbo, uMatConst), 512u);
+    EXPECT_EQ(offsetof(SgUbo, uSheen), 528u);
+    EXPECT_EQ(offsetof(SgUbo, uTex0Xf), 544u);
+    EXPECT_EQ(offsetof(SgUbo, uTex1Xf), 560u);
+    EXPECT_EQ(offsetof(SgUbo, uFog3d0), 576u);
+    EXPECT_EQ(offsetof(SgUbo, uFog3d1), 592u);
+    EXPECT_EQ(offsetof(SgUbo, uSphNrm0), 608u);
+    EXPECT_EQ(offsetof(SgUbo, uSphNrm1), 624u);
+    EXPECT_EQ(offsetof(SgUbo, uSphNrm2), 640u);
+    EXPECT_EQ(offsetof(SgUbo, uLitDif1), 656u);
+    EXPECT_EQ(offsetof(SgUbo, uLitDif2), 672u);
+    EXPECT_EQ(offsetof(SgUbo, uLightDir2), 688u);
     // Generic per-stage TEV (render.multi-stage-tev): uvec4[6] + uvec4[2] + vec4 + vec4.
     // std140 array stride of uvec4 is 16 bytes, so the flat uint32_t arrays match exactly.
-    EXPECT_EQ(offsetof(SgUbo, uTevStages), 544u);
-    EXPECT_EQ(offsetof(SgUbo, uTevConst), 640u);
-    EXPECT_EQ(offsetof(SgUbo, uTex2Xf), 672u);
-    EXPECT_EQ(offsetof(SgUbo, uTevCtl), 688u);
-    EXPECT_EQ(offsetof(SgUbo, uDebug), 704u);
-    EXPECT_EQ(offsetof(SgUbo, uBones), 720u);
+    EXPECT_EQ(offsetof(SgUbo, uTevStages), 704u);
+    EXPECT_EQ(offsetof(SgUbo, uTevConst), 800u);
+    EXPECT_EQ(offsetof(SgUbo, uTex2Xf), 832u);
+    EXPECT_EQ(offsetof(SgUbo, uTevCtl), 848u);
+    EXPECT_EQ(offsetof(SgUbo, uDebug), 864u);
+    EXPECT_EQ(offsetof(SgUbo, uBones), 880u);
 }
 
 // The skin-enable flag and shade tint live in uTintSkin (offset 160) — comfortably inside the COMMON
