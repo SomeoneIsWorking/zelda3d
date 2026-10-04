@@ -303,7 +303,13 @@ void EnBoom_Update(Actor* thisx, PlayState* play) {
     Player* player = GET_PLAYER(play);
     Actor* actor;
 
-    if (!(player->stateFlags1 & PLAYER_STATE1_20000000)) {
+    // The state read below is what decides whether the boomerang flies at all, and GET_PLAYER is
+    // NULL in every scene with no Player actor -- which the ActorViewer and the console `spawn` can
+    // both produce, and which used to crash here before the draw guard below was ever reached.
+    // With no player there is nobody to throw it back to, so the frame is skipped whole; that also
+    // covers the six player derefs in func_808A2918, which this is the only caller of.
+    // Audited 2026-08-12 (docs/issues/0023).
+    if ((player != NULL) && !(player->stateFlags1 & PLAYER_STATE1_20000000)) {
         this->actionFunc(this, play);
 
         if (((actor = this->actor.child) != NULL) || ((actor = this->actor.parent) != NULL)) {

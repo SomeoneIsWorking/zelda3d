@@ -53,6 +53,21 @@ void BgCtowerRot_Init(Actor* thisx, PlayState* play) {
     }
 
     player = GET_PLAYER(play);
+
+    // Both doors below exist only to answer "where is the player relative to me": the offset test
+    // decides DoorIdle from DoorDoNothing and there is no third answer to give without one.
+    // GET_PLAYER is NULL in every scene with no Player actor, which the ActorViewer and the console
+    // `spawn` can both produce, and offset.z was then read through the null pointer. Refused here,
+    // before either DynaPolyActor_LoadMesh, so dyna.bgId stays -1 and Destroy's
+    // DynaPoly_DeleteBgActor is already the no-op it is for an unloaded dynapoly.
+    // Audited 2026-08-12 (docs/issues/0023).
+    if (player == NULL) {
+        LUSLOG_ERROR("BgCtowerRot_Init: no player in this scene, params %d is a door -- REFUSED",
+                     this->dyna.actor.params);
+        Actor_Kill(&this->dyna.actor);
+        return;
+    }
+
     if (this->dyna.actor.params == BGCTOWERROT_STONE_DOOR_MAIN) {
         DynaPolyActor_LoadMesh(play, &this->dyna, &gClockTowerStoneDoorMainCol);
         this->dyna.actor.world.rot.y = this->dyna.actor.shape.rot.y + 0x4000;
@@ -81,6 +96,14 @@ void BgCtowerRot_CorridorRotate(BgCtowerRot* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
     Vec3f offset;
     f32 rotZ;
+
+    // The corridor's tilt IS the player's distance in front of it, so with no player there is no
+    // tilt to compute; leave shape.rot.z as Init left it instead of reading through the null
+    // pointer. GET_PLAYER is NULL in any scene with no Player actor.
+    // Audited 2026-08-12 (docs/issues/0023).
+    if (player == NULL) {
+        return;
+    }
 
     Actor_WorldToActorCoords(&this->dyna.actor, &offset, &player->actor.world.pos);
     rotZ = CLAMP(1100.0f - offset.z, 0.0f, 1000.0f);
@@ -113,6 +136,14 @@ void BgCtowerRot_DoorClose(BgCtowerRot* this, PlayState* play) {
 void BgCtowerRot_DoorIdle(BgCtowerRot* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
     Vec3f offset;
+
+    // Same as Init: the door opens when the player walks through it, and a scene with no Player
+    // actor (ActorViewer, console `spawn`) leaves nothing to walk through. Staying idle is already
+    // a defined state for this actor -- DoorDoNothing is it -- so skip rather than queue a cutscene
+    // off a null read. Audited 2026-08-12 (docs/issues/0023).
+    if (player == NULL) {
+        return;
+    }
 
     Actor_WorldToActorCoords(&this->dyna.actor, &offset, &player->actor.world.pos);
     if (offset.z > 30.0f) {
