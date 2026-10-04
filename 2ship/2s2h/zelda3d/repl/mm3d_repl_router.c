@@ -4,6 +4,7 @@
 #include "2s2h/zelda3d/repl/mm3d_framing_repl.h"
 #include "2s2h/zelda3d/repl/mm3d_lifecycle_repl.h"
 #include "2s2h/zelda3d/repl/mm3d_link_repl.h"
+#include "2s2h/zelda3d/repl/mm3d_log_repl.h"
 #include "2s2h/zelda3d/repl/mm3d_model_repl.h"
 #include "2s2h/zelda3d/repl/mm3d_scene_repl.h"
 #include "2s2h/zelda3d/repl/mm3d_world_repl.h"
@@ -15,7 +16,8 @@ void Zelda3D_MmReplRouterDispatch(PlayState* play, const char* command, Zelda3DM
         Zelda3D_MmSceneReplDispatch(play, command, reply, user) ||
         Zelda3D_MmFramingReplDispatch(play, command, reply, user) ||
         Zelda3D_MmModelReplDispatch(play, command, reply, user) ||
-        Zelda3D_MmLifecycleReplDispatch(play, command, reply, user)) {
+        Zelda3D_MmLifecycleReplDispatch(play, command, reply, user) ||
+        Zelda3D_MmLogReplDispatch(play, command, reply, user)) {
         return;
     }
 

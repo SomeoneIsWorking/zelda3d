@@ -1,4 +1,13 @@
-Checks: '-*,clang-analyzer-*,bugprone-branch-clone,bugprone-infinite-loop,bugprone-suspicious-memory-comparison,bugprone-suspicious-memset-usage,bugprone-swapped-arguments,bugprone-use-after-move,performance-move-const-arg,performance-unnecessary-copy-initialization'
+# clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling is switched off on purpose, and
+# the other two insecureAPI checks stay on. That one check fires on every bounded call -- memset,
+# snprintf, memcpy -- and its only remedy is to switch to the C11 Annex K *_s family, which glibc does
+# not implement. So the finding is unsatisfiable rather than merely noisy: the code it asks to change
+# cannot be changed, and the alternative reading is that the gate wants a diagnostic deleted instead of
+# written. The genuinely useful half of the analyzer's memory checking is not this check -- it is
+# bugprone-suspicious-memory-comparison, bugprone-suspicious-memset-usage and the core.* null and
+# uninitialized passes, and those found a real heap over-read in the collision builder when it was
+# enabled on a file that had never been in the linted set.
+Checks: '-*,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,bugprone-branch-clone,bugprone-infinite-loop,bugprone-suspicious-memory-comparison,bugprone-suspicious-memset-usage,bugprone-swapped-arguments,bugprone-use-after-move,performance-move-const-arg,performance-unnecessary-copy-initialization'
 WarningsAsErrors: '*'
 HeaderFilterRegex: '(^|/)(2ship/2s2h|Shipwright/(OTRExporter|cmb3d|libultraship/(include|src|tests)|soh/soh|soh/src/zelda3d|zelda3d_app|zelda3d_shared)|tools)/'
 FormatStyle: file

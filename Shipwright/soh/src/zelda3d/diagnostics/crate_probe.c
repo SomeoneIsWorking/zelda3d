@@ -1,8 +1,8 @@
 #include "crate_probe.h"
+#include "../core/zelda3d_log.h"
 #include "functions/actors.h"
 #include "functions/math.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 
 void Zelda3D_DebugDrawKibako(PlayState* play) {
@@ -16,9 +16,8 @@ void Zelda3D_DebugDrawKibako(PlayState* play) {
         float z = player->actor.world.pos.z + 120.0f * Math_CosS(yaw);
         Actor* crate = Actor_Spawn(&play->actorCtx, play, ACTOR_OBJ_KIBAKO2, x, player->actor.world.pos.y, z, 0,
                                    player->actor.shape.rot.y, 0, 0);
-        fprintf(stderr, "SOH3D: SPAWNKIBAKO Actor_Spawn(OBJ_KIBAKO2) -> %s\n",
+        Z3D_LOG(SOH_ASSET, "SPAWNKIBAKO Actor_Spawn(OBJ_KIBAKO2) -> %s\n",
                 crate != NULL ? "OK" : "FAILED (object not in scene)");
-        fflush(stdout);
         spawned = 1;
     }
 }

@@ -16,6 +16,8 @@ file(GLOB_RECURSE zelda3d_shared_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/audio/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/lighting/*.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/lighting/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/diagnostics/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/diagnostics/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/platform/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/platform/*.h")
 
@@ -39,8 +41,11 @@ target_include_directories(zelda3d_shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # implementation exists only in audio/dr_libs_impl.cpp here. Declared by the root CMakeLists.
 target_include_directories(zelda3d_shared PUBLIC ${dr_libs_SOURCE_DIR})
 
+# lucent is PUBLIC because diagnostics/zelda3d_log.h includes lucent/log_c.h, and both cores include
+# that header at their own diagnostic call sites -- a PRIVATE link would leave every one of those
+# translation units unable to find the include directory.
 target_link_libraries(zelda3d_shared PUBLIC SDL3::SDL3 nlohmann_json::nlohmann_json spdlog::spdlog
-    PRIVATE cmb3d lucent::zip)
+    lucent::lucent PRIVATE cmb3d lucent::zip)
 
 # Upstream third-party code; its warnings are not ours to fix and would drown the build.
 set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/audio/dr_libs_impl.cpp

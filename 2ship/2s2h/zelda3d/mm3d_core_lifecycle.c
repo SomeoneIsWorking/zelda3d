@@ -36,6 +36,7 @@
 // another is the pairing that gets missed).
 
 #include "mm3d_core_lifecycle.h"
+#include "mm3d_log.h"
 #include "mm3d_model_lifecycle.h"
 #include "2s2h/BenPortLifecycle.h"
 #include "2s2h/zelda3d/repl/mm3d_repl.h"
@@ -45,7 +46,6 @@
 
 #include "global.h"
 
-#include <stdio.h>
 #include <string.h>
 
 // ---------------------------------------------------------------------------------------------
@@ -91,9 +91,8 @@ void Zelda3D_ResetAudioContext(void) {
     // report that only ever says "reset" could not tell that apart from a run that inherited a live
     // note array. The equivalent line on the soh side is what falsified a wrong theory about which
     // piece of audio state was actually being carried over.
-    fprintf(stderr, "MM3D CORE: gAudioCtx reset (%zu bytes) -- inherited numNotes=%d notes=%p.\n", sizeof(gAudioCtx),
-            (int)inheritedNotes, inheritedNotePtr);
-    fflush(stderr);
+    Z3D_LOG_LIFECYCLE_INFO("gAudioCtx reset (%zu bytes) -- inherited numNotes=%d notes=%p.\n", sizeof(gAudioCtx),
+                           (int)inheritedNotes, inheritedNotePtr);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -119,9 +118,8 @@ void Zelda3D_ResetSaveContext(void) {
 
     // A COUNT with its denominator, not "reset ok": run 1 must report 0, and a line that cannot
     // report anything else could not tell run 1 from a run inheriting a full save.
-    fprintf(stderr, "MM3D CORE: gSaveContext reset -- inherited %zu non-zero byte(s) of %zu.\n", inheritedNonZero,
-            sizeof(gSaveContext));
-    fflush(stderr);
+    Z3D_LOG_LIFECYCLE_INFO("gSaveContext reset -- inherited %zu non-zero byte(s) of %zu.\n", inheritedNonZero,
+                           sizeof(gSaveContext));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -131,6 +129,10 @@ void Zelda3D_ResetSaveContext(void) {
 // Called by the core's entry point BEFORE anything else in a run -- in particular before InitOTR,
 // which is where the stale-pointer crash happened.
 void Zelda3D_CoreRunBegin(void) {
+    // Name any channel in ZELDA3D_LOG this game does not have, before anything tries to log
+    // through one. Once per process, and not on any hot path.
+    Zelda3D_LogWarnUnknownChannels();
+
     // First, so everything below runs in the new epoch: every Zelda3DOnce in this core is now stale
     // without any of them having to be listed here.
     sRunEpoch++;
@@ -195,17 +197,15 @@ int Zelda3D_CoreRunEnd(void) {
             continue;
         }
         leaked++;
-        fprintf(stderr,
-                "MM3D CORE: %s is STILL SET (%p) after run() finished.\n"
-                "  Should have been cleared by: %s -- so that teardown did NOT run.\n"
-                "  The next run is safe (Zelda3D_CoreRunBegin resets it), but whatever that teardown\n"
-                "  also does -- saving, actor destroy callbacks -- did not happen either.\n",
-                checks[i].name, checks[i].value, checks[i].whoShouldHaveCleared);
+        Z3D_LOG_LIFECYCLE_INFO("%s is STILL SET (%p) after run() finished.\n"
+                               "  Should have been cleared by: %s -- so that teardown did NOT run.\n"
+                               "  The next run is safe (Zelda3D_CoreRunBegin resets it), but whatever that teardown\n"
+                               "  also does -- saving, actor destroy callbacks -- did not happen either.\n",
+                               checks[i].name, checks[i].value, checks[i].whoShouldHaveCleared);
     }
 
     // Printed pass or fail, with the denominator: "no leaks" on its own is indistinguishable from a
     // check that looked at nothing, and this list is exactly the kind a later change outgrows.
-    fprintf(stderr, "MM3D CORE: run ended; checked %d run-scoped pointer(s), %d still set.\n", total, leaked);
-    fflush(stderr);
+    Z3D_LOG_LIFECYCLE_INFO("run ended; checked %d run-scoped pointer(s), %d still set.\n", total, leaked);
     return leaked;
 }

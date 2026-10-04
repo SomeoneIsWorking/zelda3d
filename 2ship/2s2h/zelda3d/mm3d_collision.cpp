@@ -11,7 +11,6 @@
 #include "mm3d_collision.h"
 
 #include <cmath>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -22,6 +21,7 @@
 #include "asset/zcol.h"
 
 #include "mm3d_draw.h" // Zelda3D_MM_SceneName — one owner for the sceneNum -> MM3D name table
+#include "mm3d_log.h"
 #include "mm3d_model_store.h"
 
 namespace {
@@ -101,14 +101,14 @@ extern "C" CollisionHeader* Zelda3D_MM_BuildSceneCollision(PlayState* play, Coll
         std::string err;
         std::vector<uint8_t> inflated = Zelda3D::LzsDecompress(bytes, &err);
         if (inflated.empty()) {
-            fprintf(stderr, "[MM3D-COL] %s: LzS inflate failed: %s\n", path.c_str(), err.c_str());
+            Z3D_LOG(MM_COLLISION, "%s: LzS inflate failed: %s\n", path.c_str(), err.c_str());
             return nullptr;
         }
         bytes = std::move(inflated);
     }
     Zelda3D::OoT3DCollision col(bytes);
     if (!col.ok()) {
-        fprintf(stderr, "[MM3D-COL] %s: %s\n", path.c_str(), col.error().c_str());
+        Z3D_LOG(MM_COLLISION, "%s: %s\n", path.c_str(), col.error().c_str());
         return nullptr;
     }
     const std::vector<Zelda3D::OoT3DCollision::Vert>& V = col.verts();
@@ -120,8 +120,8 @@ extern "C" CollisionHeader* Zelda3D_MM_BuildSceneCollision(PlayState* play, Coll
     // CollisionPoly stores 13-bit vertex indices, so a scene past 8192 verts cannot be expressed.
     // Report and fall back rather than silently truncating into wrong geometry.
     if (V.size() >= 8192 || P.size() >= 65535) {
-        fprintf(stderr,
-                "[MM3D-COL] %s: %zu verts / %zu polys exceeds the collision index budget — "
+        Z3D_LOG(MM_COLLISION,
+                "%s: %zu verts / %zu polys exceeds the collision index budget — "
                 "using N64 collision for this scene\n",
                 path.c_str(), V.size(), P.size());
         return nullptr;
@@ -197,7 +197,7 @@ extern "C" CollisionHeader* Zelda3D_MM_BuildSceneCollision(PlayState* play, Coll
     }
 
     sDiverted = 1;
-    fprintf(stderr, "[MM3D-COL] %s: %zu verts, %zu polys, %zu surface types (N64 was %u/%u)\n", path.c_str(), V.size(),
+    Z3D_LOG(MM_COLLISION, "%s: %zu verts, %zu polys, %zu surface types (N64 was %u/%u)\n", path.c_str(), V.size(),
             P.size(), S.size(), n64 ? n64->numVertices : 0, n64 ? n64->numPolygons : 0);
     return sHeader;
 }

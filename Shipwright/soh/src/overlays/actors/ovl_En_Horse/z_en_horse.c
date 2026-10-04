@@ -9,7 +9,7 @@
 #include "objects/object_horse/object_horse.h"
 #include "objects/object_hni/object_hni.h"
 #include "scenes/overworld/spot09/spot09_scene.h"
-#include "zelda3d/core/zelda3d_log.h" // Z3D_LOG(RIDER, ...) — #152 saddle/riderPos diagnostics
+#include "zelda3d/core/zelda3d_log.h" // Z3D_LOG(SOH_RIDER, ...) — #152 saddle/riderPos diagnostics
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -3786,7 +3786,7 @@ void EnHorse_PostDraw(Actor* thisx, PlayState* play, Skin* skin) {
             this->riderPos.z = this->riderPos.z - this->actor.world.pos.z;
         }
         // `log rider 1` (#152 seat diagnosis): which pose is the seat anchored to?
-        Z3D_LOG(RIDER, "PostDraw riderPos=(%.1f,%.1f,%.1f) n64AnimFrame=%.2f animIdx=%d src=%s\n",
+        Z3D_LOG(SOH_RIDER, "PostDraw riderPos=(%.1f,%.1f,%.1f) n64AnimFrame=%.2f animIdx=%d src=%s\n",
                 this->riderPos.x, this->riderPos.y, this->riderPos.z, this->skin.skelAnime.curFrame,
                 (int)this->animationIdx, Zelda3D_HorseSaddleOffset(thisx, saddle) ? "3ds-bone14" : "n64-limb30");
     } else {

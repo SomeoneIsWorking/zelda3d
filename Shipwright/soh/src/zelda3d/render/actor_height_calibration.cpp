@@ -1,12 +1,11 @@
 #include "actor_height_calibration.h"
 
 #include "actor_model_submission.h"
+#include "../core/zelda3d_log.h"
 #include "../diagnostics/model_tuning_query.h"
 #include "model_queries.h"
 #include "replacement_calibration.h"
 #include "replacement_control.h"
-
-#include <cstdio>
 
 int Zelda3D_TryDrawHeightCalibratedModel(PlayState* play, Actor* actor, Zelda3D_HeightCalibration* calibration,
                                          const Zelda3D_HeightCalibratedModel& model) {
@@ -33,9 +32,8 @@ int Zelda3D_TryDrawHeightCalibratedModel(PlayState* play, Actor* actor, Zelda3D_
                 calibration->state = 2;
                 scale = calibration->scale;
                 if (Zelda3D_AutoMode() >= 1) {
-                    fprintf(stderr, "SOH3D AUTO: %s -> scale=%.5f (n64h=%.1f modelh=%.1f)\n", model.diagnosticName,
-                            scale, calibration->measuredHeight, modelHeight);
-                    fflush(stderr);
+                    Z3D_LOG(SOH_RENDER, "%s -> scale=%.5f (n64h=%.1f modelh=%.1f)\n", model.diagnosticName, scale,
+                            calibration->measuredHeight, modelHeight);
                 }
             } else {
                 calibration->state = 3;

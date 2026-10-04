@@ -36,7 +36,7 @@
 #include "z64.h"
 #include "variables.h"
 #include "zelda3d/core/zelda3d_runtime.h"
-#include <stdio.h>
+#include "zelda3d/core/zelda3d_log.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -163,11 +163,9 @@ void Zelda3D_ResetAudioContext(void) {
 
     memset(&gAudioContext, 0, sizeof(gAudioContext));
 
-    fprintf(stderr,
-            "ZELDA3D CORE: gAudioContext reset (%zu bytes) -- inherited numNotes=%d notes=%p, freed %zu"
-            " sequence/soundfont name(s).\n",
-            sizeof(gAudioContext), (int)inheritedNotes, inheritedNotePtr, freedNames);
-    fflush(stderr);
+    Z3D_LOG_LIFECYCLE_INFO("gAudioContext reset (%zu bytes) -- inherited numNotes=%d notes=%p, freed %zu"
+                           " sequence/soundfont name(s).\n",
+                           sizeof(gAudioContext), (int)inheritedNotes, inheritedNotePtr, freedNames);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -201,9 +199,8 @@ void Zelda3D_ResetSaveContext(void) {
     // and a line that cannot say anything else could not tell run 1 from a run that inherited a full
     // save. Naming individual fields would have been worse -- whichever field the next regression
     // uses would be the one not printed.
-    fprintf(stderr, "ZELDA3D CORE: gSaveContext reset -- inherited %zu non-zero byte(s) of %zu.\n", inheritedNonZero,
-            sizeof(gSaveContext));
-    fflush(stderr);
+    Z3D_LOG_LIFECYCLE_INFO("gSaveContext reset -- inherited %zu non-zero byte(s) of %zu.\n", inheritedNonZero,
+                           sizeof(gSaveContext));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -215,6 +212,10 @@ void Zelda3D_ResetSaveContext(void) {
 // cannot inherit the last one regardless of how it ended (a clean quit, a crash-triggered exit, a
 // game switch mid-frame).
 void Zelda3D_CoreRunBegin(void) {
+    // Name any channel in ZELDA3D_LOG this game does not have, before anything tries to log
+    // through one. Once per process, and not on any hot path.
+    Zelda3D_LogWarnUnknownChannels();
+
     // First, so that everything below runs in the new epoch: every Zelda3DOnce in the process is now
     // stale, without any of them having to be listed here.
     sRunEpoch++;
@@ -307,17 +308,20 @@ int Zelda3D_CoreRunEnd(void) {
             continue;
         }
         leaked++;
-        fprintf(stderr,
-                "ZELDA3D CORE: %s is STILL SET (%p) after run() finished.\n"
-                "  Should have been cleared by: %s -- so that teardown did NOT run.\n"
-                "  The next run is safe (Zelda3D_CoreRunBegin resets it), but whatever that teardown\n"
-                "  also does -- saving, actor destroy callbacks -- did not happen either.\n",
-                checks[i].name, checks[i].value, checks[i].whoShouldHaveCleared);
+        // One call PER LINE, not one call with four concatenated lines. The logger stamps and
+        // prefixes each call exactly once, so a single four-line message would leave three of its
+        // lines unprefixed and untimestamped -- and this is the report somebody reads while a test
+        // is timing out, where "which line am I on" is the first question asked of it. The text of
+        // each line is unchanged.
+        Z3D_LOG_LIFECYCLE_INFO("%s is STILL SET (%p) after run() finished.", checks[i].name, checks[i].value);
+        Z3D_LOG_LIFECYCLE_INFO("  Should have been cleared by: %s -- so that teardown did NOT run.",
+                               checks[i].whoShouldHaveCleared);
+        Z3D_LOG_LIFECYCLE_INFO("  The next run is safe (Zelda3D_CoreRunBegin resets it), but whatever that teardown");
+        Z3D_LOG_LIFECYCLE_INFO("  also does -- saving, actor destroy callbacks -- did not happen either.");
     }
 
     // Printed pass or fail, with the denominator. "no leaks" on its own is indistinguishable from a
     // check that looked at nothing, and this list is exactly the kind a later change outgrows.
-    fprintf(stderr, "ZELDA3D CORE: run ended; checked %d run-scoped pointer(s), %d still set.\n", total, leaked);
-    fflush(stderr);
+    Z3D_LOG_LIFECYCLE_INFO("run ended; checked %d run-scoped pointer(s), %d still set.", total, leaked);
     return leaked;
 }

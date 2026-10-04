@@ -12,10 +12,10 @@
 
 #include "global.h"
 #include "functions/game_state.h"
+#include "zelda3d/core/zelda3d_log.h"
 #include "zelda3d/launcher/zelda3d_launcher.h"
 #include "z64.h"
 #include <ship/zelda3d_launcher_bridge.h>
-#include <stdio.h>
 
 void Launcher_Destroy(GameState* gameState) {
     Zelda3D_LauncherShow(0);
@@ -25,13 +25,11 @@ void Launcher_Main(GameState* gameState) {
     // gZelda3dLauncherAction is set by the launcher document's rows (SohRmlUi). 0 = still choosing.
     static int sTick = 0;
     if (sTick++ == 0) {
-        fprintf(stderr, "SOH3D LAUNCHER: gamestate Main running\n");
-        fflush(stderr);
+        Z3D_LOG(SOH_LAUNCHER, "gamestate Main running\n");
     }
     const int choice = gZelda3dLauncherAction;
     if (choice != 0) {
-        fprintf(stderr, "SOH3D LAUNCHER: choice=%d\n", choice);
-        fflush(stderr);
+        Z3D_LOG(SOH_LAUNCHER, "choice=%d\n", choice);
     }
     if (choice == 0) {
         return; // stay on this screen
@@ -62,8 +60,7 @@ void Launcher_Main(GameState* gameState) {
 }
 
 void Launcher_Init(GameState* gameState) {
-    fprintf(stderr, "SOH3D LAUNCHER: gamestate Init\n");
-    fflush(stderr);
+    Z3D_LOG(SOH_LAUNCHER, "gamestate Init\n");
     gameState->main = Launcher_Main;
     gameState->destroy = Launcher_Destroy;
     // Show the document. It is the only thing on screen: no gamestate before this one drew anything.

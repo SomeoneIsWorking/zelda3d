@@ -302,13 +302,13 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
     size_t len = 0;
     uint8_t* d = Zelda3D_RomReadAlloc("/scene/spot99_info.zsi", &len);
     if (!d) {
-        fprintf(stderr, "[Zelda3D] title cs: spot99_info.zsi not readable\n");
+        Z3D_LOG(SOH_TITLECAM, "title cs: spot99_info.zsi not readable\n");
         return 0;
     }
     ParseLightSettings(d, len);
     size_t bdq = 0;
     if (!LocateTitleCs(d, len, &bdq)) {
-        fprintf(stderr, "[Zelda3D] title cs: no ' BDQ' stream in spot99_info.zsi\n");
+        Z3D_LOG(SOH_TITLECAM, "title cs: no ' BDQ' stream in spot99_info.zsi\n");
         free(d);
         return 0;
     }
@@ -427,25 +427,23 @@ extern "C" int Zelda3D_TitleCsLoad(void) {
         }
     }
     free(d);
-    fprintf(stderr, "[Zelda3D] title cs: %zu rider cues, %zu misc cues, %zu fade cues, hasDest=%d\n",
-            sRiderCues.size(), sMiscCues.size(), sFadeCues.size(), (int)sHasDest);
+    Z3D_LOG(SOH_TITLECAM, "title cs: %zu rider cues, %zu misc cues, %zu fade cues, hasDest=%d\n", sRiderCues.size(),
+            sMiscCues.size(), sFadeCues.size(), (int)sHasDest);
     if (!found) {
-        fprintf(stderr, "[Zelda3D] title cs: OP97 spline block not found\n");
+        Z3D_LOG(SOH_TITLECAM, "title cs: OP97 spline block not found\n");
         return 0;
     }
-    fprintf(stderr, "[Zelda3D] title cs loaded: %zu camera segments, end_frame=%d\n",
-            sSpline.segments.size(), sEndFrame);
+    Z3D_LOG(SOH_TITLECAM, "title cs loaded: %zu camera segments, end_frame=%d\n", sSpline.segments.size(), sEndFrame);
     // Per-segment frame coverage — diagnoses camera-spline GAPS (frames covered by no segment fall
     // back to the static default.
     for (size_t si = 0; si < sSpline.segments.size(); ++si)
-        fprintf(stderr, "[Zelda3D]   cam seg %zu: frames (%d, %d)\n",
-                si, sSpline.segments[si].start, sSpline.segments[si].end);
+        Z3D_LOG(SOH_TITLECAM, "  cam seg %zu: frames (%d, %d)\n", si, sSpline.segments[si].start,
+                sSpline.segments[si].end);
     // Rider cue windows + actions — diagnoses which EnHorse cs func drives each frame range
     // (0x24 Move / 0x26 Rearing / 0x40 WarpMove / 0x41 WarpRearing; title_rider.cpp RiderCsFuncIdx).
     for (size_t ci = 0; ci < sRiderCues.size(); ++ci)
-        fprintf(stderr, "[Zelda3D]   rider cue %zu: action=0x%02x frames (%u, %u] yaw=%d\n",
-                ci, sRiderCues[ci].action, sRiderCues[ci].start, sRiderCues[ci].end,
-                (int)sRiderCues[ci].yaw);
+        Z3D_LOG(SOH_TITLECAM, "  rider cue %zu: action=0x%02x frames (%u, %u] yaw=%d\n", ci, sRiderCues[ci].action,
+                sRiderCues[ci].start, sRiderCues[ci].end, (int)sRiderCues[ci].yaw);
     sLoadState = 1;
     return 1;
 }
@@ -512,15 +510,15 @@ extern "C" int Zelda3D_TitleCsCamera(float frame, float eye[3], float at[3],
     }
     // `log titlecam 1`: raw eye/at defs + evaluated + which track types the segment carries — the
     // per-frame spline evaluation trail.
-    if (Zelda3D_LogEnabled(Z3D_LOG_TITLECAM)) {
+    if (Zelda3D_LogEnabled(Z3D_LOG_SOH_TITLECAM)) {
         char tks[64] = {0}; size_t tl = 0;
         for (const Track& tr : seg->tracks) tl += (size_t)snprintf(tks+tl, sizeof(tks)-tl, "%d ", tr.type);
-        Z3D_LOG(TITLECAM, "f=%.1f seg[%d,%d] eyeDef=(%.1f,%.1f,%.1f) atDef=(%.1f,%.1f,%.1f) "
+        Z3D_LOG(SOH_TITLECAM,
+                "f=%.1f seg[%d,%d] eyeDef=(%.1f,%.1f,%.1f) atDef=(%.1f,%.1f,%.1f) "
                 "eyeEval=(%.1f,%.1f,%.1f) atEval=(%.1f,%.1f,%.1f) tracks=[%s]\n",
-                frame, seg->start, seg->end,
-                seg->eyeDef[0]*kPosScale, seg->eyeDef[1]*kPosScale, seg->eyeDef[2]*kPosScale,
-                seg->atDef[0]*kPosScale, seg->atDef[1]*kPosScale, seg->atDef[2]*kPosScale,
-                eye[0], eye[1], eye[2], at[0], at[1], at[2], tks);
+                frame, seg->start, seg->end, seg->eyeDef[0] * kPosScale, seg->eyeDef[1] * kPosScale,
+                seg->eyeDef[2] * kPosScale, seg->atDef[0] * kPosScale, seg->atDef[1] * kPosScale,
+                seg->atDef[2] * kPosScale, eye[0], eye[1], eye[2], at[0], at[1], at[2], tks);
     }
     // up from roll about the view dir; sign verified against Az's live up
     // (roll=0.0873 rad -> up=(0.212,0.977,-0.013) vs Az (0.212,0.977,-0.014)).

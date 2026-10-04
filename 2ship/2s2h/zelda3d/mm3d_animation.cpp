@@ -3,7 +3,6 @@
 
 #include <array>
 #include <cmath>
-#include <cstdio>
 #include <cstring>
 #include <memory>
 #include <set>
@@ -15,6 +14,7 @@
 
 #include "asset/csab.h"
 #include "mm3d_animation_playhead.h"
+#include "mm3d_log.h"
 #include "mm3d_model_store.h"
 #include "mm3d_phase_diagnostics.h"
 #include "mm3d_player_animation.h"
@@ -135,11 +135,11 @@ Csab* LoadAnimation(int modelId, LoadedModel& model, const char* baseName) {
     if (animationFile != nullptr) {
         animation = std::make_unique<Csab>(archive->read(*animationFile));
         if (!animation->ok()) {
-            fprintf(stderr, "[MM3D] Csab %s: %s\n", key.c_str(), animation->error().c_str());
+            Z3D_LOG(MM_ANIM, "Csab %s: %s\n", key.c_str(), animation->error().c_str());
             animation.reset();
         }
     } else {
-        fprintf(stderr, "[MM3D] csab not found: %s\n", key.c_str());
+        Z3D_LOG(MM_ANIM, "csab not found: %s\n", key.c_str());
     }
     return assets.clips.emplace(std::move(key), std::move(animation)).first->second.get();
 }
@@ -276,7 +276,7 @@ const char* ApplyCapturedAnimation(int modelId, const void* jointTable) {
         if (animationOtr != nullptr) {
             static std::set<std::string> seen;
             if (seen.insert(animationOtr).second) {
-                fprintf(stderr, "[MM3D-ANIM] model=%d unmapped n64='%s' -> %s '%s'\n", modelId, animationOtr,
+                Z3D_LOG(MM_ANIM, "model=%d unmapped n64='%s' -> %s '%s'\n", modelId, animationOtr,
                         playerModel ? "exact player route" : "default", csab == nullptr ? "(none)" : csab);
             }
         }

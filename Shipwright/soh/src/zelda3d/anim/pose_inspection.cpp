@@ -4,6 +4,7 @@
 #include "automatic_playback.h"
 #include "pose_evaluation_internal.h"
 
+#include "../core/zelda3d_log.h"
 #include "../model/zelda3d_model_internal.h"
 #include "asset/csab.h"
 
@@ -122,13 +123,12 @@ extern "C" void Zelda3D_DumpAnimBonesLocal(int modelId, const char* animName, fl
     float rf = 0.0f;
     int n = Zelda3D_GetAnimBonesLocal(modelId, animName, frame, rot, id, parent, 25, csab, sizeof csab, &rf);
     if (n < 0) {
-        fprintf(stderr, "[BONEINFO] model %d: no cmb / csab not found / no live anim recorded\n", modelId);
+        Z3D_LOG(SOH_BONE, "model %d: no cmb / csab not found / no live anim recorded\n", modelId);
         return;
     }
-    fprintf(stderr, "[BONEINFO] model %d csab=%s frame=%.3f bones=%d\n", modelId, csab, rf, n);
+    Z3D_LOG(SOH_BONE, "model %d csab=%s frame=%.3f bones=%d\n", modelId, csab, rf, n);
     for (int i = 0; i < n; i++) {
-        fprintf(stderr, "[BONEINFO] b id=%d parent=%d localRot=(%.4f,%.4f,%.4f)\n", id[i], parent[i], rot[i * 3 + 0],
+        Z3D_LOG(SOH_BONE, "b id=%d parent=%d localRot=(%.4f,%.4f,%.4f)\n", id[i], parent[i], rot[i * 3 + 0],
                 rot[i * 3 + 1], rot[i * 3 + 2]);
     }
-    fflush(stderr);
 }

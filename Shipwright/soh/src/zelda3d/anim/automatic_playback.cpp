@@ -1,13 +1,13 @@
 // Automatic CSAB playhead selection and transition policy.
 #include "automatic_playback.h"
 
+#include "../core/zelda3d_log.h"
 #include "../player/player_pose_scan.h"
 #include "authored_playback.h"
 #include "pose_evaluation_internal.h"
 #include "skeleton_draw_bridge.h"
 
 #include <cmath>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -197,10 +197,9 @@ extern "C" void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float 
             morphOutFrame.erase(modelId);
         }
         if (gZelda3dAnimDebug && modelId == Zelda3D_LinkModelId()) {
-            fprintf(stderr, "SOH3D WALKSTOP: end=%s f=%.1f synthW=%.3f rate=%.3f morphOut=%s@%.1f\n", en.c_str(), ef, w,
+            Z3D_LOG(SOH_ANIM, "WALKSTOP: end=%s f=%.1f synthW=%.3f rate=%.3f morphOut=%s@%.1f\n", en.c_str(), ef, w,
                     locoStopRate[modelId], morphOut.count(modelId) ? morphOut[modelId].c_str() : "(none)",
                     morphOut.count(modelId) ? morphOutFrame[modelId] : -1.0f);
-            fflush(stdout);
         }
         if (gZelda3dLogicFrame != locoStopLF[modelId]) {
             locoStopLF[modelId] = gZelda3dLogicFrame;
@@ -254,10 +253,9 @@ extern "C" void Zelda3D_UpdateAnimAuto(int modelId, const char* animName, float 
     Zelda3D_RecordLastAuto(modelId, animName, f); // for REPL `boneinfo` live-frame dump
 
     if (gZelda3dAnimDebug && modelId == Zelda3D_LinkModelId() && (csabChanged || morphWeight > 0.0f)) {
-        fprintf(stderr, "SOH3D ANIM XTRANS: %s f=%.2f morphW=%.3f morphOut=%s outFrame=%.2f%s\n", animName, f,
-                morphWeight, (morphOut.count(modelId) ? morphOut[modelId].c_str() : "(none)"),
+        Z3D_LOG(SOH_ANIM, "ANIM XTRANS: %s f=%.2f morphW=%.3f morphOut=%s outFrame=%.2f%s\n", animName, f, morphWeight,
+                (morphOut.count(modelId) ? morphOut[modelId].c_str() : "(none)"),
                 (morphOut.count(modelId) ? morphOutFrame[modelId] : -1.0f), csabChanged ? " [CHANGE]" : "");
-        fflush(stdout);
     }
     auto moIt = morphOut.find(modelId);
     if (moIt != morphOut.end() && morphWeight > 0.0f) {

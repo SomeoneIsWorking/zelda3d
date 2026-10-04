@@ -4,10 +4,10 @@
 
 #include "../../anim/skeleton_draw_bridge.h"
 #include "../../anim/zelda3d_anim_override.h"
+#include "../../core/zelda3d_log.h"
 #include "../../render/model_queries.h"
 
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -149,9 +149,8 @@ void Zelda3D_ApplyProcOverride(PlayState* play, int modelId, Vec3s* jointTable, 
         const CuccoWingMap* row = &kCuccoWingMap[i];
         if (row->n64Limb < 0 || row->n64Limb >= limbCount) {
             if (sampleThisCall) {
-                fprintf(stderr, "[WINGFLAP-SKIP] zar=%s n64limb=%d->bone=%d SKIPPED (limbCount=%d)\n", zar,
-                        row->n64Limb, row->oot3dBone, limbCount);
-                fflush(stderr);
+                Z3D_LOG(SOH_BONE, "zar=%s n64limb=%d->bone=%d SKIPPED (limbCount=%d)\n", zar, row->n64Limb,
+                        row->oot3dBone, limbCount);
             }
             continue;
         }
@@ -193,9 +192,8 @@ void Zelda3D_ApplyProcOverride(PlayState* play, int modelId, Vec3s* jointTable, 
             dz = (f32)gZelda3dWingProbe[2] * kBinangToRad;
         }
         if (sampleThisCall) {
-            fprintf(stderr, "[WINGFLAP] zar=%s n64limb=%d->bone=%d n64binang=(%d,%d,%d) -> oot rad=(%.3f,%.3f,%.3f)\n",
-                    zar, row->n64Limb, row->oot3dBone, dd[0], dd[1], dd[2], dx, dy, dz);
-            fflush(stderr);
+            Z3D_LOG(SOH_BONE, "zar=%s n64limb=%d->bone=%d n64binang=(%d,%d,%d) -> oot rad=(%.3f,%.3f,%.3f)\n", zar,
+                    row->n64Limb, row->oot3dBone, dd[0], dd[1], dd[2], dx, dy, dz);
         }
         if (gZelda3dChickFlap) {
             // HAND-WOVEN flap: oscillate this wing bone on chickAxis, amplitude scaled by the N64

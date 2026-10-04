@@ -234,7 +234,7 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     const int funcIdx = RiderCsFuncIdx(mCueAction);
     if (funcIdx == 3 || funcIdx == 5) {
         // `log rider 1`: transition diagnosis (see the Move branch's twin below).
-        Z3D_LOG(RIDER,
+        Z3D_LOG(SOH_RIDER,
                 "REARING funcIdx=%d cutsceneAction(before)=%d animIdx(before)=%d action=%d "
                 "animFrame=%.2f riderPos=(%.1f,%.1f,%.1f) playerPos=(%.1f,%.1f,%.1f)\n",
                 funcIdx, (int)horse->cutsceneAction, (int)horse->animationIdx, (int)horse->action,
@@ -305,7 +305,7 @@ void TitleRider::applyToActor(PlayState* play, Actor* actor) {
     if (funcIdx == 1 || funcIdx == 4) {
         // `log rider 1`: catch who stomps animationIdx between our per-frame calls (the mounted-Link
         // stand-pose diagnosis: Player reads idx=REARING while this branch sets GALLOP).
-        Z3D_LOG(RIDER,
+        Z3D_LOG(SOH_RIDER,
                 "MOVE funcIdx=%d cutsceneAction(before)=%d animIdx(before)=%d action=%d "
                 "pos=(%.1f,%.1f,%.1f) animFrame=%.2f\n",
                 funcIdx, (int)horse->cutsceneAction, (int)horse->animationIdx, (int)horse->action,

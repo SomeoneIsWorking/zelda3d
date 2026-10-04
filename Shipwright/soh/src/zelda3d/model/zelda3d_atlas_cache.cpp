@@ -1,5 +1,6 @@
 #include "zelda3d_asset_source.h"
 
+#include "../core/zelda3d_log.h"
 #include "../hud/zelda3d_hud_assets.h"
 #include "asset/cityhash.h"
 #include "asset/ctxb.h"
@@ -7,7 +8,6 @@
 #include "asset/texpack.h"
 
 #include <cstdint>
-#include <cstdio>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -66,17 +66,17 @@ extern "C" const void* Zelda3D_OoT3dAtlas(const char* romfsPath, int textureInde
                         atlas.rgba = std::move(packRgba);
                         atlas.width = packWidth;
                         atlas.height = packHeight;
-                        std::fprintf(stderr, "[Zelda3D] OoT3dAtlas %s: HD pack %dx%d (rom %dx%d)\n", romfsPath,
-                                     packWidth, packHeight, texture.width, texture.height);
+                        Z3D_LOG(SOH_ASSET, "OoT3dAtlas %s: HD pack %dx%d (rom %dx%d)\n", romfsPath, packWidth,
+                                packHeight, texture.width, texture.height);
                     } else {
                         atlas.rgba = ctxb.decodeRGBA(static_cast<size_t>(textureIndex), &atlas.width, &atlas.height);
                     }
                 } else {
-                    std::fprintf(stderr, "[Zelda3D] OoT3dAtlas %s: ctxb %s\n", romfsPath,
-                                 ctxb.ok() ? "texIdx OOR" : ctxb.error().c_str());
+                    Z3D_LOG(SOH_ASSET, "OoT3dAtlas %s: ctxb %s\n", romfsPath,
+                            ctxb.ok() ? "texIdx OOR" : ctxb.error().c_str());
                 }
             } else {
-                std::fprintf(stderr, "[Zelda3D] OoT3dAtlas: romfs file not found: %s\n", romfsPath);
+                Z3D_LOG(SOH_ASSET, "OoT3dAtlas: romfs file not found: %s\n", romfsPath);
             }
         }
         it = gAtlasCache.emplace(key, std::move(atlas)).first;

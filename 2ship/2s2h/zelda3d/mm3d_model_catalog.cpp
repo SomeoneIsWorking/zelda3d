@@ -2,7 +2,6 @@
 #include "mm3d_model.h"
 
 #include <cstddef>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -15,6 +14,7 @@
 #include "asset/cmb.h"
 #include "asset/gar.h"
 #include "asset/lzs.h"
+#include "mm3d_log.h"
 #include "mm3d_model_catalog.h"
 #include "mm3d_model_store.h"
 
@@ -47,7 +47,7 @@ bool ReadArchive(const std::string& path, std::vector<uint8_t>& bytes) {
     std::string error;
     std::vector<uint8_t> inflated = LzsDecompress(bytes, &error);
     if (inflated.empty()) {
-        fprintf(stderr, "[MM3D] LzS inflate failed for %s: %s\n", path.c_str(), error.c_str());
+        Z3D_LOG(MM_MODEL, "LzS inflate failed for %s: %s\n", path.c_str(), error.c_str());
         return false;
     }
     bytes = std::move(inflated);
@@ -65,12 +65,12 @@ bool ProbeModel(const std::string& path, const std::string& cmbName, bool& skinn
     }
     const GarFile* cmbFile = FindModelCmb(archive, cmbName);
     if (cmbFile == nullptr) {
-        fprintf(stderr, "[MM3D] CMB %s not found in %s\n", cmbName.c_str(), path.c_str());
+        Z3D_LOG(MM_MODEL, "CMB %s not found in %s\n", cmbName.c_str(), path.c_str());
         return false;
     }
     Cmb cmb(archive.read(*cmbFile));
     if (!cmb.ok()) {
-        fprintf(stderr, "[MM3D] cmb probe %s/%s: %s\n", path.c_str(), cmbName.c_str(), cmb.error().c_str());
+        Z3D_LOG(MM_MODEL, "cmb probe %s/%s: %s\n", path.c_str(), cmbName.c_str(), cmb.error().c_str());
         return false;
     }
     boneCount = cmb.bones().size();
@@ -136,12 +136,11 @@ int ResolveObjectModel(int objectId) {
             skinnedEnabled = value != nullptr && value[0] != '\0' && value[0] != '0';
         }
         if (!skinnedEnabled) {
-            fprintf(stderr, "[MM3D] skip obj=0x%03X (%s): skinned (%zu bones)\n", objectId, name, boneCount);
+            Z3D_LOG(MM_MODEL, "skip obj=0x%03X (%s): skinned (%zu bones)\n", objectId, name, boneCount);
             g_objectToModel[objectId] = -1;
             return -1;
         }
-        fprintf(stderr, "[MM3D] skinned obj=0x%03X (%s): %zu bones (3DS CSAB-animated draw)\n", objectId, name,
-                boneCount);
+        Z3D_LOG(MM_MODEL, "skinned obj=0x%03X (%s): %zu bones (3DS CSAB-animated draw)\n", objectId, name, boneCount);
     }
 
     float initialScale = 0.1f;
@@ -155,8 +154,8 @@ int ResolveObjectModel(int objectId) {
     // The archive path is named explicitly because it is no longer implied by the object name: an id
     // resolved under the shared zelda_ prefix is a different archive from the same-named zelda2_ one,
     // and without the path a log line cannot tell the two apart.
-    fprintf(stderr, "[MM3D] mapped obj=0x%03X (%s) -> modelId=%d [%s] (%s, %zu bones) scale=%.4f\n", objectId, name,
-            modelId, path.c_str(), skinned ? "skinned" : "rigid", boneCount, initialScale);
+    Z3D_LOG(MM_MODEL, "mapped obj=0x%03X (%s) -> modelId=%d [%s] (%s, %zu bones) scale=%.4f\n", objectId, name, modelId,
+            path.c_str(), skinned ? "skinned" : "rigid", boneCount, initialScale);
     return modelId;
 }
 
@@ -206,14 +205,14 @@ int ResolveExplicitSkinnedModel(const char* garPath, const char* cmbName) {
     bool skinned = false;
     std::size_t boneCount = 0;
     if (!ProbeModel(garPath, cmbName, skinned, boneCount) || !skinned) {
-        fprintf(stderr, "[MM3D] explicit player model %s/%s is missing or not skinned\n", garPath, cmbName);
+        Z3D_LOG(MM_MODEL, "explicit player model %s/%s is missing or not skinned\n", garPath, cmbName);
         g_explicitModels[key] = -1;
         return -1;
     }
     const int modelId = static_cast<int>(g_models.size());
     g_models.push_back({ garPath, 0.1f, true, cmbName });
     g_explicitModels[key] = modelId;
-    fprintf(stderr, "[MM3D] mapped explicit skinned model %s/%s -> modelId=%d (%zu bones)\n", garPath, cmbName, modelId,
+    Z3D_LOG(MM_MODEL, "mapped explicit skinned model %s/%s -> modelId=%d (%zu bones)\n", garPath, cmbName, modelId,
             boneCount);
     return modelId;
 }

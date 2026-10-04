@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <vector>
 
+#include "mm3d_log.h"
 #include "mm3d_model.h"
 #include "mm3d_model_catalog.h"
 #include "mm3d_model_store.h"
@@ -54,8 +55,8 @@ void Zelda3D_MM_DumpModelBones(int modelId, int count) {
         if (bone.parent >= 0) {
             const float length = std::sqrt(bone.trans[0] * bone.trans[0] + bone.trans[1] * bone.trans[1] +
                                            bone.trans[2] * bone.trans[2]);
-            fprintf(stderr, "[MM3D-BONE-CMB] model=%d bone=%d trans=(%.1f,%.1f,%.1f) |v|=%.2f\n", modelId, index,
-                    bone.trans[0], bone.trans[1], bone.trans[2], length);
+            Z3D_LOG(MM_BONE, "model=%d bone=%d trans=(%.1f,%.1f,%.1f) |v|=%.2f\n", modelId, index, bone.trans[0],
+                    bone.trans[1], bone.trans[2], length);
         }
         ++index;
     }

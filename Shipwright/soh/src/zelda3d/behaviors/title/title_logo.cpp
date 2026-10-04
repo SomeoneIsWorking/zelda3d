@@ -454,7 +454,7 @@ extern "C" void Zelda3D_TitleLogoStepSkip(PlayState* play) {
         const bool changed = pressed || gSkip.globalState != sLastState || gSkip.delayTimer != sLastTimer ||
                              play->transitionTrigger != sLastTrig;
         if (changed) {
-            Z3D_LOG(TITLESKIP,
+            Z3D_LOG(SOH_TITLESKIP,
                     "csFrame=%d pressed=%d phase=%d globalState=%d delayTimer=%d "
                     "fadeInOverride=%d fadeOutStart=%d transitionTrigger=%d gameMode=%d\n",
                     csFrame, pressed ? 1 : 0, (int)natural.phase, gSkip.globalState, gSkip.delayTimer,
@@ -552,7 +552,7 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
         // Verification aid (`log sheen 1`) — traces the sweep parameter/direction so the ramp can
         // be confirmed from a log without relying on eyeballing a subtle (diffuse-only, no
         // specular — see the block comment above) screen-space brightness change.
-        Z3D_LOG(SHEEN, "csFrame=%d sheenT=%.2f t=%.3f dir=(%.3f,%.3f,%.3f)\n", csFrame, ps.sheenT, t, dx, dy, dz);
+        Z3D_LOG(SOH_SHEEN, "csFrame=%d sheenT=%.2f t=%.3f dir=(%.3f,%.3f,%.3f)\n", csFrame, ps.sheenT, t, dx, dy, dz);
     }
     //
     // The wordmark is a self-illuminated overlay (an authored fire-glow logo composited over the
@@ -577,8 +577,8 @@ extern "C" int Zelda3D_TryDrawTitleLogo(PlayState* play) {
     // (the retail cs438 capture) shows SoH's mid-fade letters are
     // ~0% dimmed vs the oracle's ~15% — so confirming the runtime alpha here is step 1 of ruling
     // alpha-value-correctness in or out before chasing the blend destination.
-    Z3D_LOG(WORDMARK, "csFrame=%d phase=%d wordmarkAlpha=%.2f alphaU8=%u\n", csFrame, (int)ps.phase, ps.wordmarkAlpha,
-            (unsigned)alphaU8);
+    Z3D_LOG(SOH_WORDMARK, "csFrame=%d phase=%d wordmarkAlpha=%.2f alphaU8=%u\n", csFrame, (int)ps.phase,
+            ps.wordmarkAlpha, (unsigned)alphaU8);
     gSPZelda3DDrawA(OVERLAY_DISP++, modelId | (int)ZELDA3D_HANDLE_FORCE_UNLIT | (int)ZELDA3D_HANDLE_SCREEN_SPACE,
                     alphaU8, 255, 255, 255);
     CLOSE_DISPS(play->state.gfxCtx);

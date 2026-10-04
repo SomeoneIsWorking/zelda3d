@@ -6,12 +6,12 @@
 // here — actor-specific draw-space corrections get added behind the behavior registry
 // later, exactly as OoT grew them, not bolted onto this seam.
 #include "2s2h/zelda3d/mm3d_draw.h"
+#include "2s2h/zelda3d/mm3d_log.h"
 #include "2s2h/zelda3d/mm3d_model.h"
 #include "2s2h/zelda3d/mm3d_model_diagnostics.h"
 #include "2s2h/zelda3d/mm3d_pending_draw.h"
 
 #include <fast/zelda3d_pose.h>
-#include <stdio.h>  // fprintf (bring-up diagnostic)
 #include <stdlib.h> // getenv, atoi
 #include "global.h" // Actor, PlayState, POLY_OPA_DISP, Matrix_*, Gfx_SetupDL25_Opa, gSPZelda3DDraw
 
@@ -163,13 +163,13 @@ int Zelda3D_MM_InterceptSkelAnime(PlayState* play, Actor* actor, void** skeleton
                                     continue;
                                 StandardLimb* L = (StandardLimb*)Lib_SegmentedToVirtual(skeleton[li]);
                                 float x = L->jointPos.x, y = L->jointPos.y, z = L->jointPos.z;
-                                fprintf(stderr, "[MM3D-BONE-N64] model=%d limb=%d jointPos=(%.1f,%.1f,%.1f) |v|=%.2f\n",
-                                        mid, li, x, y, z, sqrtf(x * x + y * y + z * z));
+                                Z3D_LOG(MM_BONE, "model=%d limb=%d jointPos=(%.1f,%.1f,%.1f) |v|=%.2f\n", mid, li, x, y,
+                                        z, sqrtf(x * x + y * y + z * z));
                             }
                             Zelda3D_MM_DumpModelBones(mid, 5);
                         }
-                        fprintf(stderr,
-                                "[MM3D-SCALE-IN] model=%d actorId=0x%03X actorScale=%.5f "
+                        Z3D_LOG(MM_BONE,
+                                "model=%d actorId=0x%03X actorScale=%.5f "
                                 "n64Sum=%.2f cmbSum=%.2f ratio=%.4f limbs=%d -> %.5f\n",
                                 mid, (unsigned)actor->id, actor->scale.x, n64Sum, cmbSum, n64Sum / cmbSum, limbCount,
                                 scale);
@@ -272,7 +272,7 @@ int Zelda3D_TryDrawRoom(PlayState* play, Room* room) {
         static int logged = 0;
         if (!logged) {
             logged = 1;
-            fprintf(stderr, "[MM3D-ROOM] sceneId=%d room=%d name=%s\n", (int)play->sceneId, (int)room->num,
+            Z3D_LOG(MM_DRAW, "sceneId=%d room=%d name=%s\n", (int)play->sceneId, (int)room->num,
                     sceneName ? sceneName : "(none)");
         }
     }

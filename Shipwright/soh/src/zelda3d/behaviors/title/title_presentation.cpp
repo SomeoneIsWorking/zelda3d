@@ -8,7 +8,7 @@
 #include "title_overlay.h"
 #include "title_rider_state.h"
 
-#include <cstdio>
+#include "../../core/zelda3d_log.h"
 
 extern "C" int Zelda3D_Title_Update(PlayState* play) {
     auto& activity = Zelda3D::TitleActivity::Instance();
@@ -45,7 +45,6 @@ extern "C" void Zelda3D_TitlePresentationResetRunState(void) {
 
     // The presentation owners survive game-core runs, so every reset reports whether the previous
     // run left the title active instead of silently conflating a clean first run with stale state.
-    std::fprintf(stderr, "ZELDA3D CORE: title presentation reset -- previous run left it %s.\n",
-                 inherited ? "ACTIVE (its rider still held that run's actors)" : "inactive");
-    std::fflush(stderr);
+    Z3D_LOG_LIFECYCLE_INFO("title presentation reset -- previous run left it %s.\n",
+                           inherited ? "ACTIVE (its rider still held that run's actors)" : "inactive");
 }

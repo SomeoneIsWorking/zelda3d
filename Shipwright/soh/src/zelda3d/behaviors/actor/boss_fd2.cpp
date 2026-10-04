@@ -9,6 +9,7 @@
 #include "../../anim/pose_tracking.h"
 #include "../../anim/zelda3d_anim_override.h"
 #include "../../anim/skeleton_draw_bridge.h"
+#include "../../core/zelda3d_log.h"
 #include "../../diagnostics/model_tuning_query.h"
 #include "../../render/model_draw.h"
 #include "../../render/model_queries.h"
@@ -517,8 +518,8 @@ extern "C" int Zelda3D_BossFd2DrawManeSegment(PlayState* play, Actor* actor, int
         debug = value != nullptr && value[0] != '\0';
     }
     if (debug && !reported[chain][segment]) {
-        fprintf(stderr,
-                "[BossFd2Mane] chain=%d segment=%d pos=(%.3f,%.3f,%.3f) rot=(%.6f,%.6f,%.6f) "
+        Z3D_LOG(SOH_ASSET,
+                "chain=%d segment=%d pos=(%.3f,%.3f,%.3f) rot=(%.6f,%.6f,%.6f) "
                 "scale=(%.8f,%.8f,%.8f)\n",
                 chain, segment, pos->x, pos->y, pos->z, rot->x, rot->y, rot->z, scale->x, scale->y, scale->z);
         reported[chain][segment] = true;

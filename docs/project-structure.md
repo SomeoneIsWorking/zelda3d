@@ -35,7 +35,7 @@ zelda   (base: N64-asset PC ports)          zelda3d  (our layer: 3DS-asset rende
 | **zelda3d** | umbrella for the 3DS render layer + its shared code | see the two branches | `zelda3d` / `Zelda3D_` |
 | **soh3d** | OoT3D render layer (in soh) | `Shipwright/soh/src/zelda3d/` | `zelda3d_*` / `Zelda3D_` |
 | **2ship3d** | MM3D render layer (in 2ship) | `2ship/2s2h/zelda3d/` | `mm3d_*` / `Zelda3D_` |
-| shared zelda3d | cross-game audio, extractor, GUI, init, object, player, port, and third-party support | `Shipwright/zelda3d_shared/` | `Zelda3D_` |
+| shared zelda3d | cross-game audio, diagnostics, extractor, GUI, init, object, player, port, and third-party support | `Shipwright/zelda3d_shared/` | `Zelda3D_` |
 | shared zelda3d | CMB (3DS model/texture format) library | `Shipwright/cmb3d/` | `cmb3d` |
 | reference | OoT3D decomp (ground truth for soh3d) | `oot3d-decomp/` (submodule) | — |
 | reference | MM3D decomp (ground truth for 2ship3d) | `mm3d-decomp/` (submodule) | — |
@@ -144,6 +144,17 @@ Current application boundaries:
 
 ### Tooling ownership follows the same composition rule
 
+- `Shipwright/zelda3d_shared/diagnostics/` owns the ONE product logger's adapter and its C seam over
+  Lucent. The logger itself is Lucent's (`lucent/log_c.h`): one sink, four levels, name-keyed channels
+  gated from the environment, a log file, a runtime sink hook, and a printf-style C entry point that
+  makes the compiler check every diagnostic's format string. What lives here is only what Lucent cannot
+  hold -- the `Z3D_LOG` spelling, the C channel-control seam for the REPL, and the per-game channel WALK,
+  because a channel names a subsystem and the two games do not have the same subsystems. OoT's 17
+  channels are in `soh/src/zelda3d/core/zelda3d_log.h`, MM's 6 in `2ship/2s2h/zelda3d/mm3d_log.h`; both
+  enums carry a game infix (`Z3D_LOG_SOH_*`, `Z3D_LOG_MM_*`) so one macro can serve both. The
+  run-scoped-state audit is deliberately NOT a channel: it is always emitted through
+  `Z3D_LOG_LIFECYCLE_INFO`, because a switch that does not control its own output is worse than no
+  switch, and an invariant nobody can reach has silently stopped running.
 - `tools/soh3d_harness/main.cpp` composes focused libretro, lockstep, state/probe, comparison,
   capture, REPL, watchdog, and process-lifetime modules; it contains no subsystem implementation.
   SoH state is split into typed play/environment/player/actor/input/warp/lighting/camera/animation

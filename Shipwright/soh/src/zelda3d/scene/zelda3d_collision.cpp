@@ -3,14 +3,14 @@
 // from zelda3d.c (Phase 2 codebase reorg — see this repo's docs/codemap.md). Zelda3D_BuildSceneCollision
 // is the single public entry point (declared in zelda3d.h, called from Scene_CommandCollisionHeader);
 // everything else here is a file-local helper.
+#include "../core/zelda3d_log.h"
 #include "../core/zelda3d_runtime.h"
 #include "scene_draw.h"
 #include "gameplay_collision.h" // extern "C" declarations for Zelda3D_BuildSceneCollision / Zelda3D_CollisionEnabled
-#include "zelda3d_collision.h" // C-ABI bridge: Zelda3D_RawCollision / LoadSceneCollisionRaw / stair treads
-#include <stdlib.h> // getenv, malloc/calloc/free
-#include <stdio.h>  // fprintf/stderr
-#include <string.h> // memcpy
-#include <math.h>   // lrintf
+#include "zelda3d_collision.h"  // C-ABI bridge: Zelda3D_RawCollision / LoadSceneCollisionRaw / stair treads
+#include <stdlib.h>             // getenv, malloc/calloc/free
+#include <string.h>             // memcpy
+#include <math.h>               // lrintf
 
 // --- OoT3D collision: drive gameplay (BgCheck floors/walls) from the OoT3D scene collision
 // mesh so Link physically walks the OoT3D world (see PROGRESS.md "USE OoT3D COLLISION"). The
@@ -49,8 +49,7 @@ int Zelda3D_CollisionEnabled(void) {
 static int Zelda3D_N64FloorData0(CollisionHeader* n64, float x, float y, float z, u32* outData0) {
     int i, best = -1;
     float bestDy = 1e9f;
-    if (n64 == NULL || n64->polyList == NULL || n64->vtxList == NULL ||
-        n64->surfaceTypeList == NULL) {
+    if (n64 == NULL || n64->polyList == NULL || n64->vtxList == NULL || n64->surfaceTypeList == NULL) {
         return 0;
     }
     for (i = 0; i < n64->numPolygons; i++) {
@@ -64,15 +63,19 @@ static int Zelda3D_N64FloorData0(CollisionHeader* n64, float x, float y, float z
         a = &n64->vtxList[p->flags_vIA & 0x1FFF];
         b = &n64->vtxList[p->flags_vIB & 0x1FFF];
         c = &n64->vtxList[p->vIC & 0x1FFF];
-        ax = a->x; az = a->z; bx = b->x; bz = b->z; cx = c->x; cz = c->z;
+        ax = a->x;
+        az = a->z;
+        bx = b->x;
+        bz = b->z;
+        cx = c->x;
+        cz = c->z;
         d1 = (x - bx) * (az - bz) - (ax - bx) * (z - bz);
         d2 = (x - cx) * (bz - cz) - (bx - cx) * (z - cz);
         d3 = (x - ax) * (cz - az) - (cx - ax) * (z - az);
         if (((d1 < 0) || (d2 < 0) || (d3 < 0)) && ((d1 > 0) || (d2 > 0) || (d3 > 0))) {
             continue; // (x,z) not inside this triangle
         }
-        planeY = -(COLPOLY_GET_NORMAL(p->normal.x) * x + COLPOLY_GET_NORMAL(p->normal.z) * z +
-                   (float)p->dist) / ny;
+        planeY = -(COLPOLY_GET_NORMAL(p->normal.x) * x + COLPOLY_GET_NORMAL(p->normal.z) * z + (float)p->dist) / ny;
         dy = planeY - y;
         if (dy < 0.0f) {
             dy = -dy;
@@ -98,11 +101,10 @@ static int Zelda3D_N64FloorData0(CollisionHeader* n64, float x, float y, float z
 // horizontal normal (dot > 0.85), the OoT3D centroid projects INTO the N64 wall triangle (in the
 // wall's dominant vertical plane, so tessellation offsets don't matter), nearest perpendicular plane.
 static int Zelda3D_N64WallData0(CollisionHeader* n64, float cx, float cy, float cz, float onx, float onz,
-                              u32* outData0) {
+                                u32* outData0) {
     int i, best = -1;
     float bestPlane = 1e9f;
-    if (n64 == NULL || n64->polyList == NULL || n64->vtxList == NULL ||
-        n64->surfaceTypeList == NULL) {
+    if (n64 == NULL || n64->polyList == NULL || n64->vtxList == NULL || n64->surfaceTypeList == NULL) {
         return 0;
     }
     for (i = 0; i < n64->numPolygons; i++) {
@@ -124,10 +126,14 @@ static int Zelda3D_N64WallData0(CollisionHeader* n64, float cx, float cy, float 
         c = &n64->vtxList[p->vIC & 0x1FFF];
         // Project to the wall's dominant vertical plane: (X,Y) for a ±Z wall, (Z,Y) for a ±X wall.
         useX = (nz * nz >= nx * nx);
-        au = useX ? a->x : a->z; av = a->y;
-        bu = useX ? b->x : b->z; bv = b->y;
-        cu = useX ? c->x : c->z; cv = c->y;
-        pu = useX ? cx : cz;     pv = cy;
+        au = useX ? a->x : a->z;
+        av = a->y;
+        bu = useX ? b->x : b->z;
+        bv = b->y;
+        cu = useX ? c->x : c->z;
+        cv = c->y;
+        pu = useX ? cx : cz;
+        pv = cy;
         d1 = (pu - bu) * (av - bv) - (au - bu) * (pv - bv);
         d2 = (pu - cu) * (bv - cv) - (bu - cu) * (pv - cv);
         d3 = (pu - au) * (cv - av) - (cu - au) * (pv - av);
@@ -222,8 +228,8 @@ static void Zelda3D_PropagateWallClimbBits(CollisionPoly* poly, int numPolys, Su
 // (== its own SurfaceType slot, since each poly indexes type=i) or -1. Used to give a generated
 // stair tread the SAME surface type (floor material + already-N64-sourced exit/cam) as the kaidan
 // ramp it sits on.
-static int Zelda3D_BaseFloorPoly(Vec3s* vtx, CollisionPoly* poly, int numPolys,
-                               float x, float y, float z) {
+static int Zelda3D_BaseFloorPoly(Vec3s* vtx, CollisionPoly* poly, int numPolys, int numVerts, float x, float y,
+                                 float z) {
     int i, best = -1;
     float bestDy = 1e9f;
     for (i = 0; i < numPolys; i++) {
@@ -234,18 +240,25 @@ static int Zelda3D_BaseFloorPoly(Vec3s* vtx, CollisionPoly* poly, int numPolys,
         if (ny < 0.5f) {
             continue; // floors only
         }
+        if (!p->flags_vIA >= numVerts || p->flags_vIB >= numVerts || p->vIC >= numVerts) {
+            continue; // this poly names a vertex the scene does not have; it cannot be the base
+        }
         a = &vtx[p->flags_vIA & 0x1FFF];
         b = &vtx[p->flags_vIB & 0x1FFF];
         c = &vtx[p->vIC & 0x1FFF];
-        ax = a->x; az = a->z; bx = b->x; bz = b->z; cx = c->x; cz = c->z;
+        ax = a->x;
+        az = a->z;
+        bx = b->x;
+        bz = b->z;
+        cx = c->x;
+        cz = c->z;
         d1 = (x - bx) * (az - bz) - (ax - bx) * (z - bz);
         d2 = (x - cx) * (bz - cz) - (bx - cx) * (z - cz);
         d3 = (x - ax) * (cz - az) - (cx - ax) * (z - az);
         if (((d1 < 0) || (d2 < 0) || (d3 < 0)) && ((d1 > 0) || (d2 > 0) || (d3 > 0))) {
             continue;
         }
-        planeY = -(COLPOLY_GET_NORMAL(p->normal.x) * x + COLPOLY_GET_NORMAL(p->normal.z) * z +
-                   (float)p->dist) / ny;
+        planeY = -(COLPOLY_GET_NORMAL(p->normal.x) * x + COLPOLY_GET_NORMAL(p->normal.z) * z + (float)p->dist) / ny;
         dy = planeY - y;
         if (dy < 0.0f) {
             dy = -dy;
@@ -269,7 +282,7 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
     Vec3s* vtx;
     CollisionPoly* poly;
     int i;
-    int nSurf;         // surfaceType entries allocated (>=1)
+    int nSurf; // surfaceType entries allocated (>=1)
     s16 minX, minY, minZ, maxX, maxY, maxZ;
     size_t camLen = 1; // entries in sCamData (>=1: a dummy when no N64 list)
 
@@ -289,17 +302,45 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
     // quad is 2 tris. CollisionPoly stores 13-bit vertex indices, so the combined vertex count
     // must stay < 8192 (and the poly/u16 count < 65535); if a scene would overflow, drop the
     // stair collision (render steps still show — only the per-step grounding is skipped there).
-    float* stairV = NULL;  // 3 floats per vert
+    float* stairV = NULL; // 3 floats per vert
     int stairNV = 0;
-    int* stairT = NULL;    // 3 vtx-indices per tri
+    int* stairT = NULL; // 3 vtx-indices per tri
     int stairNT = 0;
+    // The asset's own two counts are clamped here for the same reason the generated ones are below: a
+    // negative count is nonsense, and every array size and every loop bound below is built by adding
+    // and comparing these numbers. Left negative, `raw.numVerts + i` indexes vtx BEFORE its first
+    // element -- which is the mirror image of the overflow case and just as much an out-of-bounds
+    // write. A scene with no collision reports zero, not a negative count.
+    if (raw.numVerts < 0) {
+        raw.numVerts = 0;
+    }
+    if (raw.numPolys < 0) {
+        raw.numPolys = 0;
+    }
+
     Zelda3D_CollectSceneStairTreads(sceneName, &stairV, &stairNV, &stairT, &stairNT);
+    // A count is never negative, and saying so here is load-bearing rather than defensive: every array
+    // below is sized from totalVerts/totalPolys, which add these to raw's counts, and every write into
+    // those arrays is bounded by a raw count. Without the clamp that "sized from the sum" and "bounded
+    // by a part" are two facts nothing ties together, and the invariant that the sum dominates each
+    // part cannot be established -- which is precisely the invariant whose absence makes an unchecked
+    // index a heap over-read.
+    if (stairNV < 0) {
+        stairNV = 0;
+    }
+    if (stairNT < 0) {
+        stairNT = 0;
+    }
     if (stairNT > 0 && (raw.numVerts + stairNV >= 8000 || raw.numPolys + stairNT >= 60000)) {
-        fprintf(stderr, "[Zelda3D] stairs: %d verts + %d tread verts / %d polys + %d tread tris exceeds the "
-               "collision index budget — skipping stepped stair collision for %s\n",
-               raw.numVerts, stairNV, raw.numPolys, stairNT, sceneName);
+        Z3D_LOG(SOH_SCENE,
+                "stairs: %d verts + %d tread verts / %d polys + %d tread tris exceeds the "
+                "collision index budget — skipping stepped stair collision for %s\n",
+                raw.numVerts, stairNV, raw.numPolys, stairNT, sceneName);
         Zelda3D_FreeStairTreads(stairV, stairT);
-        stairV = NULL; stairT = NULL; stairNV = 0; stairNT = 0;
+        stairV = NULL;
+        stairT = NULL;
+        stairNV = 0;
+        stairNT = 0;
     }
 
     // Free the previous scene's build (its arrays were referenced by the old colCtx, which is
@@ -320,14 +361,32 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
     // generated stair treads (stairNT tris over stairNV verts) extend all three arrays.
     int totalVerts = raw.numVerts + stairNV;
     int totalPolys = raw.numPolys + stairNT;
+    // Named for the same reason as vtxCount below: this is both the allocation size and the bound the
+    // writes into sSurfaceTypes are checked against.
     nSurf = (totalPolys > 0) ? totalPolys : 1;
     h = (CollisionHeader*)calloc(1, sizeof(CollisionHeader));
-    vtx = (Vec3s*)malloc(sizeof(Vec3s) * totalVerts);
-    poly = (CollisionPoly*)calloc(totalPolys, sizeof(CollisionPoly));
+    // calloc, not malloc: the two fill loops below cover every entry, but if either is ever
+    // short the leftover reads as garbage heights rather than as zero, and a garbage height in
+    // collision is a Link who falls through the floor.
+    //
+    // vtxCount is named because it is BOTH the calloc size and the bound every index below is
+    // checked against. Writing the `> 0 ? n : 1` expression twice is how an allocation and its
+    // bounds check stop agreeing, and the disagreement is a heap over-read rather than a crash the
+    // compiler would catch.
+    const int vtxCount = (totalVerts > 0) ? totalVerts : 1;
+    vtx = (Vec3s*)calloc((size_t)vtxCount, sizeof(Vec3s));
+    // At least one entry, like nSurf. calloc(0, ...) is permitted to return NULL, and the null
+    // check below would then throw away the entire collision build for a scene that simply has no
+    // polygons -- a silent loss of collision rather than a reported one.
+    poly = (CollisionPoly*)calloc((size_t)(totalPolys > 0 ? totalPolys : 1), sizeof(CollisionPoly));
     sSurfaceTypes = (SurfaceType*)calloc(nSurf, sizeof(SurfaceType));
     if (h == NULL || vtx == NULL || poly == NULL || sSurfaceTypes == NULL) {
-        free(h); free(vtx); free(poly); free(sSurfaceTypes);
-        sHeader = NULL; sSurfaceTypes = NULL;
+        free(h);
+        free(vtx);
+        free(poly);
+        free(sSurfaceTypes);
+        sHeader = NULL;
+        sSurfaceTypes = NULL;
         Zelda3D_FreeStairTreads(stairV, stairT);
         Zelda3D_FreeRawCollision(&raw);
         return NULL;
@@ -365,13 +424,28 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
         camLen = 1;
     }
 
-    minX = maxX = raw.verts[0]; minY = maxY = raw.verts[1]; minZ = maxZ = raw.verts[2];
-    for (i = 0; i < raw.numVerts; i++) {
+    minX = maxX = raw.verts[0];
+    minY = maxY = raw.verts[1];
+    minZ = maxZ = raw.verts[2];
+    // The `i < vtxCount` half is not redundant: raw.numVerts is read out of the asset and is ADDED into
+    // totalVerts, so a corrupt count can overflow that sum and leave vtxCount smaller than raw.numVerts.
+    for (i = 0; i < raw.numVerts && i < vtxCount; i++) {
         s16 x = raw.verts[i * 3 + 0], y = raw.verts[i * 3 + 1], z = raw.verts[i * 3 + 2];
-        vtx[i].x = x; vtx[i].y = y; vtx[i].z = z;
-        if (x < minX) minX = x; if (x > maxX) maxX = x;
-        if (y < minY) minY = y; if (y > maxY) maxY = y;
-        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+        vtx[i].x = x;
+        vtx[i].y = y;
+        vtx[i].z = z;
+        if (x < minX)
+            minX = x;
+        if (x > maxX)
+            maxX = x;
+        if (y < minY)
+            minY = y;
+        if (y > maxY)
+            maxY = y;
+        if (z < minZ)
+            minZ = z;
+        if (z > maxZ)
+            maxZ = z;
     }
 
     // #11 — flatten the short outward rim-bevels of RAISED WALKABLE patches so N64 BgCheck (ny>0.5
@@ -386,15 +460,24 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
     // below); the main loop then sees ny>0.5 and classifies it as floor + re-sources its cam/exit.
 #define ZELDA3D_LIP_MAX_H 24
     {
-        unsigned char* floorVtx = (unsigned char*)calloc((size_t)(raw.numVerts > 0 ? raw.numVerts : 1), 1);
+        // floorVtxCount is named because it is BOTH the calloc size and the bound the guard below
+        // checks against. Deriving them from one expression but writing the expression twice is
+        // how the two drift apart.
+        const int floorVtxCount = (raw.numVerts > 0) ? raw.numVerts : 1;
+        unsigned char* floorVtx = (unsigned char*)calloc((size_t)floorVtxCount, 1);
         if (floorVtx != NULL) {
             int j;
             // Mark every vertex used by a real (ny>0.5) OoT3D floor poly.
             for (j = 0; j < raw.numPolys; j++) {
                 if (COLPOLY_GET_NORMAL(raw.polyNrm[j * 3 + 1]) > 0.5f) {
-                    floorVtx[raw.polyVtx[j * 3 + 0] & 0x1FFF] = 1;
-                    floorVtx[raw.polyVtx[j * 3 + 1] & 0x1FFF] = 1;
-                    floorVtx[raw.polyVtx[j * 3 + 2] & 0x1FFF] = 1;
+                    int m0 = raw.polyVtx[j * 3 + 0] & 0x1FFF;
+                    int m1 = raw.polyVtx[j * 3 + 1] & 0x1FFF;
+                    int m2 = raw.polyVtx[j * 3 + 2] & 0x1FFF;
+                    if (m0 < floorVtxCount && m1 < floorVtxCount && m2 < floorVtxCount) {
+                        floorVtx[m0] = 1;
+                        floorVtx[m1] = 1;
+                        floorVtx[m2] = 1;
+                    }
                 }
             }
             for (j = 0; j < raw.numPolys; j++) {
@@ -407,9 +490,23 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
                 ja = raw.polyVtx[j * 3 + 0] & 0x1FFF;
                 jb = raw.polyVtx[j * 3 + 1] & 0x1FFF;
                 jc = raw.polyVtx[j * 3 + 2] & 0x1FFF;
+                // TWO bounds, because this block indexes TWO differently-sized arrays: vtx holds
+                // vtxCount entries, floorVtx holds floorVtxCount. Checking only vtxCount let an index
+                // in [floorVtxCount, vtxCount) -- a stair vertex, say -- pass the guard and then read
+                // past floorVtx. Checking only floorVtxCount would leave the vtx[] reads unguarded.
+                if (ja >= vtxCount || jb >= vtxCount || jc >= vtxCount || ja >= floorVtxCount || jb >= floorVtxCount ||
+                    jc >= floorVtxCount) {
+                    continue;
+                }
                 ymin = ymax = vtx[ja].y;
-                if (vtx[jb].y < ymin) ymin = vtx[jb].y; if (vtx[jb].y > ymax) ymax = vtx[jb].y;
-                if (vtx[jc].y < ymin) ymin = vtx[jc].y; if (vtx[jc].y > ymax) ymax = vtx[jc].y;
+                if (vtx[jb].y < ymin)
+                    ymin = vtx[jb].y;
+                if (vtx[jb].y > ymax)
+                    ymax = vtx[jb].y;
+                if (vtx[jc].y < ymin)
+                    ymin = vtx[jc].y;
+                if (vtx[jc].y > ymax)
+                    ymax = vtx[jc].y;
                 if ((ymax - ymin) > ZELDA3D_LIP_MAX_H) {
                     continue; // tall slope -> a real wall/cliff, not a curb
                 }
@@ -447,9 +544,15 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
         // exit triangle can't bounce Link; keep the OoT3D cam region as a best guess.
         ny = COLPOLY_GET_NORMAL(poly[i].normal.y);
         if (ny > 0.5f) {
-            Vec3s* va = &vtx[poly[i].flags_vIA];
-            Vec3s* vb = &vtx[poly[i].flags_vIB];
-            Vec3s* vc = &vtx[poly[i].vIC];
+            Vec3s *va, *vb, *vc;
+            if (poly[i].flags_vIA >= vtxCount || poly[i].flags_vIB >= vtxCount || poly[i].vIC >= vtxCount) {
+                sSurfaceTypes[i].data[0] = d0; // no centroid to look under; keep the OoT3D bits
+                sSurfaceTypes[i].data[1] = d1;
+                continue;
+            }
+            va = &vtx[poly[i].flags_vIA];
+            vb = &vtx[poly[i].flags_vIB];
+            vc = &vtx[poly[i].vIC];
             float cx = (va->x + vb->x + vc->x) / 3.0f;
             float cy = (va->y + vb->y + vc->y) / 3.0f;
             float cz = (va->z + vb->z + vc->z) / 3.0f;
@@ -463,9 +566,15 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
             // Wall: re-source the wall-climb property (bits 21..25) from the authoritative N64 wall
             // at this triangle. OoT3D's per-triangle wall property is unreliable (#25: it splits a
             // climbable quad into a climbable + a non-climbable triangle, dropping Link mid-climb).
-            Vec3s* va = &vtx[poly[i].flags_vIA];
-            Vec3s* vb = &vtx[poly[i].flags_vIB];
-            Vec3s* vc = &vtx[poly[i].vIC];
+            Vec3s *va, *vb, *vc;
+            if (poly[i].flags_vIA >= vtxCount || poly[i].flags_vIB >= vtxCount || poly[i].vIC >= vtxCount) {
+                sSurfaceTypes[i].data[0] = d0;
+                sSurfaceTypes[i].data[1] = d1;
+                continue;
+            }
+            va = &vtx[poly[i].flags_vIA];
+            vb = &vtx[poly[i].flags_vIB];
+            vc = &vtx[poly[i].vIC];
             float cx = (va->x + vb->x + vc->x) / 3.0f;
             float cy = (va->y + vb->y + vc->y) / 3.0f;
             float cz = (va->z + vb->z + vc->z) / 3.0f;
@@ -489,22 +598,50 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
     // OoT3D ramp (left intact below), so BgCheck returns the tread as Link's floor and he stands
     // on the visible steps. Each tread inherits the surface type (floor material + N64-sourced
     // exit/cam) of the kaidan ramp poly directly beneath it.
-    for (i = 0; i < stairNV; i++) {
+    // Bounded by vtxCount rather than trusting `raw.numVerts + stairNV` to have not overflowed, for
+    // the same reason as the asset-vertex loop above.
+    for (i = 0; i < stairNV && raw.numVerts + i < vtxCount; i++) {
         s16 x = (s16)lrintf(stairV[i * 3 + 0]);
         s16 y = (s16)lrintf(stairV[i * 3 + 1]);
         s16 z = (s16)lrintf(stairV[i * 3 + 2]);
         vtx[raw.numVerts + i].x = x;
         vtx[raw.numVerts + i].y = y;
         vtx[raw.numVerts + i].z = z;
-        if (x < minX) minX = x; if (x > maxX) maxX = x;
-        if (y < minY) minY = y; if (y > maxY) maxY = y;
-        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+        if (x < minX)
+            minX = x;
+        if (x > maxX)
+            maxX = x;
+        if (y < minY)
+            minY = y;
+        if (y > maxY)
+            maxY = y;
+        if (z < minZ)
+            minZ = z;
+        if (z > maxZ)
+            maxZ = z;
     }
     for (i = 0; i < stairNT; i++) {
         int pi = raw.numPolys + i;
-        int ia = raw.numVerts + stairT[i * 3 + 0];
-        int ib = raw.numVerts + stairT[i * 3 + 1];
-        int ic = raw.numVerts + stairT[i * 3 + 2];
+        int ta = stairT[i * 3 + 0];
+        int tb = stairT[i * 3 + 1];
+        int tc = stairT[i * 3 + 2];
+        // THE CLASS OF BUG THIS GUARDS, stated once because it applies to every vertex index in this
+        // file: a 3DS collision vertex index is 13 bits wide, so it can name a vertex this scene never
+        // had. raw.polyVtx is read straight out of the asset and is never cross-checked against the
+        // vertex count, while vtx is sized FROM that count -- so an unchecked index lands past the end
+        // of the allocation on malformed or truncated data. That is a heap over-read rather than a
+        // wrong answer, which is exactly why it can sit unnoticed for so long.
+        //
+        // Here it is sharper still: stairT/stairV come from the tread GENERATOR, not from the retail
+        // asset, so a bad index here would be a bug we wrote rather than bad data we were handed. The
+        // treads' own vertices are appended at raw.numVerts and number stairNV, so `raw.numVerts + t`
+        // is inside vtx exactly when t is inside the generated block.
+        if (ta >= stairNV || tb >= stairNV || tc >= stairNV) {
+            continue;
+        }
+        int ia = raw.numVerts + ta;
+        int ib = raw.numVerts + tb;
+        int ic = raw.numVerts + tc;
         Vec3s* va = &vtx[ia];
         Vec3s* vb = &vtx[ib];
         Vec3s* vc = &vtx[ic];
@@ -526,7 +663,7 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
         // base poly under a tread can be an adjacent EXIT triangle (the entrance staircase abuts the
         // Hyrule Field transition), which would warp Link the instant he stepped on that tread.
         {
-            int b = Zelda3D_BaseFloorPoly(vtx, poly, raw.numPolys, cx, cy, cz);
+            int b = Zelda3D_BaseFloorPoly(vtx, poly, raw.numPolys, totalVerts, cx, cy, cz);
             u32 d0 = (b >= 0) ? sSurfaceTypes[b].data[0] : 0;
             u32 d1 = (b >= 0) ? sSurfaceTypes[b].data[1] : 0;
             if (Zelda3D_N64FloorData0(n64, cx, cy, cz, &n0)) {
@@ -539,13 +676,17 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
         }
     }
     if (stairNT > 0) {
-        fprintf(stderr, "[Zelda3D] stairs: spliced %d stepped tread polys (%d verts) into %s collision\n",
-               stairNT, stairNV, sceneName);
+        Z3D_LOG(SOH_SCENE, "stairs: spliced %d stepped tread polys (%d verts) into %s collision\n", stairNT, stairNV,
+                sceneName);
     }
     Zelda3D_FreeStairTreads(stairV, stairT);
 
-    h->minBounds.x = minX; h->minBounds.y = minY; h->minBounds.z = minZ;
-    h->maxBounds.x = maxX; h->maxBounds.y = maxY; h->maxBounds.z = maxZ;
+    h->minBounds.x = minX;
+    h->minBounds.y = minY;
+    h->minBounds.z = minZ;
+    h->maxBounds.x = maxX;
+    h->maxBounds.y = maxY;
+    h->maxBounds.z = maxZ;
     h->numVertices = (u16)(raw.numVerts + stairNV);
     h->vtxList = vtx;
     h->numPolygons = (u16)(raw.numPolys + stairNT);

@@ -5,6 +5,7 @@
 #include "../behaviors/actor/boss_fd2_bridge.h"
 #include "../behaviors/actor/kokiri_kid.h"
 #include "../behaviors/actor/townsfolk.h"
+#include "../core/zelda3d_log.h"
 #include "../player/zelda3d_link.h"
 #include "../render/actor_model_submission.h"
 #include "../render/actor_skin_mask_control.h"
@@ -21,7 +22,6 @@
 #include "overlays/actors/ovl_En_Ko/z_en_ko.h"
 
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -86,9 +86,8 @@ void Zelda3D_SetCurAnim(void* animation, float curFrame, float animLength, float
     if (gZelda3dAnimDebug) {
         static int debugCounter = 0;
         if ((debugCounter++ % 60) == 0) {
-            fprintf(stderr, "[SetCurAnim] pendingModel=%d anim=%s frame=%.1f/%.1f\n", gZelda3dPendingModel,
+            Z3D_LOG(SOH_BONE, "pendingModel=%d anim=%s frame=%.1f/%.1f\n", gZelda3dPendingModel,
                     animation ? (const char*)animation : "(null)", curFrame, animLength);
-            fflush(stderr);
         }
     }
     if (gZelda3dPendingModel >= 0) {
@@ -164,7 +163,7 @@ static int Zelda3D_CountN64Limbs(void** skeleton) {
 static void Zelda3D_DumpLimbCb(int limbIndex, StandardLimb* limb, void* userData) {
     Vec3s* jointTable = (Vec3s*)userData;
     Vec3s rotation = jointTable[limbIndex + 1];
-    fprintf(stderr, "[SKELDUMP] N64 limb=%d jointPos=(%d,%d,%d) child=%d sibling=%d rot=(%d,%d,%d)\n", limbIndex,
+    Z3D_LOG(SOH_BONE, "N64 limb=%d jointPos=(%d,%d,%d) child=%d sibling=%d rot=(%d,%d,%d)\n", limbIndex,
             limb->jointPos.x, limb->jointPos.y, limb->jointPos.z, limb->child, limb->sibling, rotation.x, rotation.y,
             rotation.z);
 }
@@ -222,10 +221,9 @@ static void Zelda3D_DumpPendingSkeleton(void** skeleton, Vec3s* jointTable, int 
     if (dumpedCount < (int)ARRAY_COUNT(dumped)) {
         Vec3f scale = gZelda3dPendingActor->scale;
         dumped[dumpedCount++] = gZelda3dPendingModel;
-        fprintf(stderr, "[SKELDUMP] N64 actor=0x%x model=%d limbCount=%d actorScale=(%.5f,%.5f,%.5f)\n",
+        Z3D_LOG(SOH_BONE, "N64 actor=0x%x model=%d limbCount=%d actorScale=(%.5f,%.5f,%.5f)\n",
                 gZelda3dPendingActor->id, gZelda3dPendingModel, limbCount, scale.x, scale.y, scale.z);
         Zelda3D_WalkN64Skeleton(skeleton, limbCount, Zelda3D_DumpLimbCb, jointTable);
-        fflush(stderr);
         Zelda3D_DumpModelBones(gZelda3dPendingModel);
     }
 }
@@ -248,12 +246,11 @@ static void Zelda3D_ApplyAutoScale(void** skeleton, int limbCount) {
     if (gZelda3dAnimDebug) {
         static int debugCounter = 0;
         if ((debugCounter++ % 30) == 0) {
-            fprintf(stderr,
-                    "[SKELSCALE] model %d n64sum=%.1f oot3dsum=%.1f ratio=%.3f actorScale=%.5f -> "
+            Z3D_LOG(SOH_BONE,
+                    "model %d n64sum=%.1f oot3dsum=%.1f ratio=%.3f actorScale=%.5f -> "
                     "scale=%.5f\n",
                     gZelda3dPendingModel, n64Sum, oot3dSum, n64Sum / oot3dSum, gZelda3dPendingActor->scale.x,
                     gZelda3dPendingScale);
-            fflush(stderr);
         }
     }
 }
@@ -285,11 +282,9 @@ static const char* Zelda3D_SelectAutoCsab(void) {
         if ((debugCounter++ % 30) == 0) {
             const char* otr = gZelda3dPendingAnimOtr ? gZelda3dPendingAnimOtr : "(none)";
             int locked = gZelda3dPendingN64AnimLength > 4.0f;
-            fprintf(stderr, "SOH3D ANIM: model %d n64=%s -> csab=%s%s scale=%.5f n64frame=%.1f/%.1f %s\n",
-                    gZelda3dPendingModel, otr, csab ? csab : "(bind pose)", mapped ? "" : " [default-idle]",
-                    gZelda3dPendingScale, gZelda3dPendingN64CurFrame, gZelda3dPendingN64AnimLength,
-                    locked ? "[PHASE-LOCK]" : "[free-run]");
-            fflush(stdout);
+            Z3D_LOG(SOH_ANIM, "model %d n64=%s -> csab=%s%s scale=%.5f n64frame=%.1f/%.1f %s\n", gZelda3dPendingModel,
+                    otr, csab ? csab : "(bind pose)", mapped ? "" : " [default-idle]", gZelda3dPendingScale,
+                    gZelda3dPendingN64CurFrame, gZelda3dPendingN64AnimLength, locked ? "[PHASE-LOCK]" : "[free-run]");
         }
     }
     return csab;

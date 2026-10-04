@@ -1,12 +1,12 @@
 // OoT3D Boss_Fd2 CMB material-animation binding and sampling.
 #include "boss_fd2_materials.h"
 
+#include "../../core/zelda3d_log.h"
 #include "../../model/zelda3d_cmab.h"
 #include "../../render/model_queries.h"
 #include "fast/zelda3d_material_overrides.h"
 #include "overlays/actors/ovl_Boss_Fd2/z_boss_fd2.h"
 
-#include <cstdio>
 #include <cstdlib>
 #include <initializer_list>
 
@@ -80,7 +80,7 @@ void ApplyBody(int modelId, const BossFd2* boss, const Controller& controller) {
             const int texture = Zelda3D_FacialFrameTex(modelId, 3, palette);
             Zelda3D_GL_SetMatTexOverride(modelId, 3, texture);
             if (debug && boss->eyeState != lastEyeState) {
-                fprintf(stderr, "[BossFd2Mat] eyeState=%d palette=%d texture=%d\n", boss->eyeState, palette, texture);
+                Z3D_LOG(SOH_ASSET, "eyeState=%d palette=%d texture=%d\n", boss->eyeState, palette, texture);
                 lastEyeState = boss->eyeState;
             }
         }
@@ -93,7 +93,7 @@ void ApplyBody(int modelId, const BossFd2* boss, const Controller& controller) {
         }
     }
     if (debug && !reportedLoad) {
-        fprintf(stderr, "[BossFd2Mat] cmab body=%s eye=%s pulse=%s; UV sampled %d/3 materials\n",
+        Z3D_LOG(SOH_ASSET, "cmab body=%s eye=%s pulse=%s; UV sampled %d/3 materials\n",
                 resources.body != nullptr ? "loaded" : "MISSING", resources.eye != nullptr ? "loaded" : "MISSING",
                 resources.pulse != nullptr ? "loaded" : "MISSING", uvSamples);
         reportedLoad = true;

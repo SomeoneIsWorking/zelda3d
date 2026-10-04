@@ -1,13 +1,13 @@
 // MM3D pending draw adapter: carries one actor replacement into the SkelAnime draw seam.
 #include "mm3d_pending_draw.h"
 
-#include <cstdio>
 #include <cstdlib>
 #include <unordered_map>
 
 #include "global.h"
 #include "mm3d_animation.h"
 #include "mm3d_draw.h"
+#include "mm3d_log.h"
 
 namespace Zelda3D::MM3D {
 namespace {
@@ -35,8 +35,8 @@ void LogSkinnedDraw(const char* csab) {
         return;
     }
     const Actor* actor = static_cast<const Actor*>(g_pending.actor);
-    fprintf(stderr,
-            "[MM3D-SKIN] model=%d actorId=0x%03X obj=? pos=(%.0f,%.0f,%.0f) "
+    Z3D_LOG(MM_BONE,
+            "model=%d actorId=0x%03X obj=? pos=(%.0f,%.0f,%.0f) "
             "scale=%.3f groundOff=%.1f csab=%s\n",
             g_pending.modelId, actor == nullptr ? 0u : static_cast<unsigned>(actor->id),
             actor == nullptr ? 0.0f : actor->world.pos.x, actor == nullptr ? 0.0f : actor->world.pos.y,
@@ -98,7 +98,7 @@ void Zelda3D_MM_OverridePending(float worldScale, float groundOffset) {
         static std::unordered_map<int, bool> loggedModels;
         if (!loggedModels[g_pending.modelId]) {
             loggedModels[g_pending.modelId] = true;
-            fprintf(stderr, "[MM3D-SCALE] modelId=%d worldScale=%.5f groundOff=%.3f\n", g_pending.modelId, worldScale,
+            Z3D_LOG(MM_BONE, "modelId=%d worldScale=%.5f groundOff=%.3f\n", g_pending.modelId, worldScale,
                     groundOffset);
         }
     }

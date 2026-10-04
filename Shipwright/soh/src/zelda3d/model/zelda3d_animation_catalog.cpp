@@ -1,6 +1,7 @@
 #include "zelda3d_model_internal.h"
 #include "zelda3d_model_geometry.h"
 
+#include "../core/zelda3d_log.h"
 #include "../render/model_queries.h"
 
 #include <algorithm>
@@ -51,8 +52,8 @@ extern "C" const char* Zelda3D_AutoModelDefaultAnim(int modelId) {
             }
         }
         model->defaultAnim = idle.empty() ? first : idle;
-        std::fprintf(stderr, "[Zelda3D] model %d default anim = '%s'\n", modelId,
-                     model->defaultAnim.empty() ? "(none)" : model->defaultAnim.c_str());
+        Z3D_LOG(SOH_ANIM, "model %d default anim = '%s'\n", modelId,
+                model->defaultAnim.empty() ? "(none)" : model->defaultAnim.c_str());
     }
     return model->defaultAnim.empty() ? nullptr : model->defaultAnim.c_str();
 }
@@ -116,4 +117,3 @@ extern "C" void Zelda3D_AutoModelCsabList(int modelId, char* out, int outSize) {
         position += written;
     }
 }
-

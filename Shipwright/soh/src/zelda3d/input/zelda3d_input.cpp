@@ -14,7 +14,6 @@
 #include "ship/controller/controldeck/ControlDeck.h" // #20 ProcessKeyboardEvent path
 
 #include <cstdlib>
-#include <cstdio>
 
 // ---------------------------------------------------------------------------------------------
 // #20 headless keyboard-inject verification shim (moved from zelda3d_model.cpp, where it was
@@ -198,9 +197,8 @@ void Zelda3D_WalkInject(PlayState* play) {
                     }
                 }
                 if (gZelda3dFpFrames == 0) {
-                    fprintf(stderr, "SOH3D FP_REPRO: start injecting C-up edges (scene=0x%x dayTime=0x%x)\n",
-                            play->sceneNum, gSaveContext.dayTime);
-                    fflush(stderr);
+                    Z3D_LOG(SOH_INPUT, "start injecting C-up edges (scene=0x%x dayTime=0x%x)\n", play->sceneNum,
+                            gSaveContext.dayTime);
                 }
                 // One-shot log when first-person actually engages, so we KNOW the harness works.
                 {
@@ -208,8 +206,7 @@ void Zelda3D_WalkInject(PlayState* play) {
                     Camera* ac = GET_ACTIVE_CAM(play);
                     if (!sFpEngagedLogged && ac != NULL && ac->mode == CAM_MODE_FIRSTPERSON) {
                         sFpEngagedLogged = 1;
-                        fprintf(stderr, "SOH3D FP_REPRO: first-person ENGAGED at fpFrame=%d\n", gZelda3dFpFrames);
-                        fflush(stderr);
+                        Z3D_LOG(SOH_INPUT, "first-person ENGAGED at fpFrame=%d\n", gZelda3dFpFrames);
                     }
                 }
                 gZelda3dFpFrames++;
@@ -229,5 +226,5 @@ void Zelda3D_WalkInject(PlayState* play) {
 int Zelda3D_DbgInputEnabled(void) {
     // Routed through the diagnostic-logger registry (`log input 1` / ZELDA3D_LOG=input) — this
     // extern stays because libultraship's ControlDeck call sites can't include soh headers.
-    return Zelda3D_LogEnabled(Z3D_LOG_INPUT);
+    return Zelda3D_LogEnabled(Z3D_LOG_SOH_INPUT);
 }
