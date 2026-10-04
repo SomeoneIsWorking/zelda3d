@@ -49,4 +49,10 @@ typedef enum PlandoHints {
     HINT_ALL,
 } PlandoHints;
 
+// Plandomizer's transparent ImageButton style, so a button reads as a texture rather than a chrome
+// rectangle. Defined in Plandomizer.cpp; also used by the seed-hash column, which is why they are
+// declared here rather than kept file-local.
+void PlandoPushImageButtonStyle();
+void PlandoPopImageButtonStyle();
+
 #endif

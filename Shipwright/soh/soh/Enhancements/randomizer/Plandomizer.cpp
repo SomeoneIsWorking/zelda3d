@@ -9,12 +9,11 @@
 
 #include <fstream>
 #include <filesystem>
-#include <iterator>
 
 #include "soh/SohGui/ImGuiUtils.h"
 #include "soh/Enhancements/randomizer/logic.h"
+#include "soh/Enhancements/randomizer/plandomizer_seed_hash.h"
 #include "soh/Enhancements/randomizer/randomizer_check_objects.h"
-#include "soh/Enhancements/randomizer/rando_hash.h"
 #include "soh/Enhancements/randomizer/Traps.h"
 #include "soh/Enhancements/randomizer/3drando/shops.hpp"
 
@@ -29,7 +28,6 @@ extern PlayState* gPlayState;
 
 const std::string randomizeButton = ICON_FA_RANDOM;
 
-static int32_t correctedItemID = -1;
 static int32_t getTabID = TAB_HINTS;
 
 Rando::Item temporaryItem;
@@ -53,16 +51,12 @@ bool shouldRemove = false;
 namespace fs = std::filesystem;
 std::vector<std::string> existingSeedList;
 
-std::vector<int32_t> spoilerHash;
-std::vector<int32_t> plandoHash;
 std::vector<SpoilerCheckObject> spoilerLogData;
 std::vector<SpoilerCheckObject> plandoLogData;
 std::vector<std::pair<Rando::Item, int32_t>> drawnItemsList;
 
 std::vector<SpoilerHintObject> spoilerHintData;
 std::vector<SpoilerHintObject> plandoHintData;
-
-extern std::map<RandomizerCheckArea, std::string> rcAreaNames;
 
 std::unordered_map<RandomizerGet, std::string> bossKeyShortNames = {
     { RG_FOREST_TEMPLE_BOSS_KEY, "Frst" }, { RG_FIRE_TEMPLE_BOSS_KEY, "Fire" },
@@ -533,7 +527,7 @@ void PlandomizerSaveSpoilerLog() {
         inputFile.close();
     }
 
-    spoilerSave["file_hash"] = { plandoHash[0], plandoHash[1], plandoHash[2], plandoHash[3], plandoHash[4] };
+    PlandomizerWriteSeedHash(spoilerSave);
 
     for (auto& import : plandoHintData) {
         spoilerSave["Gossip Stone Hints"][import.hintName] = { { "type", import.hintType.c_str() },
@@ -564,8 +558,7 @@ void PlandomizerSaveSpoilerLog() {
 }
 
 void PlandomizerLoadSpoilerLog(std::string logFile) {
-    spoilerHash.clear();
-    plandoHash.clear();
+    PlandomizerClearSeedHash();
     spoilerLogData.clear();
     plandoLogData.clear();
     spoilerHintData.clear();
@@ -588,11 +581,7 @@ void PlandomizerLoadSpoilerLog(std::string logFile) {
             file.close();
 
             if (spoilerLogInput.contains("file_hash")) {
-                auto hash = spoilerLogInput["file_hash"];
-                for (auto& load : hash) {
-                    spoilerHash.push_back(load);
-                    plandoHash.push_back(load);
-                }
+                PlandomizerLoadSeedHash(spoilerLogInput["file_hash"]);
             }
 
             if (spoilerLogInput.contains("Gossip Stone Hints")) {
@@ -971,65 +960,7 @@ void PlandomizerDrawOptions() {
         ImGui::EndDisabled();
 
         ImGui::TableNextColumn();
-        ImGui::SeparatorText("Current Seed Hash");
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x * 0.5f) - (34.0f * 5.0f));
-        if (spoilerLogData.size() > 0) {
-            if (ImGui::BeginTable("HashIcons", 5)) {
-                for (int i = 0; i < 5; i++) {
-                    ImGui::TableSetupColumn("Icon", ImGuiTableColumnFlags_WidthFixed, 34.0f);
-                }
-                ImGui::TableNextColumn();
-
-                int32_t index = 0;
-                PlandoPushImageButtonStyle();
-                for (auto& hash : plandoHash) {
-                    ImGui::PushID(index);
-                    textureID = std::dynamic_pointer_cast<Fast::Fast3dGui>(
-                                    Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                                    ->GetTextureByName(gSeedTextures[hash].tex);
-                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.0f, 2.0f));
-                    auto upRet = ImGui::ImageButton("HASH_ARROW_UP",
-                                                    std::dynamic_pointer_cast<Fast::Fast3dGui>(
-                                                        Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                                                        ->GetTextureByName("HASH_ARROW_UP"),
-                                                    ImVec2(35.0f, 18.0f), ImVec2(1, 1), ImVec2(0, 0),
-                                                    ImVec4(0, 0, 0, 0), ImVec4(1, 1, 1, 1));
-                    ImGui::PopStyleVar();
-                    if (upRet) {
-                        if (hash + 1 >= std::ssize(gSeedTextures)) {
-                            hash = 0;
-                        } else {
-                            hash++;
-                        }
-                    }
-                    ImGui::Image(textureID, ImVec2(35.0f, 35.0f));
-                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.0f, 2.0f));
-                    auto downRet = ImGui::ImageButton("HASH_ARROW_DWN",
-                                                      std::dynamic_pointer_cast<Fast::Fast3dGui>(
-                                                          Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                                                          ->GetTextureByName("HASH_ARROW_DWN"),
-                                                      ImVec2(35.0f, 18.0f), ImVec2(0, 0), ImVec2(1, 1),
-                                                      ImVec4(0, 0, 0, 0), ImVec4(1, 1, 1, 1));
-                    ImGui::PopStyleVar();
-                    if (downRet) {
-                        if (hash == 0) {
-                            hash = static_cast<int32_t>(gSeedTextures.size()) - 1;
-                        } else {
-                            hash--;
-                        }
-                    }
-                    if (index != std::ssize(spoilerHash) - 1) {
-                        ImGui::TableNextColumn();
-                    }
-                    ImGui::PopID();
-                    index++;
-                }
-                PlandoPopImageButtonStyle();
-                ImGui::EndTable();
-            }
-        } else {
-            ImGui::Text("No Spoiler Log Loaded");
-        }
+        PlandomizerDrawSeedHash(!spoilerLogData.empty());
         ImGui::EndTable();
     }
 

@@ -45,7 +45,6 @@ LEGACY_LINE_LIMITS = {
     "Shipwright/soh/soh/Enhancements/randomizer/3drando/hint_list/hint_list_exclude_dungeon.cpp": 2328,
     "Shipwright/soh/soh/Enhancements/randomizer/3drando/hint_list/hint_list_exclude_overworld.cpp": 2482,
     "Shipwright/soh/soh/Enhancements/randomizer/3drando/hint_list/hint_list_item.cpp": 2169,
-    "Shipwright/soh/soh/Enhancements/randomizer/Plandomizer.cpp": 1212,
     "Shipwright/soh/soh/Enhancements/randomizer/RCToRandInf.cpp": 3068,
     "Shipwright/soh/soh/Enhancements/randomizer/Traps.cpp": 1803,
     "Shipwright/soh/soh/Enhancements/randomizer/entrance.cpp": 1786,
