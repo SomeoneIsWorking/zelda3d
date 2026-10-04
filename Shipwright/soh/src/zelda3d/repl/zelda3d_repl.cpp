@@ -8,6 +8,7 @@
 #include "commands/actor_scan_diagnostics.h"
 #include "commands/animation_control.h"
 #include "commands/archive_diagnostics.h"
+#include "commands/camera_at_default.h"
 #include "commands/camera_control.h"
 #include "commands/collision_probe.h"
 #include "commands/cutscene_title.h"
@@ -89,6 +90,7 @@ void Zelda3D_ReplDispatchCommand(PlayState* play, char* line, const char* outPat
     } else if (Zelda3D_RenderEnvironmentReplCommand(play, command, line, outPath)) {
     } else if (Zelda3D_HudAtlasReplCommand(command, line, outPath)) {
     } else if (Zelda3D_InputInjectionReplCommand(command, line, outPath)) {
+    } else if (Zelda3D_CameraAtDefaultReplCommand(play, command, line, outPath)) {
     } else if (Zelda3D_CameraControlReplCommand(play, command, line, outPath)) {
     } else if (Zelda3D_CutsceneTitleReplCommand(play, command, line, outPath)) {
     } else if (Zelda3D_ActorControlReplCommand(play, command, line, outPath)) {

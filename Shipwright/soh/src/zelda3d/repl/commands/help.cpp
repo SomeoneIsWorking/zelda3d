@@ -16,7 +16,7 @@ constexpr const char* kCommandCatalog[] = {
     "floorat floorcol exitat floorgrid exitgrid wallscan meshfloor time",
     "player: move gcam walkhold btnhold pause turn posinfo cammode climbinfo forceclimb linkstate "
     "linkanimstate linkground boots gohmaclimb",
-    "camera/cutscene: cam camfreeze camorbit camdraw camlift cscams csinfo titlecam titlecs titlecue "
+    "camera/cutscene: cam camfreeze camorbit camdraw camlift atdefault cscams csinfo titlecam titlecs titlecue "
     "skip skiptest",
     "actor: asel ztarget ztargetstate ahide afreeze apos arot aparams acam aaim aorbit ainfo actors "
     "actorscan actorsnear apeek bscan asample spawn spawnp floaters",

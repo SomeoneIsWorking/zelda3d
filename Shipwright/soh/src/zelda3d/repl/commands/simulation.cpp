@@ -4,7 +4,6 @@
 #include <cstring>
 
 #include "../../control/frame_step_control.h"
-#include "../../input/zelda3d_input.h"
 #include "../zelda3d_repl.h"
 
 namespace {
@@ -29,8 +28,7 @@ void SettleAtFrame(PlayState* play, int targetFrame, const char* outPath) {
         frameCount = 4000;
     }
     for (s32 i = 0; i < frameCount; ++i) {
-        Zelda3D_WalkInject(play);
-        Play_Update(play);
+        Zelda3D_StepLogicFrame(play);
     }
     Zelda3D_ReplReply(outPath, "settle: gameplayFrames=%d (stepped %d, frozen)", play->gameplayFrames, frameCount);
 }
@@ -45,8 +43,7 @@ void StepFrames(PlayState* play, const char* line, const char* outPath) {
         frameCount = 600;
     }
     for (int i = 0; i < frameCount; ++i) {
-        Zelda3D_WalkInject(play);
-        Play_Update(play);
+        Zelda3D_StepLogicFrame(play);
     }
     Zelda3D_ReplReply(outPath, "step %d (frame advanced; freeze=%d)", frameCount, gZelda3dFreeze);
 }
