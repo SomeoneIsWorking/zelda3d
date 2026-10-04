@@ -3,7 +3,7 @@
 #include <cassert>
 #include <cmath>
 
-extern "C" void Player_Action_95(Player*, PlayState*) {}
+extern "C" void Player_Action_DekuSpinAttack(Player*, PlayState*) {}
 
 namespace {
 
@@ -29,7 +29,7 @@ int main() {
     assert(override.constantIndex == 4);
     assert(Near(override.rgba[3], 0.0F));
 
-    player.actionFunc = Player_Action_95;
+    player.actionFunc = Player_Action_DekuSpinAttack;
     assert(Zelda3D_MM_PlayerDekuSpinMaterialOverride(&player, &override));
     assert(override.enabled);
     assert(Near(override.rgba[3], 1.0F));

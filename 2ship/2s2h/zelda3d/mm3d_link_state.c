@@ -7,11 +7,11 @@ const char* Zelda3D_PlayerActionName(const Player* player) {
     if (player == NULL) {
         return "none";
     }
-    if (player->actionFunc == Player_Action_86) {
-        return "Player_Action_86";
+    if (player->actionFunc == Player_Action_StartMaskTransformation) {
+        return "Player_Action_StartMaskTransformation";
     }
-    if (player->actionFunc == Player_Action_96) {
-        return "Player_Action_96";
+    if (player->actionFunc == Player_Action_GoronRoll) {
+        return "Player_Action_GoronRoll";
     }
     return "other";
 }

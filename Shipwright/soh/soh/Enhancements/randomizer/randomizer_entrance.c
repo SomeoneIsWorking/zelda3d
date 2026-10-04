@@ -14,6 +14,7 @@
 #include "randomizer_grotto.h"
 
 #include "soh/SaveManager.h"
+#include <libultraship/log/luslog.h>
 #include <string.h>
 
 #include "global.h"
@@ -243,6 +244,32 @@ void Entrance_Init(void) {
         }
 
         // Overwrite the indices which we want to shuffle, leaving the rest as they are
+        //
+        // Audited 2026-08-13, docs/issues/0023. `index` above is
+        // `entranceOverrides[i].index`, read verbatim out of the save JSON by
+        // SaveManager::LoadRandomizer (`LoadData("index", entranceOverrides[i].index)`), so on this
+        // port it is user-controlled: a hand-edited save, or one written by another tool, decides
+        // it. entranceOverrideTable is a bare `static s16[ENTRANCE_TABLE_SIZE]` with no spare rows
+        // and no length of its own, so an out-of-range value is a silent 2-byte write into whatever
+        // static happens to sit next to it. No crash, no log -- just a save and a table that are
+        // quietly wrong for the rest of the session, which is the harder bug to notice.
+        //
+        // REFUSE THE ENTRY, not the load: the override rows already applied are valid and the rows
+        // after this one are still parseable, so one corrupt row costs exactly one entrance
+        // override. Nothing is clamped -- an out-of-range index is never rewritten to a neighbour,
+        // because that would turn a refused override into a plausible wrong warp, which is worse.
+        //
+        // The bound is checked HERE, after the two grotto branches, and that placement is load
+        // bearing: grotto indices start at ENTRANCE_GROTTO_LOAD_START (0x700), well above
+        // ENTRANCE_TABLE_SIZE (0x614), so checking before those branches would refuse every
+        // grottos shuffle outright.
+        if (originalIndex < 0 || originalIndex >= ENTRANCE_TABLE_SIZE) {
+            LUSLOG_ERROR("Entrance_Init: entranceOverrides[%zu].index %d is out of range (valid 0..%d) "
+                         "-- REFUSED, that entrance override was not applied",
+                         i, originalIndex, ENTRANCE_TABLE_SIZE - 1);
+            continue;
+        }
+
         entranceOverrideTable[originalIndex] = overrideIndex;
 
         // Override both land and water entrances for Hyrule Field -> ZR Front and vice versa
@@ -273,7 +300,13 @@ void Entrance_Init(void) {
             for (s16 i = 0; i < 4; i++) {
                 // Zero out the bit in the field which tells the game to keep playing
                 // background music for all four scene setups at each index
-                if (override + i < ENTRANCE_TABLE_SIZE) {
+                // Same provenance as the bound above: `override` came out of
+                // entranceOverrides[i].override in the save JSON, so it is an s16 and it can be
+                // negative. `override + i < ENTRANCE_TABLE_SIZE` alone therefore lets a negative
+                // value straight through into gEntranceTable[override + i], which writes BELOW the
+                // table instead of above it. Bound both ends; for every in-range value the condition
+                // is unchanged.
+                if (override >= 0 && override + i < ENTRANCE_TABLE_SIZE) {
                     gEntranceTable[override + i].field &= ~ENTRANCE_INFO_CONTINUE_BGM_FLAG;
                 }
             }
@@ -525,9 +558,9 @@ void Entrance_EnableFW(void) {
     Player* player = GET_PLAYER(gPlayState);
     // Leave restriction in Tower Collapse Interior, Castle Collapse, Treasure Box Shop, Tower Collapse Exterior,
     // Grottos area, Fishing Pond, Ganon Battle and for states that disable buttons.
-    if (!false /* farores wind anywhere */ || gPlayState->sceneNum == SCENE_GANONS_TOWER_COLLAPSE_INTERIOR ||
+    if (gPlayState->sceneNum == SCENE_GANONS_TOWER_COLLAPSE_INTERIOR ||
         gPlayState->sceneNum == SCENE_INSIDE_GANONS_CASTLE_COLLAPSE ||
-        (gPlayState->sceneNum == SCENE_TREASURE_BOX_SHOP && !false /* shuffled chest mini game */) ||
+        gPlayState->sceneNum == SCENE_TREASURE_BOX_SHOP ||
         gPlayState->sceneNum == SCENE_GANONS_TOWER_COLLAPSE_EXTERIOR || gPlayState->sceneNum == SCENE_GROTTOS ||
         gPlayState->sceneNum == SCENE_FISHING_POND || gPlayState->sceneNum == SCENE_GANON_BOSS ||
         gSaveContext.eventInf[0] & 0x1 || // Ingo's Minigame state

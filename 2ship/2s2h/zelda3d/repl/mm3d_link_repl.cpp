@@ -216,34 +216,34 @@ static void Zelda3D_MmLinkState(PlayState* play, Zelda3DMmReplArgs* args, const 
         out = fmt::format("linkstate idle -> Player_Action_Idle (actionVar1={})", player->av1.actionVar1);
     } else if (strcmp(state, "walk") == 0) {
         Zelda3D_PlayerForceWalk(player, play);
-        out = fmt::format("linkstate walk -> Player_Action_13 (speedXZ={:.2f})", player->speedXZ);
+        out = fmt::format("linkstate walk -> Player_Action_Run (speedXZ={:.2f})", player->speedXZ);
     } else if (strcmp(state, "run") == 0) {
         Zelda3D_PlayerForceRun(player, play);
-        out = fmt::format("linkstate run -> Player_Action_14 (speedXZ={:.2f})", player->speedXZ);
+        out = fmt::format("linkstate run -> Player_Action_ZTargetRun (speedXZ={:.2f})", player->speedXZ);
     } else if (strcmp(state, "turn") == 0) {
         Zelda3D_PlayerForceTurnInPlace(player, play);
         out = fmt::format("linkstate turn -> Player_Action_TurnInPlace (turnRate={})", player->turnRate);
     } else if (strcmp(state, "roll") == 0) {
         Zelda3D_PlayerForceRoll(player, play);
-        out = fmt::format("linkstate roll -> Player_Action_26 (curFrame={:.2f})", player->skelAnime.curFrame);
+        out = fmt::format("linkstate roll -> Player_Action_Roll (curFrame={:.2f})", player->skelAnime.curFrame);
     } else if (strcmp(state, "goronroll") == 0) {
         s32 ok = Zelda3D_PlayerForceGoronRoll(player, play);
         out = fmt::format("linkstate goronroll -> {} (actionVar1={} speedXZ={:.2f})",
-                          ok ? "Player_Action_96" : "requires PLAYER_FORM_GORON", player->av1.actionVar1,
+                          ok ? "Player_Action_GoronRoll" : "requires PLAYER_FORM_GORON", player->av1.actionVar1,
                           player->speedXZ);
     } else if (strcmp(state, "throw") == 0) {
         Zelda3D_PlayerForceThrow(player, play);
-        out = "linkstate throw -> Player_Action_42 (PLAYER_ANIMGROUP_throw)";
+        out = "linkstate throw -> Player_Action_Throwing (PLAYER_ANIMGROUP_throw)";
     } else if (strcmp(state, "attack") == 0) {
         Zelda3D_PlayerForceAttack(player, play);
-        out =
-            fmt::format("linkstate attack -> Player_Action_84 (meleeWeaponAnimation={})", player->meleeWeaponAnimation);
+        out = fmt::format("linkstate attack -> Player_Action_MeleeAttack (meleeWeaponAnimation={})",
+                          player->meleeWeaponAnimation);
     } else if (strcmp(state, "jump") == 0) {
         Zelda3D_PlayerForceJump(player, play);
-        out = fmt::format("linkstate jump -> Player_Action_25 (velocityY={:.2f})", player->actor.velocity.y);
+        out = fmt::format("linkstate jump -> Player_Action_Airborne (velocityY={:.2f})", player->actor.velocity.y);
     } else if (strcmp(state, "shield") == 0) {
         Zelda3D_PlayerForceShield(player, play);
-        out = fmt::format("linkstate shield -> Player_Action_18 (stateFlags1=0x{:08X})", player->stateFlags1);
+        out = fmt::format("linkstate shield -> Player_Action_Shielding (stateFlags1=0x{:08X})", player->stateFlags1);
     } else if (strcmp(state, "getitem") == 0) {
         Zelda3D_PlayerForceGetItem(player, play);
         out = fmt::format("linkstate getitem -> Player_Action_WaitForPutAway (stateFlags1=0x{:08X})",
@@ -255,17 +255,17 @@ static void Zelda3D_MmLinkState(PlayState* play, Zelda3DMmReplArgs* args, const 
                           player->stateFlags1);
     } else if (strcmp(state, "putdown") == 0) {
         Zelda3D_PlayerForcePutDown(player, play);
-        out = "linkstate putdown -> Player_Action_41 (PLAYER_ANIMGROUP_put)";
+        out = "linkstate putdown -> Player_Action_PutDownObject (PLAYER_ANIMGROUP_put)";
     } else if (strcmp(state, "death") == 0) {
         Zelda3D_PlayerForceDeath(player, play);
-        out = fmt::format("linkstate death -> health=0 (Player_Action_77 entry on a later frame, st1=0x{:08X})",
+        out = fmt::format("linkstate death -> health=0 (Player_Action_Dying entry on a later frame, st1=0x{:08X})",
                           player->stateFlags1);
     } else if (strcmp(state, "damage") == 0) {
         Zelda3D_PlayerForceDamage(player, play);
-        out = fmt::format("linkstate damage -> Player_Action_20 (curFrame={:.2f})", player->skelAnime.curFrame);
+        out = fmt::format("linkstate damage -> Player_Action_Damage (curFrame={:.2f})", player->skelAnime.curFrame);
     } else if (strcmp(state, "hang") == 0) {
         Zelda3D_PlayerForceHang(player, play);
-        out = fmt::format("linkstate hang -> Player_Action_48 (stateFlags1=0x{:08X})", player->stateFlags1);
+        out = fmt::format("linkstate hang -> Player_Action_HangOffLedge (stateFlags1=0x{:08X})", player->stateFlags1);
     } else if (strcmp(state, "carry") == 0) {
         s32 ok = Zelda3D_PlayerForceCarry(player, play);
         out = fmt::format("linkstate carry -> {} (stateFlags1=0x{:08X})",
@@ -273,28 +273,28 @@ static void Zelda3D_MmLinkState(PlayState* play, Zelda3DMmReplArgs* args, const 
                           player->stateFlags1);
     } else if (strcmp(state, "climb") == 0) {
         s32 entered = Zelda3D_PlayerForceClimb(player, play);
-        out = fmt::format("linkstate climb -> Player_Action_50 ({}, av1={} st1=0x{:08X})",
+        out = fmt::format("linkstate climb -> Player_Action_Climb ({}, av1={} st1=0x{:08X})",
                           entered == 1   ? "entered"
                           : entered == 0 ? "declined"
                                          : "no wallPoly",
                           player->av1.actionVar1, player->stateFlags1);
     } else if (strcmp(state, "swim") == 0) {
         Zelda3D_PlayerForceSwim(player, play);
-        out = fmt::format("linkstate swim -> Player_Action_54 (depthInWater={:.2f})", player->actor.depthInWater);
+        out = fmt::format("linkstate swim -> Player_Action_SwimIdle (depthInWater={:.2f})", player->actor.depthInWater);
     } else if (strcmp(state, "swimdive") == 0) {
         Zelda3D_PlayerForceSwimDive(player, play);
-        out = fmt::format("linkstate swimdive -> Player_Action_59 (av2={} st1=0x{:08X} st2=0x{:08X})",
+        out = fmt::format("linkstate swimdive -> Player_Action_SwimUnderwater (av2={} st1=0x{:08X} st2=0x{:08X})",
                           player->av2.actionVar2, player->stateFlags1, player->stateFlags2);
     } else if (strcmp(state, "itemuse") == 0) {
         Zelda3D_PlayerForceItemUse(player, play);
-        out = fmt::format("linkstate itemuse -> Player_Action_68 (av2.actionVar2={})", player->av2.actionVar2);
+        out = fmt::format("linkstate itemuse -> Player_Action_SwingBottle (av2.actionVar2={})", player->av2.actionVar2);
     } else if (strcmp(state, "backwalk") == 0) {
         s32 ok = Zelda3D_PlayerForceBackwalk(player, play);
-        out = fmt::format("linkstate backwalk -> {} (speedXZ={:.2f})", ok ? "Player_Action_15" : "decode declined",
-                          player->speedXZ);
+        out = fmt::format("linkstate backwalk -> {} (speedXZ={:.2f})",
+                          ok ? "Player_Action_TargetBackPedal" : "decode declined", player->speedXZ);
     } else if (strcmp(state, "sidestep") == 0) {
         Zelda3D_PlayerForceSidestep(player, play);
-        out = "linkstate sidestep -> Player_Action_9 (side_walkR; Z-target-gated)";
+        out = "linkstate sidestep -> Player_Action_Sidestep (side_walkR; Z-target-gated)";
     } else {
         out = "usage: linkstate <idle|walk|run|turn|roll|goronroll|throw|attack|jump|shield|getitem|talk|"
               "putdown|death|damage|hang|carry|climb|swim|swimdive|itemuse|backwalk|sidestep>";

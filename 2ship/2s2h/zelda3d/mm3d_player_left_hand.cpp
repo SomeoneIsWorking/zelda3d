@@ -9,7 +9,7 @@
 #include "mm3d_player_model_policy.h"
 
 extern "C" {
-void Player_Action_11(Player* player, PlayState* play);
+void Player_Action_BremenMarch(Player* player, PlayState* play);
 void Player_Action_ExchangeItem(Player* player, PlayState* play);
 s32 Player_UpperAction_CarryActor(Player* player, PlayState* play);
 PlayerItemAction Player_ItemToItemAction(Player* player, ItemId item);
@@ -179,7 +179,7 @@ bool StateForPlayer(Player& player, int swordEquipValue, PlayerLeftHandState& st
     state.modelForcesOpenHand = player.zoraBoomerangActor != nullptr && player.zoraBoomerangActor->id == ACTOR_EN_BOOM;
     state.giantMask = player.currentMask == PLAYER_MASK_GIANT;
     state.carryUpperAction = player.upperActionFunc == Player_UpperAction_CarryActor;
-    state.bremenMarchAction = player.actionFunc == Player_Action_11;
+    state.bremenMarchAction = player.actionFunc == Player_Action_BremenMarch;
     state.zoraGuitarStart = AnimationEqual(player.skelAnime.animation, gPlayerAnim_pz_gakkistart);
     state.zoraGuitarSpecial = AnimationEqual(player.skelAnime.animation, gPlayerAnim_pz_gakkiplay);
     state.bottleItemChangeAnimation =

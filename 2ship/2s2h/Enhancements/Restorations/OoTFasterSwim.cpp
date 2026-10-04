@@ -4,7 +4,7 @@
 
 extern "C" {
 #include "variables.h"
-void Player_Action_57(Player* player, PlayState* play);
+void Player_Action_Swim(Player* player, PlayState* play);
 }
 
 #define CVAR_NAME "gEnhancements.Restorations.OoTFasterSwim"
@@ -15,7 +15,7 @@ void RegisterOoTFasterSwim() {
         Player* player = GET_PLAYER(gPlayState);
         f32* animationSpeed = va_arg(args, f32*);
 
-        if (player->actionFunc == Player_Action_57 && player->transformation == PLAYER_FORM_HUMAN) {
+        if (player->actionFunc == Player_Action_Swim && player->transformation == PLAYER_FORM_HUMAN) {
             *should = false;
             if (*animationSpeed < 1.0f) {
                 *animationSpeed = 1.0f;

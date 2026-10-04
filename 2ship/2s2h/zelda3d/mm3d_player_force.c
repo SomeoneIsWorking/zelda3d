@@ -22,7 +22,7 @@ s32 Zelda3D_PlayerForceGoronRoll(Player* player, PlayState* play) {
     }
 
     // This is the Goron branch of the normal A-button roll handler. func_80836B3C delegates to
-    // func_80836AD8, which installs Player_Action_96 and initializes the real roll controller.
+    // func_80836AD8, which installs Player_Action_GoronRoll and initializes the real roll controller.
     func_80836B3C(play, player, 0.0f);
     return 1;
 }

@@ -5,7 +5,7 @@
 #include "mm3d_player_deku_spin_material_policy.h"
 #include "mm3d_player_model_policy.h"
 
-extern "C" void Player_Action_95(Player* player, PlayState* play);
+extern "C" void Player_Action_DekuSpinAttack(Player* player, PlayState* play);
 
 extern "C" int Zelda3D_MM_PlayerDekuSpinMaterialOverride(const Player* player,
                                                          Zelda3DMMPlayerDekuSpinMaterialOverride* materialOverride) {
@@ -22,7 +22,7 @@ extern "C" int Zelda3D_MM_PlayerDekuSpinMaterialOverride(const Player* player,
     *materialOverride = {};
     const PlayerDekuSpinMaterialState state{
         form,
-        player->actionFunc == Player_Action_95,
+        player->actionFunc == Player_Action_DekuSpinAttack,
         player->unk_B10[1],
     };
     const auto override = PlayerDekuSpinMaterialOverrideForState(state);
