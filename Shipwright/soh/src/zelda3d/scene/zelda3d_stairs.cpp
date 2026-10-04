@@ -3,6 +3,7 @@
 #include "asset/cmb.h"
 #include <stb_image.h>
 #include "../assets/stairs_stone_png.h" // embedded PNG of assets/zelda3d/stairs_stone.svg (custom stair texture)
+#include "../core/zelda3d_log.h"
 #include <algorithm>
 #include <functional>
 #include <unordered_map>
@@ -29,7 +30,7 @@ const std::vector<uint8_t>& stairStoneTex(int& w, int& h) {
             rgba.assign(px, px + (size_t)sw * sh * 4);
             stbi_image_free(px);
         } else {
-            fprintf(stderr, "[Zelda3D] stairs: failed to decode embedded stone texture\n");
+            Z3D_LOG(SOH_SCENE, "stairs: failed to decode embedded stone texture\n");
             sw = sh = 0;
         }
     }
@@ -200,11 +201,11 @@ void generateStairsGroup(Zelda3D::CmbDrawGroup& g) {
         if (stairDbg && ok) {
             float ac = (f.amin + f.amax) * 0.5f, cc = (f.cmin + f.cmax) * 0.5f;
             float wx = f.aDir[0] * ac + f.cDir[0] * cc, wz = f.aDir[2] * ac + f.cDir[2] * cc;
-            fprintf(stderr, "[Zelda3D] stairdbg: patch world XZ=(%.0f,%.0f) y=[%.0f,%.0f] N=%d aSpan=%.0f cSpan=%.0f "
-                   "aDir=(%.2f,%.2f) cDir=(%.2f,%.2f)\n",
-                   wx, wz, f.ymin, f.ymax, f.N, f.amax - f.amin, f.cmax - f.cmin,
-                   f.aDir[0], f.aDir[2], f.cDir[0], f.cDir[2]);
-            fflush(stdout);
+            Z3D_LOG(SOH_SCENE,
+                    "stairdbg: patch world XZ=(%.0f,%.0f) y=[%.0f,%.0f] N=%d aSpan=%.0f cSpan=%.0f "
+                    "aDir=(%.2f,%.2f) cDir=(%.2f,%.2f)\n",
+                    wx, wz, f.ymin, f.ymax, f.N, f.amax - f.amin, f.cmax - f.cmin, f.aDir[0], f.aDir[2], f.cDir[0],
+                    f.cDir[2]);
         }
 
         // Affine UV(a,c) fit + average color over the patch (render-only; the generated step

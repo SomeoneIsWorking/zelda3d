@@ -1,6 +1,5 @@
 #include "mm3d_player_animation.h"
 
-#include <cstdio>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -9,6 +8,7 @@
 #include <vector>
 
 #include "asset/lzs.h"
+#include "mm3d_log.h"
 #include "mm3d_model_store.h"
 #include "mm3d_player_animation_policy.h"
 
@@ -39,20 +39,20 @@ const Gar* LoadPlayerAnimationArchive() {
     g_archiveLoadAttempted = true;
     std::vector<uint8_t> bytes = rom->read(kPlayerAnimationArchive);
     if (bytes.empty()) {
-        fprintf(stderr, "[MM3D-PLAYER-ANIM] archive not found: %s\n", kPlayerAnimationArchive);
+        Z3D_LOG(MM_ANIM, "archive not found: %s\n", kPlayerAnimationArchive);
         return nullptr;
     }
     if (LzsIsCompressed(bytes)) {
         std::string error;
         bytes = LzsDecompress(bytes, &error);
         if (bytes.empty()) {
-            fprintf(stderr, "[MM3D-PLAYER-ANIM] LzS inflate %s: %s\n", kPlayerAnimationArchive, error.c_str());
+            Z3D_LOG(MM_ANIM, "LzS inflate %s: %s\n", kPlayerAnimationArchive, error.c_str());
             return nullptr;
         }
     }
     auto archive = std::make_unique<Gar>(std::move(bytes));
     if (!archive->ok()) {
-        fprintf(stderr, "[MM3D-PLAYER-ANIM] GAR parse %s: %s\n", kPlayerAnimationArchive, archive->error().c_str());
+        Z3D_LOG(MM_ANIM, "GAR parse %s: %s\n", kPlayerAnimationArchive, archive->error().c_str());
         return nullptr;
     }
     g_playerAnimations = std::move(archive);

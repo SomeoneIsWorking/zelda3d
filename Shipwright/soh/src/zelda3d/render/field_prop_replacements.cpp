@@ -1,14 +1,13 @@
 #include "field_prop_replacements.h"
 
 #include "../behaviors/actor/actor_assets.h"
+#include "../core/zelda3d_log.h"
 #include "../diagnostics/model_tuning_query.h"
 #include "actor_model_submission.h"
 #include "actor_height_calibration.h"
 #include "model_queries.h"
 #include "replacement_calibration.h"
 #include "replacement_control.h"
-
-#include <cstdio>
 
 namespace {
 
@@ -53,12 +52,11 @@ int DrawVariant(PlayState* play, Actor* actor) {
                     calibration.scale = calibration.measuredHeight / modelHeight;
                     calibration.state = 2;
                     if (Zelda3D_AutoMode() >= 1) {
-                        fprintf(stderr,
-                                "SOH3D VARIANT: actor 0x%x params&0x%x==0x%x model %d -> scale=%.5f "
+                        Z3D_LOG(SOH_RENDER,
+                                "VARIANT: actor 0x%x params&0x%x==0x%x model %d -> scale=%.5f "
                                 "(n64h=%.1f modelh=%.1f, seed was %.5f)\n",
                                 (unsigned)actor->id, variant.paramMask, variant.paramValue, variant.modelId,
                                 calibration.scale, calibration.measuredHeight, modelHeight, variant.fallbackScale);
-                        fflush(stderr);
                     }
                 }
             } else if (calibration.state != 3 && calibration.state != ZELDA3D_AUTO_NOMEAS) {

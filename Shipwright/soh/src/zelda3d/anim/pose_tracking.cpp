@@ -1,18 +1,18 @@
 // Posed-geometry tracking and measurements derived from shipping skin matrices.
 #include "pose_tracking_internal.h"
 
+#include "../core/zelda3d_log.h"
 #include "../model/zelda3d_model_internal.h"
 #include "asset/cmb.h"
 
 #include <cmath>
-#include <cstdio>
 #include <unordered_map>
 #include <vector>
 
 extern "C" void Zelda3D_DumpBoneStats(int modelId) {
     LoadedModel* lm = loadModel(modelId);
     if (!lm || !lm->ok || !lm->cmb) {
-        fprintf(stderr, "[BONESTATS] model %d not loaded\n", modelId);
+        Z3D_LOG(SOH_BONE, "model %d not loaded\n", modelId);
         return;
     }
     const auto& bones = lm->cmb->bones();
@@ -36,18 +36,17 @@ extern "C" void Zelda3D_DumpBoneStats(int modelId) {
             }
         }
     }
-    fprintf(stderr, "[BONESTATS] model %d bones=%d\n", modelId, n);
+    Z3D_LOG(SOH_BONE, "model %d bones=%d\n", modelId, n);
     for (const auto& bn : bones) {
         int id = bn.id;
         if (id < 0 || id >= n) {
             continue;
         }
         int c = vc[id];
-        fprintf(stderr, "[BONESTATS]  bone %2d parent %2d verts %5d meanPos(%.1f,%.1f,%.1f) trans(%.1f,%.1f,%.1f)\n",
-                id, bn.parent, c, c ? mx[id] / c : 0.0, c ? my[id] / c : 0.0, c ? mz[id] / c : 0.0, bn.trans[0],
+        Z3D_LOG(SOH_BONE, " bone %2d parent %2d verts %5d meanPos(%.1f,%.1f,%.1f) trans(%.1f,%.1f,%.1f)\n", id,
+                bn.parent, c, c ? mx[id] / c : 0.0, c ? my[id] / c : 0.0, c ? mz[id] / c : 0.0, bn.trans[0],
                 bn.trans[1], bn.trans[2]);
     }
-    fflush(stderr);
 }
 
 // --- Posed-feet grounding for the player path (#29b "Link floats") ---------------------------

@@ -3,6 +3,7 @@
 // change) so the model loader stays focused. Declarations live in zelda3d.h; the renderer/HUD path
 // calls these by name. See #18/#21/#31/#32.
 #include "zelda3d_hud_assets.h"
+#include "../core/zelda3d_log.h"
 #include "../input/zelda3d_keymap.h"
 #include <vector>
 #include <unordered_map>
@@ -143,7 +144,7 @@ const void* Zelda3D_XboxGlyphTex(char which, int* w, int* h) {
                 g[i].w = sw; g[i].hh = sh;
                 stbi_image_free(px);
             } else {
-                fprintf(stderr, "[Zelda3D] xbox glyph %d: PNG decode failed\n", i);
+                Z3D_LOG(SOH_HUD, "xbox glyph %d: PNG decode failed\n", i);
             }
         }
     }
@@ -204,7 +205,7 @@ static const KeyCapArt& keyCapArt() {
             if (w == kCapW && h == kCapH) {
                 a.cap.assign(px, px + (size_t)w * h * 4);
             } else {
-                fprintf(stderr, "[Zelda3D] keycap: expected %dx%d, got %dx%d\n", kCapW, kCapH, w, h);
+                Z3D_LOG(SOH_HUD, "keycap: expected %dx%d, got %dx%d\n", kCapW, kCapH, w, h);
             }
             stbi_image_free(px);
         }
@@ -216,8 +217,7 @@ static const KeyCapArt& keyCapArt() {
         }
         a.ok = !a.cap.empty() && !a.atlas.empty() && a.atlasH == kKeyGlyphCellH;
         if (!a.ok) {
-            fprintf(stderr, "[Zelda3D] keycap art: decode failed (cap=%zu atlas=%dx%d)\n", a.cap.size(),
-                    a.atlasW, a.atlasH);
+            Z3D_LOG(SOH_HUD, "keycap art: decode failed (cap=%zu atlas=%dx%d)\n", a.cap.size(), a.atlasW, a.atlasH);
         }
         return a;
     }();
@@ -403,7 +403,7 @@ const void* Zelda3D_HeartTex(int kind, int* w, int* h) {
                 t[i].w = sw; t[i].hh = sh;
                 stbi_image_free(px);
             } else {
-                fprintf(stderr, "[Zelda3D] heart tex %d: PNG decode failed\n", i);
+                Z3D_LOG(SOH_HUD, "heart tex %d: PNG decode failed\n", i);
             }
         }
     }
@@ -450,7 +450,7 @@ const void* Zelda3D_ButtonBgTex(int* w, int* h) {
                 bw = sw; bh = sh;
                 stbi_image_free(px);
             } else {
-                fprintf(stderr, "[Zelda3D] button bg tex: PNG decode failed\n");
+                Z3D_LOG(SOH_HUD, "button bg tex: PNG decode failed\n");
             }
         }
     }
@@ -499,8 +499,8 @@ static bool Zelda3dRomSprite(const char* romfsPath, int sx, int sy, int sw, int 
         sh = (int)(sh * fy + 0.5);
     }
     if (sx < 0 || sy < 0 || sw <= 0 || sh <= 0 || sx + sw > aw || sy + sh > ah) {
-        fprintf(stderr, "[Zelda3D] ROM sprite %s (%d,%d,%d,%d) out of bounds for %dx%d atlas\n",
-                romfsPath, sx, sy, sw, sh, aw, ah);
+        Z3D_LOG(SOH_HUD, "ROM sprite %s (%d,%d,%d,%d) out of bounds for %dx%d atlas\n", romfsPath, sx, sy, sw, sh, aw,
+                ah);
         return false;
     }
     const uint8_t* src = (const uint8_t*)atlas;
@@ -549,7 +549,7 @@ const void* Zelda3D_CounterIconTex(int kind, int* w, int* h) {
             if (kRomRect[i].w > 0) {
                 // Loud, not silent: falling back to the hand-drawn stand-in is the thing #207 exists
                 // to remove, so it must never look like success.
-                fprintf(stderr, "[Zelda3D] counter icon %d: ROM art unavailable, using embedded PNG\n", i);
+                Z3D_LOG(SOH_HUD, "counter icon %d: ROM art unavailable, using embedded PNG\n", i);
             }
             int sw = 0, sh = 0, n = 0;
             stbi_uc* px = stbi_load_from_memory(png[i], (int)len[i], &sw, &sh, &n, 4);
@@ -558,7 +558,7 @@ const void* Zelda3D_CounterIconTex(int kind, int* w, int* h) {
                 t[i].w = sw; t[i].hh = sh;
                 stbi_image_free(px);
             } else {
-                fprintf(stderr, "[Zelda3D] counter icon %d: PNG decode failed\n", i);
+                Z3D_LOG(SOH_HUD, "counter icon %d: PNG decode failed\n", i);
             }
         }
     }
@@ -601,7 +601,7 @@ const void* Zelda3D_DigitTex(int glyph, int* w, int* h) {
             const int rh = (i < 10) ? 15 : 12;
             if (Zelda3dRomSprite(kOoT3dNumAll, rx, ry, rw, rh, t[i].rgba, t[i].w, t[i].hh))
                 continue;
-            fprintf(stderr, "[Zelda3D] digit tex %d: ROM art unavailable, using embedded PNG\n", i);
+            Z3D_LOG(SOH_HUD, "digit tex %d: ROM art unavailable, using embedded PNG\n", i);
             int sw = 0, sh = 0, n = 0;
             stbi_uc* px = stbi_load_from_memory(png[i], (int)len[i], &sw, &sh, &n, 4);
             if (px) {
@@ -609,7 +609,7 @@ const void* Zelda3D_DigitTex(int glyph, int* w, int* h) {
                 t[i].w = sw; t[i].hh = sh;
                 stbi_image_free(px);
             } else {
-                fprintf(stderr, "[Zelda3D] digit tex %d: PNG decode failed\n", i);
+                Z3D_LOG(SOH_HUD, "digit tex %d: PNG decode failed\n", i);
             }
         }
     }

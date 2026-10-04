@@ -1,5 +1,6 @@
 #include "zelda3d_asset_source.h"
 
+#include "../core/zelda3d_log.h"
 #include "../scene/zelda3d_collision.h"
 #include "../scene/zelda3d_stairs.h"
 #include "asset/cmb.h"
@@ -7,7 +8,6 @@
 #include "asset/zsi.h"
 
 #include <array>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -26,12 +26,12 @@ extern "C" int Zelda3D_LoadSceneCollisionRaw(const char* sceneName, Zelda3D_RawC
     const std::string path = Zelda3D_ResolveSceneZsiPath(sceneName, -1);
     const std::vector<uint8_t> bytes = rom->read(path);
     if (bytes.empty()) {
-        std::fprintf(stderr, "[Zelda3D] collision zsi not found: %s\n", path.c_str());
+        Z3D_LOG(SOH_SCENE, "collision zsi not found: %s\n", path.c_str());
         return 0;
     }
     Zelda3D::OoT3DCollision collision(bytes);
     if (!collision.ok()) {
-        std::fprintf(stderr, "[Zelda3D] collision %s: %s\n", path.c_str(), collision.error().c_str());
+        Z3D_LOG(SOH_SCENE, "collision %s: %s\n", path.c_str(), collision.error().c_str());
         return 0;
     }
 
@@ -50,35 +50,46 @@ extern "C" int Zelda3D_LoadSceneCollisionRaw(const char* sceneName, Zelda3D_RawC
     out->polyNrm = static_cast<int16_t*>(std::malloc(sizeof(int16_t) * 3 * polygons.size()));
     out->polyDist = static_cast<float*>(std::malloc(sizeof(float) * polygons.size()));
     out->polyType = static_cast<uint16_t*>(std::malloc(sizeof(uint16_t) * polygons.size()));
-    out->surf0 = surfaces.empty() ? nullptr : static_cast<uint32_t*>(std::malloc(sizeof(uint32_t) * surfaces.size()));
-    out->surf1 = surfaces.empty() ? nullptr : static_cast<uint32_t*>(std::malloc(sizeof(uint32_t) * surfaces.size()));
+    out->surf0 = nullptr;
+    out->surf1 = nullptr;
     if (out->verts == nullptr || out->polyVtx == nullptr || out->polyNrm == nullptr || out->polyDist == nullptr ||
-        out->polyType == nullptr || (!surfaces.empty() && (out->surf0 == nullptr || out->surf1 == nullptr))) {
+        out->polyType == nullptr) {
         Zelda3D_FreeRawCollision(out);
         return 0;
     }
+    // Allocated, null-checked and filled in one block. It used to be a `surfaces.empty() ? nullptr :
+    // malloc(...)` line whose result the fill loop dereferenced several statements later, which is
+    // correct but reads -- and analyses -- as a null check that is nowhere near its dereference.
+    if (!surfaces.empty()) {
+        out->surf0 = static_cast<uint32_t*>(std::malloc(sizeof(uint32_t) * surfaces.size()));
+        out->surf1 = static_cast<uint32_t*>(std::malloc(sizeof(uint32_t) * surfaces.size()));
+        if (out->surf0 == nullptr || out->surf1 == nullptr) {
+            Zelda3D_FreeRawCollision(out);
+            return 0;
+        }
 
-    for (size_t index = 0; index < vertices.size(); ++index) {
-        out->verts[index * 3] = vertices[index].x;
-        out->verts[index * 3 + 1] = vertices[index].y;
-        out->verts[index * 3 + 2] = vertices[index].z;
+        for (size_t index = 0; index < vertices.size(); ++index) {
+            out->verts[index * 3] = vertices[index].x;
+            out->verts[index * 3 + 1] = vertices[index].y;
+            out->verts[index * 3 + 2] = vertices[index].z;
+        }
+        for (size_t index = 0; index < polygons.size(); ++index) {
+            out->polyVtx[index * 3] = polygons[index].vA;
+            out->polyVtx[index * 3 + 1] = polygons[index].vB;
+            out->polyVtx[index * 3 + 2] = polygons[index].vC;
+            out->polyNrm[index * 3] = polygons[index].nx;
+            out->polyNrm[index * 3 + 1] = polygons[index].ny;
+            out->polyNrm[index * 3 + 2] = polygons[index].nz;
+            out->polyDist[index] = polygons[index].dist;
+            out->polyType[index] = polygons[index].type;
+        }
+        for (size_t index = 0; index < surfaces.size(); ++index) {
+            out->surf0[index] = surfaces[index].data0;
+            out->surf1[index] = surfaces[index].data1;
+        }
     }
-    for (size_t index = 0; index < polygons.size(); ++index) {
-        out->polyVtx[index * 3] = polygons[index].vA;
-        out->polyVtx[index * 3 + 1] = polygons[index].vB;
-        out->polyVtx[index * 3 + 2] = polygons[index].vC;
-        out->polyNrm[index * 3] = polygons[index].nx;
-        out->polyNrm[index * 3 + 1] = polygons[index].ny;
-        out->polyNrm[index * 3 + 2] = polygons[index].nz;
-        out->polyDist[index] = polygons[index].dist;
-        out->polyType[index] = polygons[index].type;
-    }
-    for (size_t index = 0; index < surfaces.size(); ++index) {
-        out->surf0[index] = surfaces[index].data0;
-        out->surf1[index] = surfaces[index].data1;
-    }
-    std::fprintf(stderr, "[Zelda3D] loaded scene collision %s: %d verts, %d polys, %d surface types\n", path.c_str(),
-                 out->numVerts, out->numPolys, out->numSurf);
+    Z3D_LOG(SOH_SCENE, "loaded scene collision %s: %d verts, %d polys, %d surface types\n", path.c_str(), out->numVerts,
+            out->numPolys, out->numSurf);
     return 1;
 }
 

@@ -15,7 +15,8 @@
 // its own: threads stopped, config saved, heaps freed. Ship::Context::BeginGameSession then
 // installs the incoming game's per-game half.
 
-#include <stdio.h>
+#include "../core/zelda3d_log.h"
+
 #include <stdlib.h>
 
 #include <ship/Context.h>
@@ -44,8 +45,7 @@ int Zelda3D_LauncherEnabled(void) {
 // whether the MM core can actually be loaded is the launcher's question to answer, and it reports
 // its own failures naming the file and the dlopen error.
 int Zelda3D_LaunchMM(void) {
-    fprintf(stderr, "ZELDA3D LAUNCHER: handing back to the launcher to start Majora's Mask\n");
-    fflush(stderr);
+    Z3D_LOG(SOH_LAUNCHER, "handing back to the launcher to start Majora's Mask\n");
     Ship::Context::RequestGameSwitch("mm");
     Ship::Context::RequestExit();
     return 1;
@@ -58,8 +58,7 @@ int Zelda3D_LaunchMM(void) {
 // Identical to the switch above except for what it does NOT do -- it names no next game, so when
 // run() returns the launcher finds nothing pending and the process ends there.
 void Zelda3D_LauncherExit(void) {
-    fprintf(stderr, "SOH3D LAUNCHER: exit requested\n");
-    fflush(stderr);
+    Z3D_LOG(SOH_LAUNCHER, "exit requested\n");
     Ship::Context::RequestExit();
 }
 

@@ -3,10 +3,10 @@
 #include "gerudo_white.h"
 
 #include "../../anim/skeleton_draw_bridge.h"
+#include "../../core/zelda3d_log.h"
 #include "objects/object_ge1/object_ge1.h"
 #include "overlays/actors/ovl_En_Ge1/z_en_ge1.h"
 
-#include <cstdio>
 #include <cstring>
 
 extern "C" const char* Zelda3D_ResolveAnim_EnGe1(Actor* actor) {
@@ -25,10 +25,8 @@ extern "C" const char* Zelda3D_ResolveAnim_EnGe1(Actor* actor) {
     if (gZelda3dAnimDebug) {
         static int debugCounter = 0;
         if ((debugCounter++ % 20) == 0) {
-            std::fprintf(stderr, "SOH3D anim: csab=%s curFrame=%.2f animLength=%.2f n64=%s\n", csab,
-                         gerudo->skelAnime.curFrame, gerudo->skelAnime.animLength,
-                         n64Animation != nullptr ? n64Animation : "(null)");
-            std::fflush(stdout);
+            Z3D_LOG(SOH_ANIM, "csab=%s curFrame=%.2f animLength=%.2f n64=%s\n", csab, gerudo->skelAnime.curFrame,
+                    gerudo->skelAnime.animLength, n64Animation != nullptr ? n64Animation : "(null)");
         }
     }
     return csab;

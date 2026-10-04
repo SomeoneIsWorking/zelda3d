@@ -1,5 +1,6 @@
 // Zelda3D animation execution — resolve authored CSABs or N64 joint tables to skin matrices and
 // upload the resulting pose. Uses the model core via zelda3d_model_internal.h.
+#include "../core/zelda3d_log.h"
 #include "../model/zelda3d_model_internal.h"
 #include "authored_playback.h"
 #include "pose_evaluation_internal.h"
@@ -13,7 +14,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstdio>
 #include <cstdlib>
 #include <set>
 #include <utility>
@@ -81,11 +81,11 @@ static Zelda3D::Csab* getCsab(LoadedModel* lm, const char* animName) {
         if (af) {
             csab = std::make_unique<Zelda3D::Csab>(lm->zar->read(*af));
             if (!csab->ok()) {
-                fprintf(stderr, "[Zelda3D] Csab %s: %s\n", full.c_str(), csab->error().c_str());
+                Z3D_LOG(SOH_ANIM, "Csab %s: %s\n", full.c_str(), csab->error().c_str());
                 csab.reset();
             }
         } else {
-            fprintf(stderr, "[Zelda3D] anim not found: %s\n", full.c_str());
+            Z3D_LOG(SOH_ANIM, "anim not found: %s\n", full.c_str());
         }
         it = lm->anims.emplace(full, std::move(csab)).first;
     }
@@ -441,8 +441,7 @@ void Zelda3D_UpdateAnim(int modelId, const char* animName, float frame) {
         static std::set<std::pair<int, std::string>> sSeen;
         auto key = std::make_pair(modelId, std::string(animName));
         if (sSeen.insert(key).second) {
-            fprintf(stderr, "[Zelda3D animPlay] model=%d anim='%s'\n", modelId, animName);
-            fflush(stdout);
+            Z3D_LOG(SOH_ANIM, "model=%d anim='%s'\n", modelId, animName);
         }
     }
 

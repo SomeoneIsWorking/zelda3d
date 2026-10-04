@@ -3,7 +3,6 @@
 #include "platform/rom_install.h"
 #include <spdlog/spdlog.h>
 
-#include <cstdio>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -14,6 +13,7 @@
 #include "asset/cmb_glgroups.h"
 #include "asset/lzs.h"
 #include "asset/zsi.h"
+#include "mm3d_log.h"
 #include "mm3d_model_catalog.h"
 
 namespace Zelda3D::MM3D {
@@ -54,34 +54,34 @@ void LoadSceneRoom(int modelId, LoadedModel& model) {
     }
     auto bytes = assetRom->read(*path);
     if (bytes.empty()) {
-        fprintf(stderr, "[MM3D] zsi not found: %s\n", path->c_str());
+        Z3D_LOG(MM_MODEL, "zsi not found: %s\n", path->c_str());
         return;
     }
     if (LzsIsCompressed(bytes)) {
         std::string error;
         std::vector<uint8_t> inflated = LzsDecompress(bytes, &error);
         if (inflated.empty()) {
-            fprintf(stderr, "[MM3D] LzS inflate %s: %s\n", path->c_str(), error.c_str());
+            Z3D_LOG(MM_MODEL, "LzS inflate %s: %s\n", path->c_str(), error.c_str());
             return;
         }
         bytes = std::move(inflated);
     }
     Zsi zsi(std::move(bytes));
     if (!zsi.ok()) {
-        fprintf(stderr, "[MM3D] Zsi %s: %s\n", path->c_str(), zsi.error().c_str());
+        Z3D_LOG(MM_MODEL, "Zsi %s: %s\n", path->c_str(), zsi.error().c_str());
         return;
     }
     if (!zsi.hasGeometry()) {
-        fprintf(stderr, "[MM3D] no room geometry in %s\n", path->c_str());
+        Z3D_LOG(MM_MODEL, "no room geometry in %s\n", path->c_str());
         return;
     }
     model.cmb = std::make_unique<Cmb>(zsi.cmbBytes());
     if (!model.cmb->ok()) {
-        fprintf(stderr, "[MM3D] Cmb %s: %s\n", path->c_str(), model.cmb->error().c_str());
+        Z3D_LOG(MM_MODEL, "Cmb %s: %s\n", path->c_str(), model.cmb->error().c_str());
         return;
     }
     BuildRenderData(model, true);
-    fprintf(stderr, "[MM3D] loaded scene-room model %d (%s): %zu groups, %zu textures\n", modelId, path->c_str(),
+    Z3D_LOG(MM_MODEL, "loaded scene-room model %d (%s): %zu groups, %zu textures\n", modelId, path->c_str(),
             model.cGroups.size(), model.cTexs.size());
 }
 
@@ -98,35 +98,35 @@ void LoadActorModel(int modelId, const ModelSpec& spec, LoadedModel& model) {
 
     std::vector<uint8_t> bytes = assetRom->read(spec.garPath);
     if (bytes.empty()) {
-        fprintf(stderr, "[MM3D] gar not found: %s\n", spec.garPath.c_str());
+        Z3D_LOG(MM_MODEL, "gar not found: %s\n", spec.garPath.c_str());
         return;
     }
     if (LzsIsCompressed(bytes)) {
         std::string error;
         std::vector<uint8_t> inflated = LzsDecompress(bytes, &error);
         if (inflated.empty()) {
-            fprintf(stderr, "[MM3D] LzS inflate %s: %s\n", spec.garPath.c_str(), error.c_str());
+            Z3D_LOG(MM_MODEL, "LzS inflate %s: %s\n", spec.garPath.c_str(), error.c_str());
             return;
         }
         bytes = std::move(inflated);
     }
     model.gar = std::make_unique<Gar>(std::move(bytes));
     if (!model.gar->ok()) {
-        fprintf(stderr, "[MM3D] gar parse %s: %s\n", spec.garPath.c_str(), model.gar->error().c_str());
+        Z3D_LOG(MM_MODEL, "gar parse %s: %s\n", spec.garPath.c_str(), model.gar->error().c_str());
         return;
     }
     const GarFile* cmbFile = FindModelCmb(*model.gar, spec.cmbName);
     if (cmbFile == nullptr) {
-        fprintf(stderr, "[MM3D] no requested CMB '%s' in %s\n", spec.cmbName.c_str(), spec.garPath.c_str());
+        Z3D_LOG(MM_MODEL, "no requested CMB '%s' in %s\n", spec.cmbName.c_str(), spec.garPath.c_str());
         return;
     }
     model.cmb = std::make_unique<Cmb>(model.gar->read(*cmbFile));
     if (!model.cmb->ok()) {
-        fprintf(stderr, "[MM3D] cmb parse %s: %s\n", spec.garPath.c_str(), model.cmb->error().c_str());
+        Z3D_LOG(MM_MODEL, "cmb parse %s: %s\n", spec.garPath.c_str(), model.cmb->error().c_str());
         return;
     }
     BuildRenderData(model, false);
-    fprintf(stderr, "[MM3D] loaded model %d (%s): %zu groups, %zu textures\n", modelId, spec.garPath.c_str(),
+    Z3D_LOG(MM_MODEL, "loaded model %d (%s): %zu groups, %zu textures\n", modelId, spec.garPath.c_str(),
             model.cGroups.size(), model.cTexs.size());
 }
 

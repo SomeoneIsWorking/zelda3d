@@ -188,7 +188,7 @@ extern "C" int Zelda3D_TryDrawTitleFireGlow(PlayState* play) {
     // be confirmed live-varying quantitatively, independent of screen-capture timing (camera pan/
     // attract-mode cuts make screenshot diffing an unreliable isolation of the material-anim's own
     // contribution).
-    Z3D_LOG(FIREGLOW, "csFrame=%d cmabFrame=%.1f rgb=(%.4f,%.4f,%.4f) uvV=%.4f alpha=%.1f\n", csFrame, cmabFrame,
+    Z3D_LOG(SOH_FIREGLOW, "csFrame=%d cmabFrame=%.1f rgb=(%.4f,%.4f,%.4f) uvV=%.4f alpha=%.1f\n", csFrame, cmabFrame,
             rgb[0], rgb[1], rgb[2], uvV, alpha);
 
     float refW, refH;

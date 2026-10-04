@@ -340,6 +340,14 @@ if(NOT EXISTS "${ZELDA3D_LUCENT_SOURCE}/CMakeLists.txt")
 endif()
 set(LUCENT_BUILD_ZIP ON CACHE BOOL "Build shared bounded ZIP support" FORCE)
 set(LUCENT_BUILD_TESTS OFF CACHE BOOL "Lucent tests belong to its own repository" FORCE)
+
+# The product keeps the environment variable names its own documentation, .env and REPL already use.
+# Lucent reads <prefix>LUCENT_DEBUG and <prefix>LUCENT_LOG_FILE by default; these two are the
+# documented build-time rename, which is the ONLY order-free way to do it -- a runtime setter cannot
+# recover a line already dropped by a static initialiser that logged before it ran. So a diagnostic
+# emitted before main() is gated by the same variable as one emitted after it.
+set(LUCENT_CHANNEL_ENV "ZELDA3D_LOG" CACHE STRING "Channel-list variable for the zelda3d logger")
+set(LUCENT_LOG_FILE_ENV "ZELDA3D_LOG_FILE" CACHE STRING "Log-file variable for the zelda3d logger")
 add_subdirectory("${ZELDA3D_LUCENT_SOURCE}" "${CMAKE_BINARY_DIR}/lucent")
 add_subdirectory(${ZELDA3D_SHIPWRIGHT_DIR}/cmb3d ${CMAKE_BINARY_DIR}/cmb3d)
 

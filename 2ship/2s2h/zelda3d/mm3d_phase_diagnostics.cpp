@@ -2,12 +2,13 @@
 #include "mm3d_phase_diagnostics.h"
 
 #include <algorithm>
-#include <cstdio>
 #include <cstdlib>
 #include <map>
 #include <set>
 #include <string>
 #include <utility>
+
+#include "mm3d_log.h"
 
 namespace Zelda3D::MM3D {
 namespace {
@@ -61,7 +62,7 @@ void DumpAndClearAnimationPhases() {
     if (!PhaseReportEnabled()) {
         return;
     }
-    fprintf(stderr, "[MM3D-PHASE] %zu (model,clip) pair(s) sampled\n", g_phaseStats.size());
+    Z3D_LOG(MM_PHASE, "%zu (model,clip) pair(s) sampled\n", g_phaseStats.size());
     int stuck = 0;
     long morphTotal = 0;
     for (const auto& [key, stat] : g_phaseStats) {
@@ -73,26 +74,25 @@ void DumpAndClearAnimationPhases() {
             ++stuck;
         }
         morphTotal += stat.morphSamples;
-        fprintf(stderr,
-                "[MM3D-PHASE] %-6s model=%d %-28s f %.2f..%.2f dur=%.0f n=%ld %s "
+        Z3D_LOG(MM_PHASE,
+                "%-6s model=%d %-28s f %.2f..%.2f dur=%.0f n=%ld %s "
                 "morph=%ld/%.2f actors=%lu\n",
                 verdict, key.first, key.second.c_str(), stat.low, stat.high, stat.duration, stat.samples,
                 stat.phaseLocked ? "phase-locked" : "free-run", stat.morphSamples, stat.maxMorph,
                 static_cast<unsigned long>(actorCount));
     }
-    fprintf(stderr, "[MM3D-PHASE] morph path fired on %ld sample(s) across all pairs.%s\n", morphTotal,
+    Z3D_LOG(MM_PHASE, "morph path fired on %ld sample(s) across all pairs.%s\n", morphTotal,
             morphTotal == 0 ? "  Either no transition happened while this was watching, or MM never"
                               " reports a nonzero morphWeight -- do NOT read 0 as 'morph works'."
                             : "");
-    fprintf(stderr,
-            "[MM3D-PHASE] %d of %zu pair(s) with >=2 samples PER ACTOR never advanced."
+    Z3D_LOG(MM_PHASE,
+            "%d of %zu pair(s) with >=2 samples PER ACTOR never advanced."
             "  (THIN = too few samples per actor to say either way.)%s\n",
             stuck, g_phaseStats.size(),
             g_phaseStats.empty() ? "  NOTE: zero pairs sampled -- this run measured NOTHING, which is"
                                    " NOT the same as 'nothing was stuck'."
                                  : "");
     g_phaseStats.clear();
-    fflush(stderr);
 }
 
 } // namespace Zelda3D::MM3D

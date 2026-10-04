@@ -2,6 +2,7 @@
 #include "zelda3d_model_geometry.h"
 #include "zelda3d_model_id_ranges.h"
 
+#include "../core/zelda3d_log.h"
 #include "../render/model_group_diagnostics.h"
 #include "../render/model_queries.h"
 #include "../render/room_geometry_queries.h"
@@ -9,7 +10,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <vector>
 
 namespace {
@@ -178,8 +178,8 @@ void ComputeRoomGroundDelta(LoadedModel* model, Zelda3D_FloorFn floorFn) {
     model->dNx = nx;
     model->dNz = nz;
     model->dStep = kWarpStep;
-    std::fprintf(stderr, "[Zelda3D] ground-delta field: %dx%d grid, %d ground cells (actors offset to OoT3D ground)\n",
-                 nx, nz, validCount);
+    Z3D_LOG(SOH_ASSET, "ground-delta field: %dx%d grid, %d ground cells (actors offset to OoT3D ground)\n", nx, nz,
+            validCount);
 }
 
 } // namespace

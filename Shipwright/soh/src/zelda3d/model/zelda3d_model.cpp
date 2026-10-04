@@ -34,7 +34,6 @@
 #include <cstdint>
 #include <set>
 #include <functional>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -345,31 +344,31 @@ static void loadSceneRoom(int modelId, LoadedModel* out) {
     }
     auto bytes = r->read(path);
     if (bytes.empty()) {
-        fprintf(stderr, "[Zelda3D] zsi not found: %s\n", path.c_str());
+        Z3D_LOG(SOH_ASSET, "zsi not found: %s\n", path.c_str());
         return;
     }
     Zelda3D::Zsi zsi(std::move(bytes));
     if (!zsi.ok()) {
-        fprintf(stderr, "[Zelda3D] Zsi %s: %s\n", path.c_str(), zsi.error().c_str());
+        Z3D_LOG(SOH_ASSET, "Zsi %s: %s\n", path.c_str(), zsi.error().c_str());
         return;
     }
     if (!zsi.hasGeometry()) {
-        fprintf(stderr, "[Zelda3D] no room geometry in %s\n", path.c_str());
+        Z3D_LOG(SOH_ASSET, "no room geometry in %s\n", path.c_str());
         return;
     }
     out->cmb = std::make_unique<Zelda3D::Cmb>(zsi.cmbBytes());
     if (!out->cmb->ok()) {
-        fprintf(stderr, "[Zelda3D] Cmb %s: %s\n", path.c_str(), out->cmb->error().c_str());
+        Z3D_LOG(SOH_ASSET, "Cmb %s: %s\n", path.c_str(), out->cmb->error().c_str());
         return;
     }
     // scene rooms carry OoT3D baked vertex lighting; #5 turns fake-flat kaidan ramps into real steps
     buildFromCmb(out, /*bakedVertexColor=*/true, /*skipMesh=*/{}, /*stairs=*/true);
-    fprintf(stderr, "[Zelda3D] loaded scene-room model %d (%s): %zu groups, %zu textures\n", modelId, path.c_str(),
+    Z3D_LOG(SOH_ROOM, "loaded scene-room model %d (%s): %zu groups, %zu textures\n", modelId, path.c_str(),
             out->cGroups.size(), out->cTexs.size());
     // #29 diagnostic (`log room 1`): dump per-group material/texture + per-group bbox so the
     // "untextured dome" group can be identified by index (pair with ZELDA3D_SOLOGROUP to isolate
     // it visually).
-    if (Zelda3D_LogEnabled(Z3D_LOG_ROOM)) {
+    if (Zelda3D_LogEnabled(Z3D_LOG_SOH_ROOM)) {
         const auto& texs = out->cmb->textures();
         for (size_t i = 0; i < out->cGroups.size(); i++) {
             const auto& g = out->groups[i];
@@ -382,7 +381,7 @@ static void loadSceneRoom(int modelId, LoadedModel* out) {
                     mx[k] = std::max(mx[k], v.pos[k]);
                 }
             }
-            Z3D_LOG(ROOM,
+            Z3D_LOG(SOH_ROOM,
                     "grp%2zu mat%d tex%d %-18s verts%5zu mesh_id%d "
                     "x[%.0f,%.0f] y[%.0f,%.0f] z[%.0f,%.0f]\n",
                     i, g.material_index, ti, tn, g.verts.size(), g.mesh_id, mn[0], mx[0], mn[1], mx[1], mn[2], mx[2]);
@@ -399,12 +398,12 @@ static void loadActorModel(int modelId, LoadedModel* out) {
     }
     auto zarBytes = r->read(kModels[modelId].zarPath);
     if (zarBytes.empty()) {
-        fprintf(stderr, "[Zelda3D] zar not found: %s\n", kModels[modelId].zarPath);
+        Z3D_LOG(SOH_ASSET, "zar not found: %s\n", kModels[modelId].zarPath);
         return;
     }
     out->zar = std::make_unique<Zelda3D::Zar>(std::move(zarBytes));
     if (!out->zar->ok()) {
-        fprintf(stderr, "[Zelda3D] Zar: %s\n", out->zar->error().c_str());
+        Z3D_LOG(SOH_ASSET, "Zar: %s\n", out->zar->error().c_str());
         return;
     }
     const Zelda3D::ZarFile* cmbf = nullptr;
@@ -422,17 +421,17 @@ static void loadActorModel(int modelId, LoadedModel* out) {
         cmbf = out->zar->firstWithSuffix(".cmb"); // fallback: single-CMB ZARs
     }
     if (!cmbf) {
-        fprintf(stderr, "[Zelda3D] no .cmb in %s\n", kModels[modelId].zarPath);
+        Z3D_LOG(SOH_ASSET, "no .cmb in %s\n", kModels[modelId].zarPath);
         return;
     }
     out->cmb = std::make_unique<Zelda3D::Cmb>(out->zar->read(*cmbf));
     if (!out->cmb->ok()) {
-        fprintf(stderr, "[Zelda3D] Cmb: %s\n", out->cmb->error().c_str());
+        Z3D_LOG(SOH_ASSET, "Cmb: %s\n", out->cmb->error().c_str());
         return;
     }
     buildFromCmb(out, /*bakedVertexColor=*/false);             // characters/props: dynamic lighting, color attr unused
     Zelda3D_AppendFacialFrames(out, kModels[modelId].zarPath); // eye/mouth .cmab frames (keystone #3)
-    fprintf(stderr, "[Zelda3D] loaded model %d (%s): %zu groups, %zu textures\n", modelId, kModels[modelId].zarPath,
+    Z3D_LOG(SOH_ASSET, "loaded model %d (%s): %zu groups, %zu textures\n", modelId, kModels[modelId].zarPath,
             out->cGroups.size(), out->cTexs.size());
 }
 
@@ -572,18 +571,18 @@ static void loadBillboard(LoadedModel* out, const std::string& zarPath, const st
     if (directCtxb) {
         ctxbBytes = r->read(zarPath);
         if (ctxbBytes.empty()) {
-            fprintf(stderr, "[Zelda3D] billboard: ctxb not found: %s\n", zarPath.c_str());
+            Z3D_LOG(SOH_ASSET, "billboard: ctxb not found: %s\n", zarPath.c_str());
             return;
         }
     } else {
         auto zarBytes = r->read(zarPath);
         if (zarBytes.empty()) {
-            fprintf(stderr, "[Zelda3D] billboard: zar not found: %s\n", zarPath.c_str());
+            Z3D_LOG(SOH_ASSET, "billboard: zar not found: %s\n", zarPath.c_str());
             return;
         }
         out->zar = std::make_unique<Zelda3D::Zar>(std::move(zarBytes));
         if (!out->zar->ok()) {
-            fprintf(stderr, "[Zelda3D] billboard Zar %s: %s\n", zarPath.c_str(), out->zar->error().c_str());
+            Z3D_LOG(SOH_ASSET, "billboard Zar %s: %s\n", zarPath.c_str(), out->zar->error().c_str());
             return;
         }
         const Zelda3D::ZarFile* zf = nullptr;
@@ -594,20 +593,20 @@ static void loadBillboard(LoadedModel* out, const std::string& zarPath, const st
             }
         }
         if (!zf) {
-            fprintf(stderr, "[Zelda3D] billboard %s: no '%s'\n", zarPath.c_str(), ctxbName.c_str());
+            Z3D_LOG(SOH_ASSET, "billboard %s: no '%s'\n", zarPath.c_str(), ctxbName.c_str());
             return;
         }
         ctxbBytes = out->zar->read(*zf);
     }
     Zelda3D::Ctxb ctxb(std::move(ctxbBytes));
     if (!ctxb.ok() || ctxb.textures().empty()) {
-        fprintf(stderr, "[Zelda3D] billboard ctxb %s: %s\n", ctxbName.c_str(), ctxb.error().c_str());
+        Z3D_LOG(SOH_ASSET, "billboard ctxb %s: %s\n", ctxbName.c_str(), ctxb.error().c_str());
         return;
     }
     int tw = 0, th = 0;
     auto rgba = ctxb.decodeRGBA(0, &tw, &th);
     if (rgba.empty()) {
-        fprintf(stderr, "[Zelda3D] billboard %s: decode failed\n", ctxbName.c_str());
+        Z3D_LOG(SOH_ASSET, "billboard %s: decode failed\n", ctxbName.c_str());
         return;
     }
     if (mirrorQuadrant) {
@@ -675,8 +674,8 @@ static void loadBillboard(LoadedModel* out, const std::string& zarPath, const st
     out->cGroups.push_back(cg);
     out->skinned = false;
     out->ok = true;
-    fprintf(stderr, "[Zelda3D] billboard %s|%s%s: %dx%d tex\n", zarPath.c_str(), ctxbName.c_str(),
-            additive ? " [add]" : "", tw, th);
+    Z3D_LOG(SOH_ASSET, "billboard %s|%s%s: %dx%d tex\n", zarPath.c_str(), ctxbName.c_str(), additive ? " [add]" : "",
+            tw, th);
 }
 
 static void loadAutoModel(int modelId, LoadedModel* out) {
@@ -758,12 +757,12 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
     }
     auto zarBytes = r->read(zarPath);
     if (zarBytes.empty()) {
-        fprintf(stderr, "[Zelda3D] auto: zar not found: %s\n", zarPath.c_str());
+        Z3D_LOG(SOH_ASSET, "auto: zar not found: %s\n", zarPath.c_str());
         return;
     }
     out->zar = std::make_unique<Zelda3D::Zar>(std::move(zarBytes));
     if (!out->zar->ok()) {
-        fprintf(stderr, "[Zelda3D] auto Zar %s: %s\n", zarPath.c_str(), out->zar->error().c_str());
+        Z3D_LOG(SOH_ASSET, "auto Zar %s: %s\n", zarPath.c_str(), out->zar->error().c_str());
         return;
     }
 
@@ -778,7 +777,7 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
             }
             auto cmb = std::make_unique<Zelda3D::Cmb>(out->zar->read(f));
             if (!cmb->ok()) {
-                fprintf(stderr, "[Zelda3D] auto forced-cmb %s '%s': %s\n", zarPath.c_str(), f.name.c_str(),
+                Z3D_LOG(SOH_ASSET, "auto forced-cmb %s '%s': %s\n", zarPath.c_str(), f.name.c_str(),
                         cmb->error().c_str());
                 return;
             }
@@ -791,13 +790,12 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
                     grp.depthWrite = 0; // never occlude the world
                 }
             }
-            fprintf(stderr,
-                    "[Zelda3D] auto-loaded model %d (%s | %s)%s: cmb '%s', height=%.1f, %zu groups, %zu textures\n",
+            Z3D_LOG(SOH_ASSET, "auto-loaded model %d (%s | %s)%s: cmb '%s', height=%.1f, %zu groups, %zu textures\n",
                     modelId, zarPath.c_str(), forcedCmb.c_str(), sky ? " [sky]" : "", f.name.c_str(),
                     Zelda3D_ModelGeometryHeight(*out), out->cGroups.size(), out->cTexs.size());
             return;
         }
-        fprintf(stderr, "[Zelda3D] auto forced-cmb %s: no cmb matches '%s' -> heuristic pick\n", zarPath.c_str(),
+        Z3D_LOG(SOH_ASSET, "auto forced-cmb %s: no cmb matches '%s' -> heuristic pick\n", zarPath.c_str(),
                 forcedCmb.c_str());
     }
 
@@ -829,15 +827,14 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
                 }
                 auto c = std::make_unique<Zelda3D::Cmb>(out->zar->read(zf));
                 if (!c->ok()) {
-                    fprintf(stderr, "[Zelda3D] assembly %s: '%s': %s\n", zarPath.c_str(), zf.name.c_str(),
-                            c->error().c_str());
+                    Z3D_LOG(SOH_ASSET, "assembly %s: '%s': %s\n", zarPath.c_str(), zf.name.c_str(), c->error().c_str());
                     continue;
                 }
                 cmbs.push_back(std::move(c));
                 matched++;
             }
             if (!matched) {
-                fprintf(stderr, "[Zelda3D] assembly %s: no cmb matches '%s'\n", zarPath.c_str(), want.c_str());
+                Z3D_LOG(SOH_ASSET, "assembly %s: no cmb matches '%s'\n", zarPath.c_str(), want.c_str());
             }
         }
         if (!cmbs.empty()) {
@@ -845,14 +842,14 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
             out->skinned = false; // hand-listed assemblies are static props (no skinning)
             buildFromCmbs(out, cmbs);
             out->cmb = std::move(cmbs[0]); // keep a resident CMB (the main part)
-            fprintf(stderr,
-                    "[Zelda3D] auto-loaded ASSEMBLY model %d (%s): %zu cmbs merged, height=%.1f, %zu groups, %zu "
+            Z3D_LOG(SOH_ASSET,
+                    "auto-loaded ASSEMBLY model %d (%s): %zu cmbs merged, height=%.1f, %zu groups, %zu "
                     "textures\n",
                     modelId, zarPath.c_str(), nMerged, Zelda3D_ModelGeometryHeight(*out), out->cGroups.size(),
                     out->cTexs.size());
             return;
         }
-        fprintf(stderr, "[Zelda3D] assembly %s: no cmbs merged -> single-pick fallback\n", zarPath.c_str());
+        Z3D_LOG(SOH_ASSET, "assembly %s: no cmbs merged -> single-pick fallback\n", zarPath.c_str());
     }
 
     // Pick the MAIN model CMB. Parse each candidate once (one-time per object). Prefer the
@@ -910,7 +907,7 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
         }
     }
     if (!bestCmb || !bestCmb->ok()) {
-        fprintf(stderr, "[Zelda3D] auto: no usable .cmb in %s\n", zarPath.c_str());
+        Z3D_LOG(SOH_ASSET, "auto: no usable .cmb in %s\n", zarPath.c_str());
         return;
     }
     out->cmb = std::move(bestCmb);
@@ -930,9 +927,9 @@ static void loadAutoModel(int modelId, LoadedModel* out) {
     // SkelAnime joint table (see Zelda3D_AutoModelSkinned callers). The
     // old " (skinned->skip)" tag was misleading; state=3 (real skip) only
     // fires when the retarget path is unavailable.
-    fprintf(stderr,
-            "[Zelda3D] auto-loaded model %d (%s): cmb '%s' of %d, height=%.1f, bones=%zu%s, %zu groups, %zu textures\n",
-            modelId, zarPath.c_str(), best ? best->name.c_str() : "?", nCmb, Zelda3D_ModelGeometryHeight(*out),
+    Z3D_LOG(SOH_ASSET,
+            "auto-loaded model %d (%s): cmb '%s' of %d, height=%.1f, bones=%zu%s, %zu groups, %zu textures\n", modelId,
+            zarPath.c_str(), best ? best->name.c_str() : "?", nCmb, Zelda3D_ModelGeometryHeight(*out),
             out->cmb->bones().size(), out->skinned ? " (skinned=SkelAnime retarget)" : "", out->cGroups.size(),
             out->cTexs.size());
 }

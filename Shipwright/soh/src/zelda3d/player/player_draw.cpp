@@ -24,7 +24,6 @@
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
 
 #include <cmath>
-#include <cstdio>
 #include <cstring>
 
 static inline Zelda3D::PlayerBehavior& P() {
@@ -149,9 +148,8 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         if (gZelda3dAnimDebug) {
             static int dbg = 0;
             if ((dbg++ % 30) == 0) {
-                fprintf(stderr, "SOH3D LINK: src=N64 jointTable limbCount=%d (live blended pose, per-bone corr)\n",
+                Z3D_LOG(SOH_LINK, "src=N64 jointTable limbCount=%d (live blended pose, per-bone corr)\n",
                         player->skelAnime.limbCount);
-                fflush(stderr); // these lines go to stderr; flushing stdout never flushed them
             }
         }
         P().retarget.ensure();
@@ -241,7 +239,7 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         if (gZelda3dLinkForceCsab[0] != '\0') {
             csab = gZelda3dLinkForceCsab; // REPL `linkanim` override (verification)
         }
-        if (Zelda3D_LogEnabled(Z3D_LOG_LINK)) {
+        if (Zelda3D_LogEnabled(Z3D_LOG_SOH_LINK)) {
             // #117 pickup diagnosis: trace the exact fields that decide the carry/lift CSAB per draw.
             const char* lo = (const char*)player->skelAnime.animation;
             const char* lob = lo ? strrchr(lo, '/') : NULL;
@@ -253,7 +251,7 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
             // Player's latched copy (av2.actionVar2), and the horse frame Link syncs to (z_player.c
             // ~14048/14081) — the title-demo riding-pose diagnosis needs exactly these three.
             EnHorse* rh = (EnHorse*)player->rideActor;
-            Z3D_LOG(LINK,
+            Z3D_LOG(SOH_LINK,
                     "held=%d carryWalk=%d lin=%.2f spd=%.2f lower=%s(cf=%.1f/%.1f mw=%.3f mr=%.3f) upper=%s(cf=%.1f)"
                     " unk868=%.2f horseAnimIdx=%d av2=%d horseCurFrame=%.1f -> csab=%s\n",
                     player->heldActor != NULL, carryWalk, player->linearVelocity, player->actor.speedXZ, lob,
@@ -273,10 +271,8 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
             if (otr != sLastOtr || csab != sLastCsab) {
                 sLastOtr = otr;
                 sLastCsab = csab;
-                fprintf(stderr, "SOH3D LINK: src=3DS n64=%s -> csab=%s frame=%.1f/%.1f speedXZ=%.2f\n",
-                        otr ? otr : "(none)", csab, player->skelAnime.curFrame, player->skelAnime.animLength,
-                        player->actor.speedXZ);
-                fflush(stderr);
+                Z3D_LOG(SOH_LINK, "src=3DS n64=%s -> csab=%s frame=%.1f/%.1f speedXZ=%.2f\n", otr ? otr : "(none)",
+                        csab, player->skelAnime.curFrame, player->skelAnime.animLength, player->actor.speedXZ);
             }
         }
         // carry-WALK rides the same speed-driven loco free-run as walk/run (nml_carryB_free has no
@@ -358,9 +354,8 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
         static unsigned long long sLastMask = ~0ull;
         if (midMask != sLastMask) {
             sLastMask = midMask;
-            fprintf(stderr, "SOH3D LINK mids: LH=%d RH=%d sheath=%d shield=%d -> mask=0x%llx\n", player->leftHandType,
+            Z3D_LOG(SOH_LINK, "mids: LH=%d RH=%d sheath=%d shield=%d -> mask=0x%llx\n", player->leftHandType,
                     player->rightHandType, player->sheathType, player->currentShield, midMask);
-            fflush(stderr);
         }
     }
     Zelda3D_GL_SetMidMask(modelId, midMask);
@@ -403,12 +398,12 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     // #152 seat diagnostics (`log rider 1`): posed origins of the first rig bones while mounted —
     // identifies which bone carries the riding clip's root translation (the term the 3DS subtracts
     // from the attach: player.pos = anchor - rootJoint*scale, FUN_002b7fd0 / en_horse_rider_pos.md).
-    if (mountedPose && Zelda3D_LogEnabled(Z3D_LOG_RIDER)) {
+    if (mountedPose && Zelda3D_LogEnabled(Z3D_LOG_SOH_RIDER)) {
         float b0[3] = { 0 }, b1[3] = { 0 }, b2[3] = { 0 };
         Zelda3D_PosedBoneWorldPos(modelId, 0, b0);
         Zelda3D_PosedBoneWorldPos(modelId, 1, b1);
         Zelda3D_PosedBoneWorldPos(modelId, 2, b2);
-        Z3D_LOG(RIDER,
+        Z3D_LOG(SOH_RIDER,
                 "LINKROOT b0=(%.0f,%.0f,%.0f) b1=(%.0f,%.0f,%.0f) b2=(%.0f,%.0f,%.0f) "
                 "scale=%.5f csab=%s\n",
                 b0[0], b0[1], b0[2], b1[0], b1[1], b1[2], b2[0], b2[1], b2[2], gZelda3dLinkScale,
@@ -432,7 +427,7 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
     }
     // Per-draw world-anchor trace (jitter/slide/climb measurement): every term that enters the draw
     // translate, one line per logic frame.
-    Z3D_LOG(LINK, "GROUND gf=%d pos=(%.3f,%.3f,%.3f) yOff=%.3f drawY=%.3f spd=%.3f csab=%s%s\n",
+    Z3D_LOG(SOH_LINK, "GROUND gf=%d pos=(%.3f,%.3f,%.3f) yOff=%.3f drawY=%.3f spd=%.3f csab=%s%s\n",
             (int)play->gameplayFrames, actor->world.pos.x, actor->world.pos.y, actor->world.pos.z, actor->shape.yOffset,
             actor->world.pos.y + actor->shape.yOffset * actor->scale.y, player->actor.speedXZ, csab ? csab : "(n64)",
             mountedPose ? " [mounted]" : "");
@@ -519,12 +514,11 @@ extern "C" int Zelda3D_PlayerDrawImpl(PlayState* play, Actor* actor) {
             Matrix_MultVec3f(&l11, &w11);
             static int fdbg = 0;
             if ((fdbg++ % 30) == 0) {
-                fprintf(stderr,
-                        "SOH3D FOCUS dbg b9=(%.0f,%.0f,%.0f) b10=(%.0f,%.0f,%.0f) b11=(%.0f,%.0f,%.0f) "
+                Z3D_LOG(SOH_LINK,
+                        "FOCUS dbg b9=(%.0f,%.0f,%.0f) b10=(%.0f,%.0f,%.0f) b11=(%.0f,%.0f,%.0f) "
                         "world=(%.0f,%.0f,%.0f)\n",
                         w9.x, w9.y, w9.z, w10.x, w10.y, w10.z, w11.x, w11.y, w11.z, actor->world.pos.x,
                         actor->world.pos.y, actor->world.pos.z);
-                fflush(stderr); // these lines go to stderr; flushing stdout never flushed them
             }
         }
     }

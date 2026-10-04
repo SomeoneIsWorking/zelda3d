@@ -1,3 +1,4 @@
+#include "../core/zelda3d_log.h"
 #include "../core/zelda3d_runtime.h"
 #include "../anim/skeleton_draw_bridge.h"
 #include "actor_auto_replacement.h"
@@ -141,13 +142,12 @@ static void Zelda3D_Report1to1(int objId, const char* modelKey, Actor* actor, fl
     // rotated to match the world-space N64 measure. A non-zero yaw here is the case that used to be
     // silently wrong, so it must be visible on the line that reports the verdict.
     const float yawDeg = measYaw * (360.0f / 65536.0f);
-    fprintf(stderr,
-            "SOH3D 1TO1: obj 0x%x %s src=%s derived=%.5f | actor->scale=(%.5f,%.5f,%.5f) yaw=%.1fdeg "
+    Z3D_LOG(SOH_RENDER,
+            "1TO1: obj 0x%x %s src=%s derived=%.5f | actor->scale=(%.5f,%.5f,%.5f) yaw=%.1fdeg "
             "ratios h=%.5f%c x=%.5f%c z=%.5f%c | %d/%d -> %s\n",
             objId, modelKey ? modelKey : "?", source, derived, actor->scale.x, actor->scale.y, actor->scale.z, yawDeg,
             rh, hv ? (hm ? '=' : '!') : '-', rx, xv ? (xm ? '=' : '!') : '-', rz, zv ? (zm ? '=' : '!') : '-', nMatch,
             nValid, verdict);
-    fflush(stderr);
 }
 
 // Try the ZELDA3D_AUTO path for an actor with no explicit sModelTable entry. Returns 1 if
@@ -344,23 +344,21 @@ int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
                 e->state = 2;
                 Zelda3D_Report1to1(objId, modelKey, actor, r[0], r[1], r[2], e->scale, "actor-scale", e->measYaw);
                 if (Zelda3D_AutoMode() >= 1) {
-                    fprintf(stderr,
-                            "SOH3D AUTO: obj 0x%x %s -> scale=%.5f FROM actor->scale, CONFIRMED 1:1 on "
+                    Z3D_LOG(SOH_RENDER,
+                            "obj 0x%x %s -> scale=%.5f FROM actor->scale, CONFIRMED 1:1 on "
                             "[%s] (h=%.5f x=%.5f z=%.5f; height-primary would have given %.5f, %+.1f%%)\n",
                             objId, modelKey, e->scale, members, r[0], r[1], r[2], wasHeight,
                             (wasHeight > 1e-6f) ? 100.0f * (e->scale / wasHeight - 1.0f) : 0.0f);
-                    fflush(stderr);
                 }
                 return 0; // draw next frame, now that a scale exists
             }
             if (m >= 1 && !uniform && Zelda3D_AutoMode() >= 1) {
                 // Say it out loud rather than silently falling through: this is the King Zora class.
-                fprintf(stderr,
-                        "SOH3D AUTO: obj 0x%x %s CONFIRMED 1:1 on [%s] but actor->scale is NON-UNIFORM "
+                Z3D_LOG(SOH_RENDER,
+                        "obj 0x%x %s CONFIRMED 1:1 on [%s] but actor->scale is NON-UNIFORM "
                         "(%.5f,%.5f,%.5f) -- a single worldScale cannot express it, so the derived "
                         "scale is used and the prop renders at a WRONG ASPECT. Needs per-axis scale.\n",
                         objId, modelKey, members, sx, sy, sz);
-                fflush(stderr);
             }
         }
         if (tooFlat) {
@@ -394,12 +392,11 @@ int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
                         // N64 footprint reads square at 60x60 against a 1044x1192 model, so something
                         // other than the plane was measured). Flag it rather than hide it in an average.
                         const float spread = (sx > 1e-6f && sz > 1e-6f) ? (sx > sz ? sx / sz : sz / sx) - 1.0f : 0.0f;
-                        fprintf(stderr,
-                                "SOH3D AUTO: obj 0x%x %s -> scale=%.5f FROM FOOTPRINT "
+                        Z3D_LOG(SOH_RENDER,
+                                "obj 0x%x %s -> scale=%.5f FROM FOOTPRINT "
                                 "(n64 %.1fx%.1f model %.1fx%.1f, height was %.2f, axis spread %.1f%%%s)\n",
                                 objId, modelKey, e->scale, e->measFootX, e->measFootZ, mx, mz, e->measuredH,
                                 100.0f * spread, (spread > 0.08f) ? " *** AXES DISAGREE, scale is a guess ***" : "");
-                        fflush(stderr);
                     }
                     return 0; // draw next frame, now that a scale exists
                 }
@@ -440,12 +437,11 @@ int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
                     const float wx = rx > 1.0f ? rx : 1.0f / rx;
                     const float wz = rz > 1.0f ? rz : 1.0f / rz;
                     if (wx > 1.25f || wz > 1.25f) {
-                        fprintf(stderr,
-                                "SOH3D AUTO: obj 0x%x %s -- height scale %.5f differs from the footprint "
+                        Z3D_LOG(SOH_RENDER,
+                                "obj 0x%x %s -- height scale %.5f differs from the footprint "
                                 "(x %.2fx, z %.2fx). CHECK the pairing: a gross mismatch means the wrong "
                                 "mesh, a modest consistent one may just be a Grezzo re-authoring\n",
                                 objId, modelKey, e->scale, wx, wz);
-                        fflush(stderr);
                     }
                 }
             }
@@ -454,9 +450,8 @@ int Zelda3D_TryAuto(PlayState* play, Actor* actor) {
                 // that says WHICH mesh was picked. Printing the bare zar made a forced slot and the
                 // default per-object slot log identically, so the log could not show that a forced
                 // entry had resolved at all.
-                fprintf(stderr, "SOH3D AUTO: obj 0x%x %s -> scale=%.5f (n64h=%.1f modelh=%.1f)%s\n", objId, modelKey,
-                        e->scale, e->measuredH, modelH, e->skinned ? " [n64anim]" : "");
-                fflush(stdout);
+                Z3D_LOG(SOH_RENDER, "obj 0x%x %s -> scale=%.5f (n64h=%.1f modelh=%.1f)%s\n", objId, modelKey, e->scale,
+                        e->measuredH, modelH, e->skinned ? " [n64anim]" : "");
             }
             if (e->skinned) {
                 // Defer to the SkelAnime hook (drive the OoT3D skeleton from live N64 joints).
@@ -515,8 +510,6 @@ void Zelda3D_AutoRetryOnSceneChange(PlayState* play) {
     }
     revived += Zelda3D_SpecialReplacementRetryNoMeasurement();
     if (revived > 0 && Zelda3D_AutoMode() >= 1) {
-        fprintf(stderr, "SOH3D AUTO: scene %d -- retrying %d slot(s) that never got a measurement\n", (int)cur,
-                revived);
-        fflush(stderr);
+        Z3D_LOG(SOH_RENDER, "scene %d -- retrying %d slot(s) that never got a measurement\n", (int)cur, revived);
     }
 }

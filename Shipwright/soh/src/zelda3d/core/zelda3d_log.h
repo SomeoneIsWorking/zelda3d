@@ -1,61 +1,68 @@
-// Zelda3D diagnostic logger — ONE registry for every debug channel, replacing the ad-hoc
-// per-site `static int sDbg = getenv("ZELDA3D_DBG_X")` sprawl (banned by the env-flag-registry
-// rule in the global CLAUDE.md).
+// OoT's diagnostic channels -- the names ZELDA3D_LOG and the REPL `log` command accept for this game,
+// and the enum whose values index this game's channel table. The logger itself (sink, levels, the
+// gate, the log file) is Lucent's, reached through zelda3d_shared/diagnostics/zelda3d_log.h; MM
+// registers its own channels the same way.
 //
-// Usage at a call site (C or C++):
-//     #include "../core/zelda3d_log.h"
-//     Z3D_LOG(RIDER, "funcIdx=%d animIdx=%d\n", funcIdx, idx);
-// Compiles to a channel-enabled check + stderr fprintf with a "[RIDER] " prefix. Cheap when off
-// (one array read).
+// The enum and the table in zelda3d_log.c MUST list the same channels in the same order: a compiled-in
+// Z3D_LOG_* value indexes that table directly, so a reordering that desynchronised them would not fail
+// to build -- it would print every message under another channel's name. That is the one failure mode a
+// shared registry cannot catch for us, and the reason the table is an indexed initializer rather than a
+// list someone has to keep in step.
 //
-// Enabling channels:
-//   - env  ZELDA3D_LOG=rider,titlecam   (comma list, case-insensitive; "all" enables everything)
-//   - REPL `log list` / `log <channel> <0|1>` / `log all <0|1>` — runtime toggle, no rebuild
-//     (zelda3d_repl.cpp), per the iterate-via-REPL-not-rebuild rule.
-//
-// Adding a channel: one enum entry here + its name in kZelda3dLogNames (zelda3d_log.c). Do NOT
-// add new ZELDA3D_DBG_* env vars — this file is the registry.
+// CUT BY SUBSYSTEM, NOT BY MESSAGE PREFIX, because a channel is a switch and a prefix is only a label
+// someone typed: the test each channel has to pass is that one investigation can be run by turning on
+// one channel. The nine title/input/player channels below are the ones this game already had; the rest
+// were added when the rest of the tree's direct stderr writes were brought onto the logger, so the
+// asset, animation, bone, HUD, render, scene and launcher diagnostics became reachable at all.
 #ifndef ZELDA3D_LOG_H
 #define ZELDA3D_LOG_H
 
-#include <stdio.h>
+// Re-exports the shared adapter and the macros, so a call site includes this header and gets both: it
+// names a channel from the enum below and writes through the one logger. A caller never includes the
+// shared header directly, because a channel name is meaningless without the game's enum.
+#include "diagnostics/zelda3d_log.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef enum {
-    Z3D_LOG_RIDER,     // title-demo EnHorse cs dispatch (title_rider.cpp)
-    Z3D_LOG_TITLECAM,  // title cs camera spline eval (zelda3d_cutscene.cpp)
-    Z3D_LOG_TITLESKIP, // press-START skip state machine (title_logo.cpp)
-    Z3D_LOG_FIREGLOW,  // title fire-glow CMAB channels (title_fireglow.cpp)
-    Z3D_LOG_WORDMARK,  // title wordmark decoration (title_logo.cpp)
-    Z3D_LOG_SHEEN,     // title logo sheen ramp (title_logo.cpp)
-    Z3D_LOG_INPUT,     // input scheme / pad mapping (zelda3d input sites)
-    Z3D_LOG_ROOM,      // room/scene model swaps (zelda3d.c room sites)
-    Z3D_LOG_LINK,      // player CSAB selection per draw (zelda3d_link.cpp, ex `linktrace`)
-    Z3D_LOG_COUNT
+    // ── title demo ──────────────────────────────────────────────────────────────────────────────
+    Z3D_LOG_SOH_RIDER,     // title-demo EnHorse cs dispatch (title_rider.cpp)
+    Z3D_LOG_SOH_TITLECAM,  // title cs camera spline eval (zelda3d_cutscene.cpp)
+    Z3D_LOG_SOH_TITLESKIP, // press-START skip state machine (title_logo.cpp)
+    Z3D_LOG_SOH_FIREGLOW,  // title fire-glow CMAB channels (title_fireglow.cpp)
+    Z3D_LOG_SOH_WORDMARK,  // title wordmark decoration (title_logo.cpp)
+    Z3D_LOG_SOH_SHEEN,     // title logo sheen ramp (title_logo.cpp)
+
+    // ── input and player ────────────────────────────────────────────────────────────────────────
+    Z3D_LOG_SOH_INPUT, // input scheme / pad mapping, and the first-person repro injector
+    Z3D_LOG_SOH_LINK,  // player CSAB selection per draw (zelda3d_link.cpp, ex `linktrace`)
+
+    // ── world and assets ────────────────────────────────────────────────────────────────────────
+    Z3D_LOG_SOH_ROOM,  // room/scene model swaps (zelda3d.c room sites)
+    Z3D_LOG_SOH_ASSET, // CMB/GAR/ZAR/ZSI/CTXB load and parse, atlases, facial CMABs, ground fields
+    Z3D_LOG_SOH_SCENE, // collision zsi decode, the stair mesh splice, its embedded stone texture
+    Z3D_LOG_SOH_ANIM,  // CSAB lookup, anim mapping, automatic playback decisions, walk-stop synth
+
+    // ── skeleton inspection ─────────────────────────────────────────────────────────────────────
+    // The N64-limb side, the CMB-side dumps and the pose tables, together: they answer one question
+    // (why is this limb at this pose), and splitting them would make it unanswerable without enabling
+    // three unrelated subsystems at once.
+    Z3D_LOG_SOH_BONE,
+
+    // ── render ──────────────────────────────────────────────────────────────────────────────────
+    Z3D_LOG_SOH_RENDER, // auto object replacement, its scale calibration, field props, sky
+    Z3D_LOG_SOH_HUD,    // HUD glyph, keycap, heart, button and counter texture decode
+
+    // ── process ─────────────────────────────────────────────────────────────────────────────────
+    Z3D_LOG_SOH_LAUNCHER, // the in-game chooser: hand-off, exit requests, choice state
+    Z3D_LOG_SOH_REPL,     // the control channel's own transport and session-default reports
+    // There is deliberately NO lifecycle channel. The run-scoped-state audit is always emitted, so a
+    // channel here would be a switch that does not switch it -- see Z3D_LOG_LIFECYCLE_INFO.
+
+    Z3D_LOG_SOH_COUNT
 } Zelda3dLogChannel;
-
-// 1 if the channel is enabled (env parsed lazily on first call).
-int Zelda3D_LogEnabled(int channel);
-
-// Runtime toggle by name ("rider", "all", ...). Returns 1 if the name matched.
-int Zelda3D_LogSet(const char* name, int on);
-
-// One line per channel: "name on|off" (REPL `log list`).
-void Zelda3D_LogList(char* out, int outCap);
-
-// Channel name for the message prefix (internal to the macro).
-const char* Zelda3D_LogName(int channel);
-
-#define Z3D_LOG(ch, ...)                                             \
-    do {                                                             \
-        if (Zelda3D_LogEnabled(Z3D_LOG_##ch)) {                      \
-            fprintf(stderr, "[%s] ", Zelda3D_LogName(Z3D_LOG_##ch)); \
-            fprintf(stderr, __VA_ARGS__);                            \
-        }                                                            \
-    } while (0)
 
 #ifdef __cplusplus
 }

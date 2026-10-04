@@ -1,8 +1,8 @@
 #include "collectible_probe.h"
+#include "../core/zelda3d_log.h"
 #include "functions/actors.h"
 #include "functions/math.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 
 void Zelda3D_DebugDrawDrop(PlayState* play) {
@@ -19,7 +19,7 @@ void Zelda3D_DebugDrawDrop(PlayState* play) {
         };
         long dropId = strtol(value, NULL, 0);
         EnItem00* item = Item_DropCollectible(play, &pos, (s16)dropId);
-        fprintf(stderr, "[Zelda3D #36] dropped id=%ld at (%.0f,%.0f,%.0f) -> %s\n", dropId, pos.x, pos.y, pos.z,
+        Z3D_LOG(SOH_ASSET, "dropped id=%ld at (%.0f,%.0f,%.0f) -> %s\n", dropId, pos.x, pos.y, pos.z,
                 item != NULL ? "OK" : "NULL");
         spawned = 1;
     }

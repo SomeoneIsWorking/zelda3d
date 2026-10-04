@@ -1,11 +1,11 @@
 #include "zelda3d_facial_assets.h"
 
 #include "zelda3d_model_internal.h"
+#include "../core/zelda3d_log.h"
 #include "../render/model_queries.h"
 #include "asset/pica_texture.h"
 
 #include <cstdint>
-#include <cstdio>
 #include <memory>
 #include <string>
 #include <utility>
@@ -89,7 +89,7 @@ Zelda3D::Faceb* GetFaceb(LoadedModel* model, const char* animationName) {
         if (facebFile != nullptr) {
             faceb = std::make_unique<Zelda3D::Faceb>(model->zar->read(*facebFile));
             if (!faceb->ok()) {
-                std::fprintf(stderr, "[Zelda3D] Faceb %s: %s\n", name.c_str(), faceb->error().c_str());
+                Z3D_LOG(SOH_ASSET, "Faceb %s: %s\n", name.c_str(), faceb->error().c_str());
                 faceb.reset();
             }
         }
@@ -138,7 +138,7 @@ void Zelda3D_AppendFacialFrames(LoadedModel* model, const std::string& archiveKe
             }
         }
         if (cmabFile == nullptr) {
-            std::fprintf(stderr, "[Zelda3D] facial %s: cmab '%s' not in zar\n", archiveKey.c_str(), channel.cmabSuffix);
+            Z3D_LOG(SOH_ASSET, "facial %s: cmab '%s' not in zar\n", archiveKey.c_str(), channel.cmabSuffix);
             continue;
         }
 
@@ -159,9 +159,8 @@ void Zelda3D_AppendFacialFrames(LoadedModel* model, const std::string& archiveKe
         const uint32_t dataLength = baseTexture.data_len;
         if (dataLength == 0 || frameCount == 0 ||
             static_cast<uint64_t>(textureDataOffset) + static_cast<uint64_t>(frameCount) * dataLength > bytes.size()) {
-            std::fprintf(stderr, "[Zelda3D] facial %s/%s: bad cmab layout (n=%u dataLen=%u texOff=%u len=%zu)\n",
-                         archiveKey.c_str(), channel.cmabSuffix, frameCount, dataLength, textureDataOffset,
-                         bytes.size());
+            Z3D_LOG(SOH_ASSET, "facial %s/%s: bad cmab layout (n=%u dataLen=%u texOff=%u len=%zu)\n",
+                    archiveKey.c_str(), channel.cmabSuffix, frameCount, dataLength, textureDataOffset, bytes.size());
             continue;
         }
 
@@ -176,8 +175,8 @@ void Zelda3D_AppendFacialFrames(LoadedModel* model, const std::string& archiveKe
             dimensions.emplace_back(baseTexture.width, baseTexture.height);
         }
         model->facialFrames[materialIndex] = std::move(frameTextures);
-        std::fprintf(stderr, "[Zelda3D] facial %s: loaded %u frames for mat %d from %s\n", archiveKey.c_str(),
-                     frameCount, materialIndex, channel.cmabSuffix);
+        Z3D_LOG(SOH_ASSET, "facial %s: loaded %u frames for mat %d from %s\n", archiveKey.c_str(), frameCount,
+                materialIndex, channel.cmabSuffix);
     }
 
     model->cTexs.resize(model->texRgba.size());
