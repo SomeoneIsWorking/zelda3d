@@ -448,9 +448,21 @@ void Context::ParseSpoiler(const char* spoilerFileName) {
 
 void Context::ParseHashIconIndexesJson(nlohmann::json spoilerFileJson) {
     nlohmann::json hashJson = spoilerFileJson["file_hash"];
+    // Audited 2026-08-13, docs/issues/0023. "file_hash" comes from a spoiler file this port loads
+    // from the player's disk, so both the loop count and the value are user-controlled here, and
+    // hashIconIndexes is a fixed std::array<uint8_t, 5> with no spare slots:
+    //  - an array longer than five entries walked off the end of hashIconIndexes, which is the next
+    //    member of Context, and
+    //  - each value indexed gSeedTextures (100 entries) with no bound, and that stored value is
+    //    later handed straight to GetSeedTexture by the file-select seed-hash row.
+    // Extra entries are ignored and an out-of-range value leaves its slot at the default 0 (icon
+    // zero), which is what an absent entry produces anyway. Nothing is clamped to a neighbour.
     int index = 0;
-    for (auto it = hashJson.begin(); it != hashJson.end(); ++it) {
-        hashIconIndexes[index] = gSeedTextures[it.value()].id;
+    for (auto it = hashJson.begin(); it != hashJson.end() && index < static_cast<int>(hashIconIndexes.size()); ++it) {
+        // SeedIconIndex takes a uint8_t, which is exactly what hashIconIndexes stores, so a
+        // non-integer or out-of-range value is refused there rather than here. The count is bounded by
+        // the loop condition: hashIconIndexes has five slots and this array is the player's file.
+        hashIconIndexes[index] = SeedIconIndex(it.value().get<uint8_t>(), "file_hash", index);
         index++;
     }
 }
@@ -553,7 +565,28 @@ TrialInfo* Context::GetTrial(TrialKey key) const {
 }
 
 Sprite* Context::GetSeedTexture(const uint8_t index) {
+    // Audited 2026-08-13, docs/issues/0023. This accessor deliberately has NO range check of its own,
+    // because it cannot refuse one. Its only callers are decomp code -- SpriteLoad/SpriteDraw in
+    // soh/src/overlays/gamestates/ovl_file_choose/z_file_choose.c, reached from ovl_file_choose.c:327-328
+    // and :347-348 -- and both dereference the returned Sprite on the next token, so returning nullptr
+    // would just move the failure, and there is no blank icon in the table to point a refused index at
+    // (Sprite.tex holds an "__OTR__textures/..." asset NAME).
+    //
+    // The bound therefore lives where the value is produced, on the same "reject at the boundary" rule
+    // the rest of this audit applies. Rando::SeedIconIndex is that one place: ParseHashIconIndexesJson
+    // calls it for a spoiler file, and SaveManager calls it for both copies of a save file's "seed"
+    // array. Every in-range index behaves exactly as it did before.
     return &gSeedTextures[index];
+}
+
+uint8_t SeedIconIndex(const uint8_t value, const char* source, const size_t index) {
+    if (static_cast<size_t>(value) >= gSeedTextures.size()) {
+        LUSLOG_ERROR("Rando::SeedIconIndex: %s[%zu] icon id %u is out of range (valid 0..%zu) -- REFUSED, "
+                     "icon left unset",
+                     source, index, value, gSeedTextures.size() - 1);
+        return 0;
+    }
+    return value;
 }
 
 OptionValue& Context::GetOption(const RandomizerSettingKey key) {

@@ -7,6 +7,8 @@
 #include "soh/Enhancements/custom-message/CustomMessageTypes.h"
 #include "draw.h"
 
+#include <libultraship/log/luslog.h>
+
 using namespace Rando;
 
 std::array<Item, RG_MAX> Rando::StaticData::itemTable;
@@ -473,7 +475,26 @@ void Rando::StaticData::InitItemTable() {
 }
 
 Item& Rando::StaticData::RetrieveItem(const RandomizerGet rgid) {
-    return itemTable[rgid];
+    // Audited 2026-08-13, docs/issues/0023. itemTable has no spare row, and rgid reaches this
+    // accessor as user-typed console text: `give_item randomizer <n>` casts std::stoi(args[2])
+    // straight to RandomizerGet with no range check (soh/Enhancements/debugconsole.cpp), and the
+    // save/plandomizer JSON name maps feed it too. An unchecked value returns an Item& into memory
+    // past the table, and Item owns a std::string and a shared_ptr<GetItemEntry>, so the first
+    // accessor call on it is already undefined behaviour rather than merely wrong data.
+    //
+    // It cannot return nullptr: every caller dereferences the result immediately. So a refused id
+    // lands on RG_GREEN_RUPEE, which is the fallback ItemFromGIID below already uses for exactly this
+    // shape of request ("there are vanilla items that don't exist in the item table ... if we don't
+    // return anything, the game will crash, so, as a workaround, return greg"). The index is never
+    // rewritten to a neighbouring row, which would be a plausible wrong item instead of a refusal.
+    const size_t index = static_cast<size_t>(rgid);
+    if (index >= itemTable.size()) {
+        LUSLOG_ERROR("StaticData::RetrieveItem: RandomizerGet %zu is out of range (valid 0..%zu) -- "
+                     "REFUSED, returning the fallback item",
+                     index, itemTable.size() - 1);
+        return itemTable[RG_GREEN_RUPEE];
+    }
+    return itemTable[index];
 }
 
 Item& Rando::StaticData::ItemFromGIID(const int giid) {
