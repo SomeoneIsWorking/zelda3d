@@ -44,7 +44,9 @@ Within that tree's `randomizer/`, `draw_boss_souls.cpp` owns boss-soul display l
 in `settings_world_options.cpp`, `settings_inventory_options.cpp`, `settings_trick_options.cpp`, and
 `settings_option_groups.cpp`, with option-list construction in `settings_option_lists.{h,cpp}`.
 `check_tracker_order.{h,cpp}` owns completion/reward ordering separately
-from tracker UI and event handling. `Shipwright/soh/soh/SaveManagerCBridge.cpp` implements the existing
+from tracker UI and event handling. `plandomizer_seed_hash.{h,cpp}` owns the spoiler log's
+`file_hash` seed-icon column -- its load, its write-back, and the `HashIcons` row -- separately from
+the rest of `Plandomizer.cpp`'s load/save/UI. `Shipwright/soh/soh/SaveManagerCBridge.cpp` implements the existing
 C save ABI over `SaveManager`. MM's controller LED/rumble policy lives in
 `2ship/2s2h/controller_feedback.cpp` behind the existing port ABI. Its graphics-text UTF-16 conversion and glyph callback
 adapter live in `2ship/2s2h/host/gfx_print`, using SDL's bounded UTF-8 decoder while retaining MM's
