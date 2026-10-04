@@ -286,6 +286,15 @@ ResourceLoader::ReadResourceInitDataXml(const std::string& filePath, std::shared
     resourceInitData->Format = RESOURCE_FORMAT_XML;
 
     auto root = document->FirstChildElement();
+    if (root == nullptr) {
+        // A document that parsed cleanly can still hold no element at all (a lone declaration or
+        // comment is not an error for tinyxml2), so the root cannot be assumed. Leave Type at
+        // ResourceType::None, which is how the no-document path above fails: GetFactory finds no
+        // factory for it and LoadResource returns nullptr, so nothing half-parsed is handed on.
+        SPDLOG_ERROR("Error reading OTR header from XML: No root element for file {}", filePath);
+        return resourceInitData;
+    }
+
     resourceInitData->Type =
         Context::GetRawInstance()->GetResourceManager()->GetResourceLoader()->GetResourceType(root->Name());
     resourceInitData->ResourceVersion = root->IntAttribute("Version");
