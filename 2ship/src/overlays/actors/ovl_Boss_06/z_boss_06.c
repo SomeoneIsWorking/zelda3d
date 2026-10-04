@@ -10,6 +10,7 @@
 #include "overlays/actors/ovl_En_Knight/z_en_knight.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/object_knight/object_knight.h"
+#include "libultraship/log/luslog.h"
 
 #include "2s2h/BenPort.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
@@ -155,6 +156,19 @@ void Boss06_Init(Actor* thisx, PlayState* play) {
     u8* curtainTexture;
     s32 i;
 
+    // params indexes sCurtainLocations, one entry per curtain (0 and 1, which the rest of this
+    // actor treats as lens flare 1 vs 2). EnKnight only ever spawns those two, but ActorViewer and
+    // the console `spawn` pass a raw s16 Params. Refusing before anything is set up leaves the
+    // actor killed with an empty Destroy, and leaves sIgosInstance on the real EnKnight instead of
+    // clobbering it with a parentless spawn. Audited 2026-08-12 (docs/issues/0023).
+    if ((ENBOSS06_GET_PARAMS(&this->actor) < 0) ||
+        (ENBOSS06_GET_PARAMS(&this->actor) >= ARRAY_COUNT(sCurtainLocations))) {
+        LUSLOG_ERROR("Boss06_Init: curtain params %d is not 0..%d -- REFUSED", ENBOSS06_GET_PARAMS(&this->actor),
+                     (int)ARRAY_COUNT(sCurtainLocations) - 1);
+        Actor_Kill(&this->actor);
+        return;
+    }
+
     sIgosInstance = (EnKnight*)this->actor.parent;
     this->actor.colChkInfo.damageTable = &sDamageTable;
 
@@ -177,8 +191,7 @@ void Boss06_Init(Actor* thisx, PlayState* play) {
     this->actor.flags &= ~ACTOR_FLAG_ATTENTION_ENABLED;
 }
 
-void Boss06_Destroy(Actor* thisx, PlayState* play) {
-}
+void Boss06_Destroy(Actor* thisx, PlayState* play) {}
 
 void Boss06_UpdateDamage(Boss06* this) {
     if (this->collider.base.acFlags & AC_HIT) {

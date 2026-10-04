@@ -7,6 +7,7 @@
 #include "z_en_boom.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
+#include "libultraship/log/luslog.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED)
 
@@ -334,6 +335,18 @@ EnBoomStruct D_808A3078[] = {
 
 void EnBoom_Draw(Actor* thisx, PlayState* play) {
     EnBoom* this = (EnBoom*)thisx;
+
+    // params indexes D_808A3078, one entry per EnBoomType (0..1), and it is a full s16, so an
+    // unknown value walks off the table and hands garbage to gSPDisplayList. Retail only spawns
+    // the two types (Player_UpperAction_15), but ActorViewer and the console `spawn` pass a raw
+    // s16 Params. Returning before OPEN_DISPS leaves the display list as found; only the cosmetic
+    // blure trail is also skipped. Audited 2026-08-12 (docs/issues/0023).
+    if ((this->actor.params < 0) || (this->actor.params >= ARRAY_COUNT(D_808A3078))) {
+        LUSLOG_ERROR("EnBoom_Draw: params %d is not 0..%d -- draw skipped", this->actor.params,
+                     (int)ARRAY_COUNT(D_808A3078) - 1);
+        return;
+    }
+
     EnBoomStruct* sp58 = &D_808A3078[this->actor.params];
     Vec3f sp4C;
     Vec3f sp40;

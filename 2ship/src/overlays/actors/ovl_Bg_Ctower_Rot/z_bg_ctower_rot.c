@@ -6,6 +6,7 @@
 
 #include "z_bg_ctower_rot.h"
 #include "objects/object_ctower_rot/object_ctower_rot.h"
+#include "libultraship/log/luslog.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED)
 
@@ -91,8 +92,7 @@ void BgCtowerRot_CorridorRotate(BgCtowerRot* this, PlayState* play) {
     }
 }
 
-void BgCtowerRot_DoorDoNothing(BgCtowerRot* this, PlayState* play) {
-}
+void BgCtowerRot_DoorDoNothing(BgCtowerRot* this, PlayState* play) {}
 
 void BgCtowerRot_DoorClose(BgCtowerRot* this, PlayState* play) {
     if (!Math_SmoothStepToF(&this->timer, 0.0f, 0.1f, 15.0f, 0.1f)) {
@@ -141,6 +141,16 @@ void BgCtowerRot_Update(Actor* thisx, PlayState* play) {
 
 void BgCtowerRot_Draw(Actor* thisx, PlayState* play) {
     BgCtowerRot* this = (BgCtowerRot*)thisx;
+
+    // params indexes sDLists, one entry per BgCtowerRotType (0..2). ActorViewer and the console
+    // `spawn` pass a raw s16 Params and Init's `else` branch has no default to reject one, so skip
+    // the draw instead of reading past the table. No OPEN_DISPS here, so returning is free.
+    // Audited 2026-08-12 (docs/issues/0023).
+    if ((this->dyna.actor.params < 0) || (this->dyna.actor.params >= ARRAY_COUNT(sDLists))) {
+        LUSLOG_ERROR("BgCtowerRot_Draw: params %d is not 0..%d -- draw skipped", this->dyna.actor.params,
+                     (int)ARRAY_COUNT(sDLists) - 1);
+        return;
+    }
 
     Gfx_DrawDListOpa(play, sDLists[this->dyna.actor.params]);
     if (this->dyna.actor.params == BGCTOWERROT_CORRIDOR) {
