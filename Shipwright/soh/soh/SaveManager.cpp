@@ -6,6 +6,7 @@
 #include "Enhancements/randomizer/SeedContext.h"
 #include "Enhancements/randomizer/entrance.h"
 #include "Enhancements/randomizer/dungeon.h"
+#include "Enhancements/randomizer/rando_hash.h"
 #include "Enhancements/randomizer/trial.h"
 #include "soh/util.h"
 #include "Enhancements/randomizer/hint.h"
@@ -206,7 +207,9 @@ void SaveManager::LoadRandomizer() {
     });
 
     SaveManager::Instance->LoadArray("seed", randoContext->hashIconIndexes.size(), [&](size_t i) {
-        SaveManager::Instance->LoadData("", randoContext->hashIconIndexes[i]);
+        uint8_t seedIcon = 0;
+        SaveManager::Instance->LoadData("", seedIcon);
+        randoContext->hashIconIndexes[i] = Rando::SeedIconIndex(seedIcon, "seed", i);
     });
 
     std::string inputSeed;
@@ -235,8 +238,6 @@ void SaveManager::LoadRandomizer() {
     SaveManager::Instance->LoadData("bombchuUpgradeLevel", gSaveContext.ship.quest.data.randomizer.bombchuUpgradeLevel);
 
     SaveManager::Instance->LoadData("pendingIceTrapCount", gSaveContext.ship.pendingIceTrapCount);
-
-    std::shared_ptr<Randomizer> randomizer = OTRGlobals::Instance->gRandomizer;
 
     size_t mqDungeonCount;
     SaveManager::Instance->LoadData("masterQuestDungeonCount", mqDungeonCount, (size_t)0);
@@ -389,8 +390,6 @@ void SaveManager::SaveRandomizer(SaveContext* saveContext, int sectionID, bool f
     SaveManager::Instance->SaveData("bombchuUpgradeLevel", saveContext->ship.quest.data.randomizer.bombchuUpgradeLevel);
 
     SaveManager::Instance->SaveData("pendingIceTrapCount", saveContext->ship.pendingIceTrapCount);
-
-    std::shared_ptr<Randomizer> randomizer = OTRGlobals::Instance->gRandomizer;
 
     SaveManager::Instance->SaveData("masterQuestDungeonCount", randoContext->GetDungeons()->CountMQ());
 
@@ -577,8 +576,9 @@ void SaveManager::StartupCheckAndInitMeta(int fileNum) {
         if (isRando) {
             nlohmann::json& randoBlock = metaSaveBlock["sections"]["randomizer"]["data"];
 
+            // Refuse an out-of-range seed icon and log it; see Rando::SeedIconIndex. docs/issues/0023.
             for (int i = 0; i < ARRAY_COUNT(fileMetaInfo[fileNum].seedHash); i++) {
-                fileMetaInfo[fileNum].seedHash[i] = randoBlock["seed"][i];
+                fileMetaInfo[fileNum].seedHash[i] = Rando::SeedIconIndex(randoBlock["seed"][i], "seed", i);
             }
             fileMetaInfo[fileNum].gregFound =
                 (int16_t)baseBlock["randomizerInf"][RAND_INF_GREG_FOUND >> 4] & (1 << (RAND_INF_GREG_FOUND & 0xF));

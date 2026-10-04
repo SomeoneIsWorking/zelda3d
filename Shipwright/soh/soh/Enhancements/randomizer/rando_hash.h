@@ -112,4 +112,21 @@ inline std::array<Sprite, 100> gSeedTextures = { {
     { dgQuestIconMagicJarSmallTex, 24, 24, G_IM_FMT_RGBA, G_IM_SIZ_32b, 98 },
     { dgQuestIconMagicJarBigTex, 24, 24, G_IM_FMT_RGBA, G_IM_SIZ_32b, 99 },
 } };
+
+namespace Rando {
+/// @brief Returns @p value if it indexes gSeedTextures, otherwise logs and returns 0.
+///
+/// Declared here because this header owns gSeedTextures and therefore its length. Every UNTRUSTED
+/// producer of a seed-icon byte goes through it: a spoiler file on disk and a save file that may
+/// have been hand-edited or written by another tool. The consumer,
+/// Rando::Context::GetSeedTexture, cannot check the index itself -- its only caller is decomp code
+/// that dereferences the returned Sprite on the next token -- so the bound has to live on the way
+/// in. Audited 2026-08-13, docs/issues/0023.
+///
+/// @param value The icon index read from the untrusted source.
+/// @param source Human-readable name of that source, for the log line.
+/// @param index Position within that source, for the log line.
+/// @return @p value, or 0 (icon zero, the same value an absent entry produces) when out of range.
+uint8_t SeedIconIndex(uint8_t value, const char* source, size_t index);
+} // namespace Rando
 #endif

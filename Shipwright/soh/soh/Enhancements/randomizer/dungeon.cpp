@@ -1,10 +1,32 @@
 #include "dungeon.h"
 
+#include <libultraship/log/luslog.h>
+
 #include "3drando/pool_functions.hpp"
 #include "static_data.h"
 #include "SeedContext.h"
 
 namespace Rando {
+
+namespace {
+// Where GetDungeon sends a DungeonKey that is not one of the twelve real keys. Audited 2026-08-13,
+// docs/issues/0023.
+//
+// It cannot be nullptr. SaveManager::LoadRandomizer dereferences the result unconditionally
+// (`randoContext->GetDungeon(dungeonId)->SetMQ()`) and that call is exactly the one carrying a
+// save-JSON-controlled `dungeonId`, so returning nullptr would turn the silent corruption this guard
+// exists to stop into a null-pointer write one line later -- inside a save load, which is a far
+// worse place to crash than in the console.
+//
+// So the refusal is a sink: a DungeonInfo that owns the whole surface GetDungeon hands out
+// (SetMQ/ClearMQ/IsMQ/SetKeyRing/GetName/...), is never visited by any enumeration --
+// GetDungeonList, CountMQ, ClearAllMQ and ParseJson all walk dungeonList, never this -- and is not
+// addressable through dungeonList. A refused id therefore writes to private state that no frame and
+// no later load can observe, which is the "change nothing" the issue asks for, without inventing a
+// neighbour dungeon to blame for it.
+DungeonInfo sRefusedDungeon;
+} // namespace
+
 DungeonInfo::DungeonInfo(std::string name_, const RandomizerHintTextKey hintKey_, const RandomizerGet map_,
                          const RandomizerGet compass_, const RandomizerGet smallKey_, const RandomizerGet keyRing_,
                          const RandomizerGet bossKey_, RandomizerGet reward_, RandomizerArea area_,
@@ -196,7 +218,19 @@ Dungeons::Dungeons() {
 Dungeons::~Dungeons() = default;
 
 DungeonInfo* Dungeons::GetDungeon(const DungeonKey key) {
-    return &dungeonList[key];
+    // dungeonList has no spare row and GetDungeon does not carry its own length, so an unchecked
+    // key is a DungeonInfo-shaped write into the following member. dungeonId reaches this accessor
+    // straight from the save JSON array "masterQuestDungeons" (SaveManager::LoadRandomizer), which
+    // makes it user-controlled on this port. See sRefusedDungeon above for why a refused key lands
+    // there instead of in a neighbour row.
+    const size_t index = static_cast<size_t>(key);
+    if (index >= dungeonList.size()) {
+        LUSLOG_ERROR("Dungeons::GetDungeon: dungeon id %zu is out of range (valid 0..%zu) -- REFUSED, "
+                     "no dungeon was modified",
+                     index, dungeonList.size() - 1);
+        return &sRefusedDungeon;
+    }
+    return &dungeonList[index];
 }
 
 DungeonInfo* Dungeons::GetDungeonFromScene(const uint16_t scene) {

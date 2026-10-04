@@ -1,9 +1,12 @@
 #include "trial.h"
 #include "static_data.h"
 
+#include <libultraship/log/luslog.h>
+
 namespace Rando {
-TrialInfo::TrialInfo(RandomizerHintTextKey nameKey_, TrialKey trialKey_)
-    : nameKey(std::move(nameKey_)), trialKey(std::move(trialKey_)) {
+// std::move removed: both parameters are enums, which are trivially copyable, so it had no effect and
+// clang-tidy rejects it (performance-move-const-arg). Behaviour is identical.
+TrialInfo::TrialInfo(RandomizerHintTextKey nameKey_, TrialKey trialKey_) : nameKey(nameKey_), trialKey(trialKey_) {
 }
 TrialInfo::TrialInfo() = default;
 TrialInfo::~TrialInfo() = default;
@@ -43,8 +46,37 @@ Trials::Trials() {
 }
 Trials::~Trials() = default;
 
+namespace {
+// Where GetTrial sends a TrialKey that is not one of the real trials. Audited 2026-08-13,
+// docs/issues/0023.
+//
+// It cannot be nullptr: SaveManager::LoadRandomizer dereferences the result unconditionally
+// (`randoContext->GetTrial(trialId)->SetAsRequired()`) and that call is exactly the one carrying a
+// save-JSON-controlled `trialId`, so nullptr would trade the silent corruption this guard exists to
+// stop for a null-pointer write in the middle of a save load.
+//
+// Built with the two-argument constructor on purpose. TrialInfo() is = default and leaves nameKey
+// UNINITIALIZED, and GetName() would index hintTextTable with it -- so a default-constructed sink
+// would still be a crash, just a different one. RHT_NONE keeps GetName() in range and TK_MAX states
+// plainly that this is not one of the trials, which nothing indexes by: GetTrialList,
+// GetAllTrialHintHeys and ParseJson all walk mTrials, never this object.
+TrialInfo sRefusedTrial{ RHT_NONE, TK_MAX };
+} // namespace
+
 TrialInfo* Trials::GetTrial(const TrialKey key) {
-    return &mTrials[key];
+    // mTrials has no spare row and GetTrial does not carry its own length, so an unchecked key is a
+    // TrialInfo-shaped write into the following member. trialId reaches this accessor straight from
+    // the save JSON array "requiredTrials" (SaveManager::LoadRandomizer), which makes it
+    // user-controlled on this port. See sRefusedTrial above for why a refused key lands there
+    // instead of in a neighbour trial.
+    const size_t index = static_cast<size_t>(key);
+    if (index >= mTrials.size()) {
+        LUSLOG_ERROR("Trials::GetTrial: trial id %zu is out of range (valid 0..%zu) -- REFUSED, "
+                     "no trial was modified",
+                     index, mTrials.size() - 1);
+        return &sRefusedTrial;
+    }
+    return &mTrials[index];
 }
 
 void Trials::SkipAll() {
