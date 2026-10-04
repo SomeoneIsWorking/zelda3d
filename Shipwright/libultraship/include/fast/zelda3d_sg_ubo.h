@@ -15,6 +15,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include "fast/zelda3d_fragment_lighting.h"
 #include "fast/zelda3d_model_types.h"
 
 namespace Zelda3DSg {
@@ -44,6 +45,19 @@ struct SgUbo {
     // function colors); the enabled fixed-function calculation remains a separate RE surface.
     float uMatDiffuse[4];
     float uPrimaryCtl[4];
+    // PICA fixed-function FRAGMENT lighting (render.cmb-fragment-lighting). uFragCtl.x is the
+    // number of light slots the fragment shader may evaluate; 0 means the reduced form is
+    // inapplicable or no producer has been grounded, and the shader then keeps its previous
+    // sources. uFragGlobalAmbient is PICA's `global_ambient` register, which FUN_003fa34c fills
+    // from the material's emission colour.
+    // uFragLight is 2 slots x 4 vec4 (see fast/zelda3d_fragment_lighting.h for the layout):
+    //   slot s, base = s*16: [0..3] (ambient.rgb, position.x), [4..7] (diffuse.rgb, position.y),
+    //                   [8..11] (specular0.rgb, position.z), [12..15] (specular1.rgb, -).
+    // Four vec4 per slot (three colour triples plus the direction halves), so the C view is 16
+    // floats per slot.
+    float uFragCtl[4];
+    float uFragGlobalAmbient[4];
+    float uFragLight[ZELDA3D_FRAG_LIGHT_SLOTS * 16];
     // PICA200 TEV constant-color: the selected slot (matConstant[combConstIdx]) for this
     // group's stage-0 combiner. .rgb = the color; .a = APPLY FLAG (>=0.5 modulates the
     // fragment output; <0.5 is a no-op so materials that don't use CONSTANT are unchanged).

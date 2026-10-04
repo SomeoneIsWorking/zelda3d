@@ -6,6 +6,7 @@
 #include "fast/backends/gfx_sdl3gpu.h"
 #include "fast/backends/zelda3d_sdl3gpu.h"
 #include "fast/zelda3d_material_overrides.h"
+#include "fast/zelda3d_fragment_lighting.h"
 #include "fast/zelda3d_instrumentation.h"
 #include "fast/zelda3d_sg_ubo.h"
 #include "fast/unified_material.h"
@@ -718,6 +719,20 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
         // CMB IsFragmentLighting (+0x00). The exact disabled branch supplies zero for both
         // fixed-function fragment colors; the enabled branch remains separately RE-partial.
         ubo.uPrimaryCtl[1] = grp.fragmentLighting ? 1.0f : 0.0f;
+        // PICA fixed-function fragment lighting's per-slot payload. Reports zero usable slots until
+        // a producer publishes the 0x60-byte runtime light records (see
+        // fast/zelda3d_fragment_lighting.h), which is what keeps FRAGMENT_SECONDARY at the
+        // deliberate black it has always been instead of a guessed flat specular.
+        Zelda3DFragmentLightMaterial fragMaterial = {};
+        fragMaterial.fragmentLighting = grp.fragmentLighting;
+        for (int k = 0; k < 3; k++) {
+            fragMaterial.emission[k] = grp.matEmission[k];
+            fragMaterial.ambient[k] = grp.matAmbient[k];
+            fragMaterial.diffuse[k] = grp.matDiffuse[k];
+            fragMaterial.specular0[k] = grp.matSpecular0[k];
+            fragMaterial.specular1[k] = grp.matSpecular1[k];
+        }
+        Zelda3DFragmentLighting::PackDraw(ubo, fragMaterial);
         // Per-light diffuse products for the vertex-lit sum (#153): matDiffuse * sceneLightColor.
         // Terrain materials bake matDiffuse=BLACK, so these are zero there and the light sum
         // reduces to the previously-verified ambient-only value. Alpha is different: CmbVShader
@@ -999,6 +1014,9 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
             // combiner, per-actor constant overrides, coordinator transforms, and alpha compare.
             // These fields are byte-compatible vec4/uvec4 blocks by construction (unified_ubo.h).
             memcpy(uu.common.uMatConst, ubo.uMatConst, sizeof(uu.common.uMatConst));
+            memcpy(uu.common.uFragCtl, ubo.uFragCtl, sizeof(uu.common.uFragCtl));
+            memcpy(uu.common.uFragGlobalAmbient, ubo.uFragGlobalAmbient, sizeof(uu.common.uFragGlobalAmbient));
+            memcpy(uu.common.uFragLight, ubo.uFragLight, sizeof(uu.common.uFragLight));
             memcpy(uu.common.uSheen, ubo.uSheen, sizeof(uu.common.uSheen));
             memcpy(uu.common.uTex0Xf, ubo.uTex0Xf, sizeof(uu.common.uTex0Xf));
             memcpy(uu.common.uTex1Xf, ubo.uTex1Xf, sizeof(uu.common.uTex1Xf));

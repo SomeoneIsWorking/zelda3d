@@ -3,6 +3,7 @@
 #include "fast/unified_vtx.h"
 #include "fast/unified_material.h" // UnifiedMaterial — ditto
 #include "fast/unified_ubo.h"      // CommonUbo/UnifiedDrawUbo — static_assert-checked against kCommonUboBody here
+#include "fast/zelda3d_fragment_lighting.h" // ZELDA3D_FRAG_LIGHT_SLOTS — the fragment-light transport
 #include "fast/zelda3d_model_types.h"
 
 #include <prism/processor.h>
@@ -132,6 +133,9 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
     vec4 uMatAmbient; \
     vec4 uMatDiffuse; \
     vec4 uPrimaryCtl; \
+    vec4 uFragCtl; \
+    vec4 uFragGlobalAmbient; \
+    vec4 uFragLight[@{ZELDA3D_FRAG_LIGHT_VEC4S}]; \
     vec4 uMatConst; \
     vec4 uSheen; \
     vec4 uTex0Xf; \
@@ -436,6 +440,28 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
         @if(o_genericTev)
             vec4 fragPrimary = ubo.uPrimaryCtl.y > 0.5 ? vColor0 : vec4(0.0);
             vec4 fragSecondary = vec4(0.0);
+            // PICA's fixed-function FRAGMENT colours, reduced exactly and gated exactly as the
+            // native route (render.cmb-fragment-lighting; see the mirrored block in
+            // zelda3d_sdl3gpu_shaders.cpp for the full derivation). uFragCtl.x is 0 until a
+            // producer publishes the per-light bank, so this leaves the pre-existing sources alone.
+            if (ubo.uFragCtl.x > 0.5) {
+                vec3 fragNormal = normalize(vNrmView);
+                vec3 diffuseSum = ubo.uFragGlobalAmbient.rgb;
+                vec3 specularSum = vec3(0.0);
+                int slots = int(ubo.uFragCtl.x + 0.5);
+                for (int i = 0; i < slots; ++i) {
+                    int b = i * 16;
+                    vec4 ambient = ubo.uFragLight[b];
+                    vec4 diffuse = ubo.uFragLight[b + 1];
+                    vec4 spec0 = ubo.uFragLight[b + 2];
+                    vec4 spec1 = ubo.uFragLight[b + 3];
+                    vec3 lightVector = normalize(vec3(diffuse.w, spec0.w, spec1.w));
+                    diffuseSum += diffuse.rgb * max(dot(fragNormal, lightVector), 0.0) + ambient.rgb;
+                    specularSum += spec0.rgb + spec1.rgb;
+                }
+                fragPrimary = vec4(clamp(diffuseSum, 0.0, 1.0), 1.0);
+                fragSecondary = vec4(clamp(specularSum, 0.0, 1.0), 1.0);
+            }
             vec4 texel = tevRun(vColor0, fragPrimary, fragSecondary, texel0(), texel1(), texel2());
             int afn = int(ubo.uTevCtl.w + 0.5);
             if (afn > 0 && !alphaPass(texel.a, ubo.uParams0.x, afn - 1)) discard;
@@ -552,6 +578,7 @@ std::string BuildSource(Variant v, bool vertex, int fragmentProbeMode = 0) {
         { "o_probeCombined", !vertex && fragmentProbeMode == 6 },
         { "generic_tev_functions", Fast::Zelda3DTev::kGenericFunctions },
         { "ZELDA3D_GL_MAX_BONES", ZELDA3D_GL_MAX_BONES },
+        { "ZELDA3D_FRAG_LIGHT_VEC4S", ZELDA3D_FRAG_LIGHT_SLOTS * 4 },
     };
     processor.populate(ctx);
     processor.load(kUnifiedShaderTemplate);

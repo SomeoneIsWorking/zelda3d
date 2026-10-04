@@ -42,6 +42,17 @@ typedef struct Zelda3DGlGroup {
     int fogEnabled;
     float matAmbient[3];
     float matDiffuse[4];
+    // The rest of the authored CMB colour block, needed only by the PICA fixed-function
+    // FRAGMENT lighting path (render.cmb-fragment-lighting). FUN_003fa5d0 forms four per-light
+    // colour products per slot -- ambient (+0xA4), diffuse (+0xA8), specular_0 (+0xAC),
+    // specular_1 (+0xB0) -- and also writes the material's EMISSION (+0xA0) to PICA's
+    // `global_ambient` register. Emission, specular_0 and specular_1 used to stop at the parser
+    // (cmb3d/asset/cmb_color_block.cpp), which is why the host had no specular anywhere and
+    // FRAGMENT_SECONDARY could only ever be black. Authored, in [0,1], already /255.
+    // See fast/zelda3d_fragment_lighting.h for the producer contract.
+    float matEmission[3];
+    float matSpecular0[3];
+    float matSpecular1[3];
     float combScaleRGB;
     float matConstant[6][4];
     int combConstIdx;

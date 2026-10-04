@@ -63,6 +63,13 @@ struct SgGroup {
     float combScaleRGB = 1.0f;
     float matAmbient[3] = { 1.0f, 1.0f, 1.0f };
     float matDiffuse[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    // The rest of the CMB colour block, needed only by the PICA fixed-function FRAGMENT path
+    // (render.cmb-fragment-lighting): FUN_003fa5d0 multiplies the per-light colours by these to
+    // form the four PICA LightSrc triples, and FUN_003fa34c writes the emission colour to PICA's
+    // `global_ambient`. See fast/zelda3d_fragment_lighting.h.
+    float matEmission[3] = { 0.0f, 0.0f, 0.0f };
+    float matSpecular0[3] = { 0.0f, 0.0f, 0.0f };
+    float matSpecular1[3] = { 0.0f, 0.0f, 0.0f };
     // PICA200 TEV constant palette + stage-0 selector (see Zelda3DGlGroup::matConstant /
     // combConstIdx). Populated by the model provider; overwritten by the per-actor override
     // channel (Step 2c EnHy body-color port) before submit.
