@@ -4,7 +4,7 @@
 
 extern "C" {
 #include "variables.h"
-void Player_Action_93(Player* player, PlayState* play);
+void Player_Action_DekuFlowerLaunch(Player* player, PlayState* play);
 }
 
 #define CVAR_NAME "gEnhancements.Player.FastFlowerLaunch"
@@ -13,7 +13,7 @@ void Player_Action_93(Player* player, PlayState* play);
 void RegisterFastFlowerLaunch() {
     COND_ID_HOOK(OnActorUpdate, ACTOR_PLAYER, CVAR, [](Actor* actor) {
         Player* player = GET_PLAYER(gPlayState);
-        if (player->actionFunc != Player_Action_93) {
+        if (player->actionFunc != Player_Action_DekuFlowerLaunch) {
             return;
         }
 

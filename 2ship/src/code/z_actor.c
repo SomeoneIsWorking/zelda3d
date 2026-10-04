@@ -2916,7 +2916,7 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
 }
 
 // 2S2H [Port] Extern these for use below in interpolation checks
-extern void Player_Action_93(Player* this, PlayState* play);
+extern void Player_Action_DekuFlowerLaunch(Player* this, PlayState* play);
 extern void Player_Action_DekuSpinAttack(Player* this, PlayState* play);
 
 void Actor_Draw(PlayState* play, Actor* actor) {
@@ -2941,7 +2941,7 @@ void Actor_Draw(PlayState* play, Actor* actor) {
     // If the player is performing a Deku spin or entering a Deku flower, set it so that interpolation allows for >90
     // angle changes to be interpolated smoothly
     if (actor->id == ACTOR_PLAYER &&
-        (((Player*)actor)->actionFunc == Player_Action_93 || ((Player*)actor)->actionFunc == Player_Action_DekuSpinAttack)) {
+        (((Player*)actor)->actionFunc == Player_Action_DekuFlowerLaunch || ((Player*)actor)->actionFunc == Player_Action_DekuSpinAttack)) {
         FrameInterpolation_InterpolateWiderAngles();
     }
 

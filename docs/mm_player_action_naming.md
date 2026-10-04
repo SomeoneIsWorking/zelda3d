@@ -1,23 +1,52 @@
-# MM (2S2H) z_player.c — action-function behavioral-RE reference (NOT applied)
+# MM (2S2H) z_player.c — action-function behavioral-RE reference
+
+> **STATUS 2026-10-04 — APPLIED. Read the corrections below before using this table.**
+> Of the 83 numbered `Player_Action_NN`, **82 are now named in the tree** (63 in `56cd4474`, 19 more
+> since; only `Player_Action_80` is still numbered). This table is kept as the RE record, but several
+> of its "proposed" names were **wrong or incomplete** and were replaced on landing. Where the landed
+> name differs, the landed name is the one in the code:
+>
+> | this table's proposal | landed name | why it changed |
+> |---|---|---|
+> | `Player_Action_1` → `ReturnToSolidGround` | `Player_Action_DekuHopFailed` | The state has no solid-ground reference: it fades to black, teleports to `gSaveContext.respawn[RESPAWN_MODE_DOWN]` (or `unk_3C0`), re-enters the room and fades in. Its own sfx is `NA_SE_SY_DEKUNUTS_JUMP_FAILED`, and 2ship's `Rando::RespawnOnWaterTouch` installs it with the comment "Mimic Deku Hop failure behavior". `Player_Action_Dying` (77) is the general void-out. |
+> | `Player_Action_2` → `TargetEnemyStand` | `Player_Action_TargetStand` | Kept short so it matches the existing `Target*` family (`TargetBackPedal`, `TargetBackBrake`); "enemy" is implied by the hostile-lock-on install gate. |
+> | `Player_Action_3` → `TargetNeutralStand` | `Player_Action_TargetFriendlyStand` | The gate is literally `Player_FriendlyLockOnOrParallel` (`PLAYER_STATE1_FRIENDLY_ACTOR_FOCUS` / `_PARALLEL` / `_LOCK_ON_FORCED_TO_RELEASE`), not "neutral". |
+> | `Player_Action_5` → `TargetSidewalk` | `Player_Action_TargetSideWalk` | The table's own note that "6's installer plays no anim" was the tell: 6's anim is loaded per-frame by `func_8083EE60`, and 5's installer anim is overwritten by the body's `func_8082EFE4` = `PLAYER_ANIMGROUP_side_walk`. |
+> | `Player_Action_6` → `TargetBackwalk` | `Player_Action_TargetBackWalk` | Renamed for legibility against the existing `TargetBackPedal` (15); 15 and 6 are genuinely different — 15 decelerates on `link_anchor_back_walk`, 6 blends `PLAYER_ANIMGROUP_back_walk` + `back_run` and accelerates. |
+> | `Player_Action_19` → `StartShielding` | `Player_Action_ShieldHit` | **"Never read" was false** — it is installed at `z_player.c:6208` by the shield-collision branch of the damage check. It plays `link_normal_defense_hit` / `link_anchor_defense_hit`, so it is the block reaction, not the shield raise (that is `Player_Action_Shielding`, 18). |
+> | `Player_Action_28` → `ZoraDive` | `Player_Action_ZoraLeapOutOfWater` | The install plays `NA_SE_EV_JUMP_OUT_WATER` and the body uses Zora gravity `-1.0` plus the R fin — it leaves the water, not enters it (`NA_SE_EV_DIVE_INTO_WATER` is 27's counterpart). |
+> | `Player_Action_31` → `SpinAttackChargeMove` | `Player_Action_SpinAttackChargeWalk` | The `func_8083E7F8` direction is not the discriminator; the anim blend target is: `D_8085CF70` = `link_fighter_power_kiru_walk` (31). |
+> | `Player_Action_32` → `SpinAttackChargeSideWalk` | `Player_Action_SpinAttackChargeSideWalk` | Correct; settled by `D_8085CF78` = `link_fighter_power_kiru_side_walk`. 31's distinct anim is why the direction branch alone could not name either. |
+> | `Player_Action_33` → `ClimbOntoLedge` | `Player_Action_StepUpLedge` | "ClimbOntoLedge" collided with `Player_Action_ClimbUpLedge` (49), which is the hang-then-climb. 33 is the run-at-the-ledge step-up (`Player_ActionHandler_12`), and its three anims are three HEIGHTS of that one action, not three actions. |
+> | `Player_Action_36` → `OpenDoor` | `Player_Action_OpenDoor` | Correct, and it IS distinguishable from 35 `DoorTransition` — 36's sole installer is `Player_Door_Knob` (`doorA`/`doorB`, `knobDoor->requestOpen`, `ENDOOR_TYPE_FRAMED`), 35's is the sliding-door/fade path. |
+> | `Player_Action_45` → `GrabWall` | `Player_Action_GrabWall` | Correct, and now backed by the state flags: `PLAYER_STATE2_1` / `40` / `100` are OoT's `PLAYER_STATE2_DO_ACTION_GRAB` / `_DISABLE_ROTATION_ALWAYS` / `_GRABBING_DYNAPOLY`. |
+> | `Player_Action_55` → `EnterWater` | `Player_Action_EnterWater` | Correct; a 1:1 twin of OoT `Player_Action_8084D7C4`. |
+> | `Player_Action_80` → `RideSwampBoat` | **(NOT APPLIED — still numbered)** | See `docs/re-frontier.md` `mm.action-func-naming`. The install side supports the scene (`SCENE_20SICHITAI` = the Southern Swamp, and `BgIngate` forces the B-button field during `CAM_SET_BOAT_CRUISE`), but the body has no ride reference at all and outside that scene it only wraps `Player_Action_81`. Two defensible names, so it stays numbered. |
+> | `Player_Action_81` → `BowMinigame` | `Player_Action_BowAim` | 81 is the weapon-aim state: `func_80847880` installs it with `Player_UseItem(ITEM_BOW)` and its body sets `unk_AA5 = PLAYER_UNKAA5_3`, which `func_8083868C` maps to `CAM_MODE_BOWARROW` / `SLINGSHOT` / `DEKUSHOOT` / `ZORAFIN`. "Bow minigames" described the shooting galleries (`En_Syateki_Man` forces the aim), not the state. |
+> | `Player_Action_87` → `FinishMaskTransformation` | `Player_Action_FinishMaskTransformation` | Correct; installed only from `Player_Init` after the post-mask skeleton reload. |
+> | `Player_Action_88` → `ElegyOfEmptiness` | `Player_Action_ElegyOfEmptiness` | Correct; the frame-10 call `func_80848640` spawns/repositions `play->actorCtx.elegyShells[transformation]` (`ACTOR_EN_TORCH2`). |
+> | `Player_Action_93` → `DekuFlowerLaunch` | `Player_Action_DekuFlowerLaunch` | Correct. The Deku-Baba-vs-Flower doubt is settled by `ACTOR_OBJ_ETCETERA` (2ship documents that overlay as "Deku Flower") with `params & 0x100` = the GOLD flower type, and by `DMG_DEKU_LAUNCH`. |
+> | `Player_Action_94` → `DekuFlowerFly` | `Player_Action_DekuFlowerFly` | Correct. `NA_SE_IT_DEKUNUTS_FLOWER_OPEN`, and the loop sfx `0x1851` = `NA_SE_IT_DEKUNUTS_FLOWER_ROLL`. |
+>
+> One premise of this document is **false**: upstream `zeldaret/mm` does not supply these names. At
+> `56fa21d` its `z_player.c` leaves all 20 of tranche 2's targets numbered exactly as ours, and names
+> only 16 others. Upstream is a partial check, not a source of names.
 
 Behavioral RE of the numbered `Player_Action_NN` player state-machine action functions in
 `2ship/src/overlays/actors/ovl_player_actor/z_player.c` — one row per function: what it does, its
 `Player_SetAction(this, <fn>, ...)` install context, the OoT (soh) `z_player.c` structural twin, and a
 **proposed** descriptive name. Adversarially verified per function.
 
-> **STATUS: reference only — these names are NOT applied to the code, and should not be batch-applied.**
-> Per `docs/re-frontier.md` `mm.action-func-naming`, renaming all 83 as a standalone sweep was
-> deliberately ruled out: `2ship` is a vendored fork, the OoT side is itself address-named (no
-> descriptive Rosetta stone), and non-canonical names diverge from the eventual upstream zeldaret
-> canonical names → permanent merge churn. The established pattern keeps the action funcs **numbered**
-> and names only the `Zelda3D_PlayerForce*` wrappers. This table exists to **seed instrumental naming**:
-> when `mm.force-hook-layer` (or a future dedicated pass) needs to intercept a specific action func, use
-> the behavioral evidence here to identify it — and reconcile the final name against the canonical
-> reference, treating the "proposed" column as a hypothesis, not an answer.
-
-The proposed names below survived adversarial verification against the function body + install context;
-treat the OoT-equiv column (itself address-named, e.g. `Player_Action_80840450`) as the structural
-match, and the evidence column as the checkable behavioral basis.
+> **HOW THE TABLE BELOW IS TO BE READ NOW.** The "new" column is the name that was *proposed* on
+> 2026-07-21 and is the historical RE record; the *landed* column in the status block above is what the
+> tree now contains. Where they differ, the correction table above is the authority. Two rows are
+> still useful as-is: the OoT-equiv column (a structural match, itself address-named in soh) and the
+> evidence column, which is the checkable behavioral basis for every name that did land.
+>
+> The historical reason this was kept as a reference table — batch-applying all 83 as a standalone
+> sweep was ruled out in July 2026 — turned out to be **mechanical, not epistemic** (see
+> `docs/re-frontier.md` `mm.action-func-naming`): the cross-file references were the only blocker, and
+> per-function RE plus editing every referencing file resolved 82 of 83.
 
 
 ## Proposed names (verified behavior, non-canonical — do not batch-apply)

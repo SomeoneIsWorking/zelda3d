@@ -8,7 +8,7 @@ extern "C" {
 
 #include "include/z64player.h"
 extern s32 Player_SetAction(PlayState* play, Player* player, PlayerActionFunc actionFunc, s32 arg3);
-extern void Player_Action_1(Player* player, PlayState* play);
+extern void Player_Action_DekuHopFailed(Player* player, PlayState* play);
 }
 
 static u8 lastOcarinaButton = OCARINA_BTN_INVALID;
@@ -22,7 +22,7 @@ void RespawnOnWaterTouch(Player* player) {
 
     if (player->stateFlags1 & PLAYER_STATE1_8000000) {
         // Mimic Deku Hop failure behavior
-        Player_SetAction(gPlayState, player, Player_Action_1, 0);
+        Player_SetAction(gPlayState, player, Player_Action_DekuHopFailed, 0);
         player->stateFlags1 |= PLAYER_STATE1_20000000;
     }
 }
