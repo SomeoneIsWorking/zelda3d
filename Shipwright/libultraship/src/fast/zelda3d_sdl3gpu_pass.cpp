@@ -844,14 +844,17 @@ void Fast::Zelda3DRenderer::DrawModel(int modelId, const float* mp16, const floa
                         constSlots[2][0], constSlots[2][1], constSlots[2][2], constSlots[2][3],
                         matConstMap ? matConstMap->size() : 0u);
             }
-            // Coordinator-1/2 transforms for the extra units. Mapping 4 (ProjectionMap) is not
-            // emulated and falls back to plain UV. oot3d-decomp/docs/cmb_texcoord_mapping.md
-            // recovers what the retail shader actually does: the mapping switch only exists in
-            // CmbVShader body@14, which the entry point selects on ShaderMode.w (0 or 1), so a
-            // material on body@214 is plain regardless of its mapping byte. The host does not
-            // transport ShaderMode.w yet, which is why the sphere map above is applied
-            // unconditionally on method 3 — see the render.cmb-texcoord-mapping frontier row
-            // before changing any of this.
+            // Coordinator-1/2 transforms for the extra units. The retail CmbVShader's mapping
+            // switch only exists in body@14, which the entry point selects on ShaderMode.w (0 or
+            // 1), so a material on body@214 is plain regardless of its mapping byte. The host does
+            // not transport ShaderMode.w, so mapping is applied UNCONDITIONALLY on the model path
+            // and never on the 2D overlay path (whose draws carry no mapping method) -- which is
+            // what the oracle does: all 38 mapped title draws are at ShaderMode.w == 0, and the
+            // 13 mode-2 draws bind no lights and draw with an ortho projection. Do NOT gate this on
+            // lit-ness: `ShaderMode.w == lit` is refuted twice over (OoT3D's mapped materials are
+            // vertex-lit, MM3D's are fragment-lit). Mapping method 4 (ProjectionMap) is emulated
+            // in the vertex shader; see docs/re-frontier.md `render.cmb-texcoord-mapping` for what
+            // is measured and what is still open before changing any of this.
             ubo.uTex1Xf[0] = grp.uv1Scale[0];
             ubo.uTex1Xf[1] = grp.uv1Scale[1];
             ubo.uTex1Xf[2] = uvOverride

@@ -216,6 +216,36 @@ void main() {
         vec2 suv = vec2((nv.x * 0.5 + 0.5 - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,
                         (nv.y * 0.5 + 0.5 - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
         vUv1 = vec2(suv.x, 1.0 - suv.y);
+    } else if (ubo.uTevCtl.y > 3.5 && ubo.uTevCtl.y < 4.5) {
+    // ProjectionMap (mapping method 4), recovered from the retail /CmbVShader.shbin's
+    // coordinator-1 arm (words 156-177, oot3d-decomp/docs/cmb_texcoord_mapping.md §4):
+    //   p    = (uInvView · viewPos, 1)      -- view position with the camera taken back out
+    //   t    = (TexMtx1 row0 · p, row1 · p, row2 · p)
+    //   if (0 >= zPre) or (0 < t.z):  t.xy ±= 32        [sub@300]
+    //   uv   = t.xy + 0.5                              [o3 has no w slot, so no divide]
+    // uInvView is a RIGID matrix (orthonormal rows, det +1) carrying a world-scale translation --
+    // decoded from the cached title command list, not assumed -- so it is the inverse VIEW
+    // matrix, and p is the vertex's PLACED position. uModelView is view·model, so the host's
+    // own model matrix applied to the skinned position IS p: ubo.uMV * sp, already computed as
+    // vWorld above (measured: DrawModel's mv16 translation equals the actor's world.pos).
+    // The same decode measured TexMtx1 row2 = (0,0,1,0), so zPre and t.z are the world normal's
+    // and the placed position's z. That identity holds for the whole retail method-4 population:
+    // every method-4 material in both games carries an identity coordinator transform (106 OoT3D
+    // + 73 MM3D actor materials), which is why uTex1Xf reduces to (1,1,0,0) here.
+    // The ±32 step is one full texcoord repeat, so it is inert under the only two wrap modes
+    // those materials use (REPEAT period 1, MIRRORED_REPEAT period 2) -- kept because it is the
+    // recovered program, not because it changes a texel today.
+        vec2 t4 = vec2((vWorld.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,
+                       (vWorld.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
+        // zPre is dp3(uInvView, viewNormal) -- the WORLD normal, which is mat3(uMV) * nM here and
+        // NOT `ns` (that one is an oracle-derived view-space override when a title draw sets one).
+        vec3 worldN = mat3(ubo.uMV) * nM;
+        if (!(worldN.z > 0.0 && vWorld.z <= 0.0)) {
+            t4.x += t4.x <= 0.0 ? -32.0 : 32.0;
+            t4.y += t4.y <= 0.0 ? -32.0 : 32.0;
+        }
+        t4 += 0.5;
+        vUv1 = vec2(t4.x, 1.0 - t4.y);
     } else {
         vec2 uv1 = vec2((aUv1.x - ubo.uTex1Xf.z) * ubo.uTex1Xf.x,
                         (aUv1.y - ubo.uTex1Xf.w) * ubo.uTex1Xf.y);
