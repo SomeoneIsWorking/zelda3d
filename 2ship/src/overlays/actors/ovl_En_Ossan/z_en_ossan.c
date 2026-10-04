@@ -8,6 +8,7 @@
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+#include "libultraship/log/luslog.h"
 
 #define FLAGS (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY | ACTOR_FLAG_UPDATE_CULLING_DISABLED)
 
@@ -268,8 +269,15 @@ void EnOssan_Init(Actor* thisx, PlayState* play) {
     EnOssan* this = (EnOssan*)thisx;
     s16 objectId;
 
-    if ((this->actor.params > ENOSSAN_PART_TIME_WORKER) && (this->actor.params < ENOSSAN_CURIOSITY_SHOP_MAN)) {
-        //! @bug: Impossible to reach, && should be an ||
+    //! @bug: `&&` is impossible to reach -- it should be an `||`. Harmless on a console, where Ossan
+    //! only ever comes from scene data as one of the two EnOssanWorker values, but ActorViewer and
+    //! the console `spawn` pass a raw s16 Params, so an unknown worker id read past sObjectIds. That
+    //! also covers every later sAnimationInfoList/sShops/sInitFuncs/sActorScales lookup, which is
+    //! all one row per worker: this actor never gets an update or draw func. Audited 2026-08-12
+    //! (docs/issues/0023).
+    if ((this->actor.params > ENOSSAN_PART_TIME_WORKER) || (this->actor.params < ENOSSAN_CURIOSITY_SHOP_MAN)) {
+        LUSLOG_ERROR("EnOssan_Init: worker params %d is not 0..%d -- REFUSED", this->actor.params,
+                     (int)ARRAY_COUNT(sObjectIds) - 1);
         Actor_Kill(&this->actor);
         return;
     }
