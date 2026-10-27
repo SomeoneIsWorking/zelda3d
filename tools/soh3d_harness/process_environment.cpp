@@ -137,7 +137,7 @@ bool AcquireSingletonLock() {
         buf[n] = 0;
         std::fprintf(stderr,
                      "soh3d_harness: another instance is already running (pid %s).\n"
-                     "  Kill it first: <safekill> soh3d_harness\n"
+                     "  Kill it first: kill <that pid>\n"
                      "  Lock file: %s\n",
                      buf[0] ? buf : "?", path.c_str());
         close(g_instance_lock_fd);
