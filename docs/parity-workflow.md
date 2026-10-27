@@ -31,7 +31,7 @@ improves (a first audit that used mismatched frames has to be superseded).
 
 ## Phase 2 — RE each divergence to GROUND TRUTH (the oot3d-decomp, not memory pokes)
 For each real gap, extend the OoT3D decomp until it covers the behavior; derive the correct
-value/behavior from the 3DS binary (decomp-port / ghidra-re skills), NOT from guessed SoH
+value/behavior from the 3DS binary (ghidra-re skill), NOT from guessed SoH
 struct offsets (SoH is 64-bit; N64 offset comments are wrong past ~0x74). Record in
 `oot3d-decomp/docs/`. **Ghidra derives; the running game only locates** (user directive
 2026-07-09): constants/behavior come from static decompilation, never from measuring the
