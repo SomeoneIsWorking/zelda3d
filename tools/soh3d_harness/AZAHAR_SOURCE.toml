@@ -2,7 +2,7 @@
 # The checkout remains local and gitignored; this file is the reproducible
 # dependency contract used to provision it.
 url = "https://github.com/SomeoneIsWorking/azahar.git"
-revision = "0de1e9d7ab2aff3d980ec9056966e85f4c0ba345"
+revision = "91e7bb30117da915a7dbdf6a13093afeb324a0a0"
 branch = "soh3d-harness"
 upstream = "https://github.com/azahar-emu/azahar.git"
 upstream_base = "7088baae4c2ea48f7dcaf1fb5ea21ed812af2a55"

@@ -42,7 +42,7 @@ GLSLANG = NativeSource(
 LUCENT = NativeSource(
     "lucent",
     "https://github.com/SomeoneIsWorking/lucent.git",
-    "cac301db85b1f0aabdec8bdcf31a13cae560d8e2",
+    "3c915f62d7d7395647be69b3904f3145a2873a97",
     ("-DLUCENT_BUILD_ZIP=ON", "-DLUCENT_BUILD_TESTS=OFF"),
 )
 SOURCES = {source.name: source for source in (TINYXML2, GLSLANG, SDL, LUCENT)}

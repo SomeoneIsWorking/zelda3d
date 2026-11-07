@@ -237,7 +237,7 @@ Added explicit SOH3D_HARNESS_NO_CAPTURE=1 diagnostic mode in the first-party har
 ### Note (2026-09-12)
 The libretro Azahar dependency now has a maintained fork and immutable source declaration at
 `tools/soh3d_harness/AZAHAR_SOURCE.toml` (`SomeoneIsWorking/azahar`, revision
-`0de1e9d7ab2aff3d980ec9056966e85f4c0ba345`). The fork carries the six harness RPC/oracle commits
+`91e7bb30117da915a7dbdf6a13093afeb324a0a0`). The fork carries the six harness RPC/oracle commits
 and the applied memory, PICA, software-rasterizer, logging, and custom-texture probes that were
 previously described as a re-applied patch stack. The separate GPU blit logger remains only in the
 existing dirty checkout and is not part of this pinned branch.
