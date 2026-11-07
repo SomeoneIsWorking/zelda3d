@@ -120,3 +120,5 @@ partial, and what is still missing.
 GPL-3.0, inherited from the engines this builds on. Zelda, Ocarina of Time and Majora's Mask are trademarks of Nintendo; this
 project is unaffiliated with and unendorsed by Nintendo, ships no game assets, and requires
 that you own the games it runs.
+
+Built with AI assistance (Claude and other LLMs).
