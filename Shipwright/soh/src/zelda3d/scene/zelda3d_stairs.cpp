@@ -1,10 +1,14 @@
 // Zelda3D procedural stair geometry (see zelda3d_stairs.h). Moved verbatim out of zelda3d_model.cpp.
 #include "zelda3d_stairs.h"
 #include "asset/cmb.h"
+#include "asset/pica_texture.h"
 #include <stb_image.h>
 #include "../assets/stairs_stone_png.h" // embedded PNG of assets/zelda3d/stairs_stone.svg (custom stair texture)
 #include "../core/zelda3d_log.h"
 #include <algorithm>
+#include <complex>
+#include <map>
+#include <string>
 #include <functional>
 #include <unordered_map>
 #include <array>
@@ -43,6 +47,94 @@ bool texNameIsKaidan(const Zelda3D::Cmb& cmb, int matIndex) {
     int ti = cmb.materials()[matIndex].tex0_idx;
     if (ti < 0 || ti >= (int)cmb.textures().size()) return false;
     return cmb.textures()[ti].name.find("kaidan") != std::string::npos;
+}
+
+namespace {
+// A curb column's step-period strength is below this share of the strong columns', and a curb is at
+// most this share of the texture wide.
+constexpr float kCurbStrength = 0.4f;
+constexpr float kMaxCurb = 0.25f;
+
+// |sum (x - mean) e^(-2 pi i k n / count)|: the strength of period count/k in a row or column.
+float periodStrength(const std::vector<float>& values, int k) {
+    float mean = 0.0f;
+    for (float v : values)
+        mean += v;
+    mean /= (float)values.size();
+    std::complex<double> sum = 0.0;
+    const double step = -2.0 * M_PI * k / (double)values.size();
+    for (size_t n = 0; n < values.size(); n++)
+        sum += (double)(values[n] - mean) * std::polar(1.0, step * (double)n);
+    return (float)std::abs(sum);
+}
+
+StairCurbs detectCurbs(const std::vector<uint8_t>& rgba, int w, int h) {
+    StairCurbs curbs;
+    if (w < 4 || h < 8 || rgba.size() < (size_t)w * h * 4)
+        return curbs;
+    auto lum = [&](int x, int y) {
+        const uint8_t* p = &rgba[((size_t)y * w + x) * 4];
+        return 0.299f * p[0] + 0.587f * p[1] + 0.114f * p[2];
+    };
+    // Steps per tile: the strongest period down the rows.
+    std::vector<float> rows(h, 0.0f);
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++)
+            rows[y] += lum(x, y);
+        rows[y] /= (float)w;
+    }
+    int steps = 2;
+    float best = -1.0f;
+    for (int k = 2; k < h / 4; k++) {
+        const float s = periodStrength(rows, k);
+        if (s > best) {
+            best = s;
+            steps = k;
+        }
+    }
+    // Edge columns where that period is weak are the curbs.
+    std::vector<float> strength(w);
+    std::vector<float> column(h);
+    for (int x = 0; x < w; x++) {
+        for (int y = 0; y < h; y++)
+            column[y] = lum(x, y);
+        strength[x] = periodStrength(column, steps);
+    }
+    std::vector<float> sorted = strength;
+    std::sort(sorted.begin(), sorted.end());
+    const float strong = sorted[(size_t)w * 3 / 4] * kCurbStrength;
+    int first = 0;
+    while (first < w && strength[first] < strong)
+        first++;
+    int last = w;
+    while (last > first && strength[last - 1] < strong)
+        last--;
+    if (first > w * kMaxCurb)
+        first = 0;
+    if (w - last > w * kMaxCurb)
+        last = w;
+    curbs.first = (float)first / (float)w;
+    curbs.last = (float)last / (float)w;
+    return curbs;
+}
+} // namespace
+
+StairCurbs stairTextureCurbs(const Zelda3D::Cmb& cmb, int matIndex) {
+    static std::map<std::string, StairCurbs> cache;
+    if (matIndex < 0 || matIndex >= (int)cmb.materials().size())
+        return {};
+    const int ti = cmb.materials()[matIndex].tex0_idx;
+    if (ti < 0 || ti >= (int)cmb.textures().size())
+        return {};
+    const Zelda3D::CmbTexture& tex = cmb.textures()[ti];
+    auto found = cache.find(tex.name);
+    if (found != cache.end())
+        return found->second;
+    const StairCurbs curbs = detectCurbs(
+        Zelda3D::PicaDecode(tex.glFormat(), tex.width, tex.height, cmb.textureRaw(tex)), tex.width, tex.height);
+    Z3D_LOG(SOH_SCENE, "stairs: %s curbs u<%.3f and u>%.3f\n", tex.name.c_str(), curbs.first, curbs.last);
+    cache.emplace(tex.name, curbs);
+    return curbs;
 }
 
 // Solve a 3x3 linear system A x = b (Gaussian elimination, partial pivot). Returns false
@@ -142,7 +234,7 @@ std::vector<std::vector<int>> stairPatches(const Zelda3D::CmbDrawGroup& g,
 // Compute the step frame for one patch. Returns false (caller keeps the flat tris) when the
 // patch is not a walkable slope (flat floor / near-vertical wall) or is degenerate.
 bool stairFrameOf(const Zelda3D::CmbDrawGroup& g, const std::vector<int>& tris,
-                         const std::vector<std::array<float, 3>>& nrm, StairFrame& f) {
+                  const std::vector<std::array<float, 3>>& nrm, const StairCurbs& curbs, StairFrame& f) {
     float n[3] = { 0, 0, 0 };
     for (int t : tris) { n[0] += nrm[t][0]; n[1] += nrm[t][1]; n[2] += nrm[t][2]; }
     float nl = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
@@ -176,13 +268,75 @@ bool stairFrameOf(const Zelda3D::CmbDrawGroup& g, const std::vector<int>& tris,
     if (f.N > 200) f.N = 200;
     f.da = (f.amax - f.amin) / f.N;
     f.dy = (f.ymax - f.ymin) / f.N;
+
+    // The steps lie where the ramp's texture paints them and the painted curbs stay walls. A flight
+    // is often several strips with their own u, so u is read from the triangle under each sample.
+    const float amid = 0.5f * (f.amin + f.amax);
+    auto paintedCurb = [&](float c) {
+        for (int t : tris) {
+            float A[3], C[3], U[3];
+            for (int k = 0; k < 3; k++) {
+                const Zelda3D::CmbVertex& v = g.verts[3 * t + k];
+                A[k] = f.aDir[0] * v.pos[0] + f.aDir[2] * v.pos[2];
+                C[k] = f.cDir[0] * v.pos[0] + f.cDir[2] * v.pos[2];
+                U[k] = v.uv[0];
+            }
+            const float det = (C[1] - C[2]) * (A[0] - A[2]) + (A[2] - A[1]) * (C[0] - C[2]);
+            if (std::fabs(det) < 1e-6f)
+                continue;
+            const float w0 = ((C[1] - C[2]) * (amid - A[2]) + (A[2] - A[1]) * (c - C[2])) / det;
+            const float w1 = ((C[2] - C[0]) * (amid - A[2]) + (A[0] - A[2]) * (c - C[2])) / det;
+            const float w2 = 1.0f - w0 - w1;
+            if (w0 < -1e-4f || w1 < -1e-4f || w2 < -1e-4f)
+                continue;
+            const float u = w0 * U[0] + w1 * U[1] + w2 * U[2];
+            const float fu = u - std::floor(u);
+            return fu < curbs.first || fu > curbs.last;
+        }
+        return false;
+    };
+    constexpr int kSamples = 1024;
+    constexpr float kMinSpan = 1.0f;
+    const float w = (f.cmax - f.cmin) / kSamples;
+    f.spans.clear();
+    for (int i = 0; i < kSamples; i++) {
+        const bool curb = (curbs.first > 0.0f || curbs.last < 1.0f) && paintedCurb(f.cmin + (i + 0.5f) * w);
+        const float c1 = i + 1 == kSamples ? f.cmax : f.cmin + (i + 1) * w;
+        if (!f.spans.empty() && f.spans.back().curb == curb) {
+            f.spans.back().c1 = c1;
+        } else {
+            f.spans.push_back({ f.cmin + i * w, c1, curb });
+        }
+    }
+    // A sliver too thin to read joins its neighbours.
+    for (size_t i = 0; i < f.spans.size() && f.spans.size() > 1;) {
+        if (f.spans[i].c1 - f.spans[i].c0 >= kMinSpan) {
+            i++;
+            continue;
+        }
+        if (i > 0) {
+            f.spans[i - 1].c1 = f.spans[i].c1;
+        } else {
+            f.spans[1].c0 = f.spans[0].c0;
+        }
+        f.spans.erase(f.spans.begin() + (long)i);
+        for (size_t j = 1; j < f.spans.size();) {
+            if (f.spans[j].curb == f.spans[j - 1].curb) {
+                f.spans[j - 1].c1 = f.spans[j].c1;
+                f.spans.erase(f.spans.begin() + (long)j);
+            } else {
+                j++;
+            }
+        }
+        i = 0;
+    }
     return true;
 }
 
 // Replace one kaidan draw group's flat-ramp triangles with stepped geometry. Each
 // connected, coplanar patch (a single ramp; one group may hold several separate
 // staircases) is rebuilt as treads+risers over its footprint.
-void generateStairsGroup(Zelda3D::CmbDrawGroup& g) {
+void generateStairsGroup(Zelda3D::CmbDrawGroup& g, const StairCurbs& curbs) {
     size_t ntri = g.verts.size() / 3;
     if (ntri < 2) return;
 
@@ -197,15 +351,21 @@ void generateStairsGroup(Zelda3D::CmbDrawGroup& g) {
 
     for (const std::vector<int>& tris : patches) {
         StairFrame f;
-        bool ok = stairFrameOf(g, tris, nrm, f);
+        bool ok = stairFrameOf(g, tris, nrm, curbs, f);
         if (stairDbg && ok) {
             float ac = (f.amin + f.amax) * 0.5f, cc = (f.cmin + f.cmax) * 0.5f;
+            std::string curbList;
+            for (const StairSpan& s : f.spans) {
+                if (s.curb)
+                    curbList += "[" + std::to_string((int)s.c0) + "," + std::to_string((int)s.c1) + "]";
+            }
             float wx = f.aDir[0] * ac + f.cDir[0] * cc, wz = f.aDir[2] * ac + f.cDir[2] * cc;
-            Z3D_LOG(SOH_SCENE,
-                    "stairdbg: patch world XZ=(%.0f,%.0f) y=[%.0f,%.0f] N=%d aSpan=%.0f cSpan=%.0f "
-                    "aDir=(%.2f,%.2f) cDir=(%.2f,%.2f)\n",
-                    wx, wz, f.ymin, f.ymax, f.N, f.amax - f.amin, f.cmax - f.cmin, f.aDir[0], f.aDir[2], f.cDir[0],
-                    f.cDir[2]);
+            Z3D_LOG(
+                SOH_SCENE,
+                "stairdbg: patch world XZ=(%.0f,%.0f) y=[%.0f,%.0f] N=%d aSpan=%.0f c=[%.1f,%.1f] spans=%zu curbs=%s "
+                "aDir=(%.2f,%.2f) cDir=(%.2f,%.2f)\n",
+                wx, wz, f.ymin, f.ymax, f.N, f.amax - f.amin, f.cmin, f.cmax, f.spans.size(), curbList.c_str(),
+                f.aDir[0], f.aDir[2], f.cDir[0], f.cDir[2]);
         }
 
         // Affine UV(a,c) fit + average color over the patch (render-only; the generated step
@@ -278,68 +438,90 @@ void generateStairsGroup(Zelda3D::CmbDrawGroup& g) {
         const float nCmax[3] = {  f.cDir[0], 0,  f.cDir[2] }; // side wall at cmax faces +c
         const float kTileW = 44.0f;   // world units per horizontal texture tile
         const float Vnose = 0.62f;    // tread/riser split in the texture (matches the SVG)
-        const float uMin = f.cmin / kTileW, uMax = f.cmax / kTileW;
-        // #1: raise the whole flight by a FULL step (user, 2026-06-20: "move elevation from d/2 to d")
-        // so the treads sit a step above the original ramp diagonal and the top tread reaches the
-        // upper ground. yr=dy => the tread top yk = ymin+(k+1)*dy lands exactly on the ORIGINAL ramp
-        // diagonal at a1 (yRamp(a1) = ymin + (a1-amin)*dy/da = ymin+(k+1)*dy). So the stepped upper
-        // surface and the ramp diagonal coincide at every step's back edge and diverge by at most one
-        // step in front of it — the solid occupies ONLY the thin wedge between the steps and the ramp
-        // they replace, exactly the envelope of the old flat ramp. The side caps are per-step wedge
-        // TRIANGLES bounded above by the tread and below by the ramp diagonal — NOT rectangles down to
-        // ymin (those buried the flanking brick wall, #1 follow-up). The closed stepped-vs-ramp wedge
-        // still admits no sky bleed (#1 cyan halo) from normal viewing angles, while leaving the wall
-        // behind fully visible.
-        const float yr = f.dy;
-        for (int k = 0; k < f.N; k++) {
-            float a0 = f.amin + k * f.da, a1 = f.amin + (k + 1) * f.da;
-            // yk/yk1 = the treads/risers, raised a full step above the original ramp diagonal. The
-            // riser climbs at the BACK of the tread (a1) up to the next tread's height.
-            float yk = f.ymin + k * f.dy + yr, yk1 = f.ymin + (k + 1) * f.dy + yr;
-            // Tread (top face, +Y) at yk: front edge a0 = nosing (V=Vnose) -> back a1 = V=0.
-            stepShade = SH_TREAD;
-            emit(a0, yk, f.cmin, uMin, Vnose, nUp); emit(a1, yk, f.cmin, uMin, 0.0f, nUp); emit(a1, yk, f.cmax, uMax, 0.0f, nUp);
-            emit(a0, yk, f.cmin, uMin, Vnose, nUp); emit(a1, yk, f.cmax, uMax, 0.0f, nUp); emit(a0, yk, f.cmax, uMax, Vnose, nUp);
-            // Riser (front face, -aDir) at a1, yk -> yk1: top yk1 = nosing (V=Vnose), bottom yk = V=1.
-            // (Skip the last step's riser; the top tread meets the upper ground at amax, no face past it.)
-            if (k + 1 < f.N) {
-                stepShade = SH_RISER;
-                emit(a1, yk, f.cmin, uMin, 1.0f, nDn); emit(a1, yk1, f.cmin, uMin, Vnose, nDn); emit(a1, yk1, f.cmax, uMax, Vnose, nDn);
-                emit(a1, yk, f.cmin, uMin, 1.0f, nDn); emit(a1, yk1, f.cmax, uMax, Vnose, nDn); emit(a1, yk, f.cmax, uMax, 1.0f, nDn);
+        // Treads sit a full step above the ramp, so each meets the ramp diagonal at its back edge and
+        // the stepped solid fills only the wedge between the steps and the ramp they replace.
+        struct Corner {
+            float a, y, c, u, v;
+        };
+        // One triangle facing `n`, wound counter-clockwise seen from that side.
+        auto tri = [&](Corner p, Corner q, Corner r, const float n[3]) {
+            auto world = [&](const Corner& k, float out[3]) {
+                out[0] = f.aDir[0] * k.a + f.cDir[0] * k.c;
+                out[1] = k.y;
+                out[2] = f.aDir[2] * k.a + f.cDir[2] * k.c;
+            };
+            float P[3], Q[3], R[3];
+            world(p, P);
+            world(q, Q);
+            world(r, R);
+            const float e1[3] = { Q[0] - P[0], Q[1] - P[1], Q[2] - P[2] };
+            const float e2[3] = { R[0] - P[0], R[1] - P[1], R[2] - P[2] };
+            const float cx = e1[1] * e2[2] - e1[2] * e2[1], cy = e1[2] * e2[0] - e1[0] * e2[2],
+                        cz = e1[0] * e2[1] - e1[1] * e2[0];
+            if (cx * n[0] + cy * n[1] + cz * n[2] < 0.0f)
+                std::swap(q, r);
+            emit(p.a, p.y, p.c, p.u, p.v, n);
+            emit(q.a, q.y, q.c, q.u, q.v, n);
+            emit(r.a, r.y, r.c, r.u, r.v, n);
+        };
+        auto quad = [&](Corner p, Corner q, Corner r, Corner s, const float n[3]) {
+            tri(p, q, r, n);
+            tri(p, r, s, n);
+        };
+        for (size_t s = 0; s < f.spans.size(); s++) {
+            const StairSpan& span = f.spans[s];
+            const bool edgeLo = s == 0, edgeHi = s + 1 == f.spans.size();
+            const float c0 = span.c0, c1 = span.c1, u0 = c0 / kTileW, u1 = c1 / kTileW;
+            for (int k = 0; k < f.N; k++) {
+                const float a0 = f.amin + k * f.da, a1 = f.amin + (k + 1) * f.da;
+                const float ua0 = a0 / kTileW, ua1 = a1 / kTileW;
+                const float ramp0 = stairRampY(f, a0), ramp1 = stairRampY(f, a1);
+                if (!span.curb) {
+                    const float yk = ramp0 + f.dy, yk1 = ramp1 + f.dy;
+                    stepShade = SH_TREAD;
+                    quad({ a0, yk, c0, u0, Vnose }, { a1, yk, c0, u0, 0.0f }, { a1, yk, c1, u1, 0.0f },
+                         { a0, yk, c1, u1, Vnose }, nUp);
+                    // The top tread meets the upper ground, so the last step has no riser.
+                    if (k + 1 < f.N) {
+                        stepShade = SH_RISER;
+                        quad({ a1, yk, c0, u0, 1.0f }, { a1, yk1, c0, u0, Vnose }, { a1, yk1, c1, u1, Vnose },
+                             { a1, yk, c1, u1, 1.0f }, nDn);
+                    }
+                    // At the flight's edge the wedge between step and ramp is closed; inside, a curb is.
+                    stepShade = SH_SIDE;
+                    if (edgeLo)
+                        tri({ a0, ramp0, c0, ua0, 1.0f }, { a1, yk, c0, ua1, Vnose }, { a0, yk, c0, ua0, Vnose },
+                            nCmin);
+                    if (edgeHi)
+                        tri({ a0, ramp0, c1, ua0, 1.0f }, { a0, yk, c1, ua0, Vnose }, { a1, yk, c1, ua1, Vnose },
+                            nCmax);
+                } else {
+                    const float top0 = stairCurbTop(f, a0), top1 = stairCurbTop(f, a1);
+                    stepShade = SH_TREAD;
+                    quad({ a0, top0, c0, u0, Vnose }, { a1, top1, c0, u0, 0.0f }, { a1, top1, c1, u1, 0.0f },
+                         { a0, top0, c1, u1, Vnose }, nUp);
+                    stepShade = SH_SIDE;
+                    // Outside the flight the wall stands on the ramp; beside steps it rises above their tread.
+                    if (edgeLo) {
+                        quad({ a0, ramp0, c0, ua0, 1.0f }, { a1, ramp1, c0, ua1, 1.0f }, { a1, top1, c0, ua1, Vnose },
+                             { a0, top0, c0, ua0, Vnose }, nCmin);
+                    } else if (top1 > top0 + 0.01f) {
+                        tri({ a0, top0, c0, ua0, Vnose }, { a1, top0, c0, ua1, Vnose }, { a1, top1, c0, ua1, 0.0f },
+                            nCmin);
+                    }
+                    if (edgeHi) {
+                        quad({ a0, ramp0, c1, ua0, 1.0f }, { a1, ramp1, c1, ua1, 1.0f }, { a1, top1, c1, ua1, Vnose },
+                             { a0, top0, c1, ua0, Vnose }, nCmax);
+                    } else if (top1 > top0 + 0.01f) {
+                        tri({ a0, top0, c1, ua0, Vnose }, { a1, top0, c1, ua1, Vnose }, { a1, top1, c1, ua1, 0.0f },
+                            nCmax);
+                    }
+                }
             }
-            // Side cap: the thin WEDGE between this step and the original ramp diagonal, on each c
-            // edge — a single TRIANGLE per step (NOT a rectangle down to ymin, which buried the
-            // flanking brick wall, #1 follow-up). The ramp diagonal is yRamp(a)=ymin+(a-amin)*dy/da,
-            // so yRamp(a0)=ymin+k*dy and yRamp(a1)=ymin+(k+1)*dy=yk (since yr=dy). The wedge corners:
-            //   P1 (a0, yRamp(a0)=ymin+k*dy) — front-bottom, on the ramp / base of this riser front
-            //   P2 (a0, yk)                  — front-top, top of the riser / front edge of the tread
-            //   P3 (a1, yk)                  — back, where the tread rejoins the ramp (yk=yRamp(a1))
-            // Consecutive steps share P1 with the previous step's P3 along the ramp, so the triangles
-            // tile the steps-vs-ramp region with no gap and no overhang below the ramp surface — the
-            // staircase occupies exactly the old flat ramp's envelope, leaving the brick wall behind
-            // fully visible. The ramp diagonal closes the underside, so no separate bottom/back plane
-            // is needed and no sky bleeds through from normal viewing angles (#1 cyan halo).
-            stepShade = SH_SIDE;
-            float uA0 = a0 / kTileW, uA1 = a1 / kTileW;
-            float yRamp0 = f.ymin + (float)k * f.dy; // ramp surface at a0 (one step below the tread)
-            // cmin side faces -c (outward). CCW seen from -c: P1 -> P3 -> P2.
-            emit(a0, yRamp0, f.cmin, uA0, 1.0f, nCmin); emit(a1, yk, f.cmin, uA1, Vnose, nCmin); emit(a0, yk, f.cmin, uA0, Vnose, nCmin);
-            // cmax side faces +c (outward, opposite winding): P1 -> P2 -> P3.
-            emit(a0, yRamp0, f.cmax, uA0, 1.0f, nCmax); emit(a0, yk, f.cmax, uA0, Vnose, nCmax); emit(a1, yk, f.cmax, uA1, Vnose, nCmax);
-
-            // BOTTOM-FRONT SEAL (first step only). Each step's riser is emitted at the BACK of its
-            // tread (a1), so the very FIRST step has no downhill face at its front (a=amin): the
-            // volume between the first tread (ymin+dy) and the ramp base (ymin) is left OPEN there,
-            // and the OoT3D sky bleeds through that gap at the bottom of the flight (user: "first
-            // step missing its Y vertex" — a cyan wedge under the bottom step). Close it with one
-            // downhill-facing front wall at a=amin spanning the full width, from the first tread top
-            // (yk) down to the ramp base (ymin) — one step tall, flush with the ground, so nothing
-            // below ymin is added and the flanking wall stays visible.
-            if (k == 0) {
-                stepShade = SH_RISER;
-                emit(a0, f.ymin, f.cmin, uMin, 1.0f, nDn); emit(a0, yk, f.cmin, uMin, Vnose, nDn); emit(a0, yk, f.cmax, uMax, Vnose, nDn);
-                emit(a0, f.ymin, f.cmin, uMin, 1.0f, nDn); emit(a0, yk, f.cmax, uMax, Vnose, nDn); emit(a0, f.ymin, f.cmax, uMax, 1.0f, nDn);
-            }
+            // The first step's front, from its top down to the ground: risers stand at the back of treads.
+            stepShade = SH_RISER;
+            quad({ f.amin, f.ymin, c0, u0, 1.0f }, { f.amin, f.ymin + f.dy, c0, u0, Vnose },
+                 { f.amin, f.ymin + f.dy, c1, u1, Vnose }, { f.amin, f.ymin, c1, u1, 1.0f }, nDn);
         }
     }
     g.verts.swap(outv);

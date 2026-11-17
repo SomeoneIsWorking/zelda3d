@@ -9,6 +9,7 @@
 
 #include <array>
 #include <cstdlib>
+#include <algorithm>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -143,26 +144,34 @@ extern "C" int Zelda3D_CollectSceneStairTreads(const char* sceneName, float** ou
             }
             const std::vector<std::array<float, 3>> normals = stairTriNormals(group);
             const std::vector<std::vector<int>> patches = stairPatches(group, normals);
+            const StairCurbs curbs = stairTextureCurbs(cmb, group.material_index);
             for (const auto& patch : patches) {
                 StairFrame frame;
-                if (!stairFrameOf(group, patch, normals, frame)) {
+                if (!stairFrameOf(group, patch, normals, curbs, frame)) {
                     continue;
                 }
-                const float riser = frame.dy;
-                for (int step = 0; step < frame.N; ++step) {
-                    const float a0 = frame.amin + step * frame.da;
-                    const float a1 = frame.amin + (step + 1) * frame.da;
-                    const float y = frame.ymin + step * frame.dy + riser;
-                    const float corners[][2] = {
-                        { a0, frame.cmin }, { a1, frame.cmin }, { a1, frame.cmax }, { a0, frame.cmax }
-                    };
+                // One quad over [a0, a1] x [c0, c1], its front edge at y0 and its back at y1.
+                auto floorQuad = [&](float a0, float a1, float c0, float c1, float y0, float y1) {
+                    const float corners[][3] = { { a0, c0, y0 }, { a1, c0, y1 }, { a1, c1, y1 }, { a0, c1, y0 } };
                     const int base = static_cast<int>(vertices.size() / 3);
                     for (const auto& corner : corners) {
                         vertices.push_back(frame.aDir[0] * corner[0] + frame.cDir[0] * corner[1]);
-                        vertices.push_back(y);
+                        vertices.push_back(corner[2]);
                         vertices.push_back(frame.aDir[2] * corner[0] + frame.cDir[2] * corner[1]);
                     }
                     triangles.insert(triangles.end(), { base, base + 1, base + 2, base, base + 2, base + 3 });
+                };
+                for (int step = 0; step < frame.N; ++step) {
+                    const float a0 = frame.amin + step * frame.da;
+                    const float a1 = frame.amin + (step + 1) * frame.da;
+                    const float y = frame.ymin + step * frame.dy + frame.dy;
+                    for (const StairSpan& span : frame.spans) {
+                        if (span.curb) {
+                            floorQuad(a0, a1, span.c0, span.c1, stairCurbTop(frame, a0), stairCurbTop(frame, a1));
+                        } else {
+                            floorQuad(a0, a1, span.c0, span.c1, y, y);
+                        }
+                    }
                 }
             }
         }

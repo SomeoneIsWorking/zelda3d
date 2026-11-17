@@ -653,10 +653,29 @@ CollisionHeader* Zelda3D_BuildSceneCollision(PlayState* play, CollisionHeader* n
         poly[pi].flags_vIA = ia & 0x1FFF;
         poly[pi].flags_vIB = ib & 0x1FFF;
         poly[pi].vIC = ic & 0x1FFF;
-        poly[pi].normal.x = 0;
-        poly[pi].normal.y = COLPOLY_SNORMAL(1.0f); // horizontal tread, +Y up
-        poly[pi].normal.z = 0;
-        poly[pi].dist = (s16)lrintf(-cy); // plane n.p + dist == 0, n=(0,1,0) -> dist = -y
+        // Treads are level; curb tops climb with the flight. The plane faces up either way.
+        {
+            float e1x = vb->x - va->x, e1y = vb->y - va->y, e1z = vb->z - va->z;
+            float e2x = vc->x - va->x, e2y = vc->y - va->y, e2z = vc->z - va->z;
+            float nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+            float len = sqrtf(nx * nx + ny * ny + nz * nz);
+            if (len < 1e-6f) {
+                nx = 0.0f;
+                ny = 1.0f;
+                nz = 0.0f;
+                len = 1.0f;
+            }
+            if (ny < 0.0f) {
+                len = -len;
+            }
+            nx /= len;
+            ny /= len;
+            nz /= len;
+            poly[pi].normal.x = COLPOLY_SNORMAL(nx);
+            poly[pi].normal.y = COLPOLY_SNORMAL(ny);
+            poly[pi].normal.z = COLPOLY_SNORMAL(nz);
+            poly[pi].dist = (s16)lrintf(-(nx * cx + ny * cy + nz * cz)); // plane n.p + dist == 0
+        }
         // Surface type: take the kaidan ramp's FLOOR material (data1 + the non-exit bits of data0),
         // but re-source cam+exit (low 13 bits) from the N64 floor at the tread centroid — EXACTLY
         // as the main floor loop does. Copying the ramp's data0 wholesale is unsafe: the nearest

@@ -201,6 +201,9 @@ static bool strEndsWith(const std::string& value, const char* suffix) {
 // painted kaidan ramp), the rise is no longer pinned to the asset — it's a runtime tunable
 // (RmlUi "Stair Step Size" / Zelda3D_SetStairRiserY), so the player can pick larger/smaller
 // steps. N = round(rampRiseY / gZelda3dStairRiserY). Default is chunkier than the old 7.8.
+//
+// Curbs: the u columns of the kaidan texture where the step period is weak are painted curbs.
+// Where the ramp maps them, the flight keeps a wall topped on the step noses instead of steps.
 
 // Replace every kaidan ramp group in a freshly-built scene-room model with stepped
 // geometry. cGroups must be (re)built AFTER this — it mutates group vert vectors.
@@ -211,7 +214,7 @@ static void generateRoomStairs(LoadedModel* out) {
     }
     for (auto& g : out->groups) {
         if (texNameIsKaidan(*out->cmb, g.material_index)) {
-            generateStairsGroup(g);
+            generateStairsGroup(g, stairTextureCurbs(*out->cmb, g.material_index));
         }
     }
 }
