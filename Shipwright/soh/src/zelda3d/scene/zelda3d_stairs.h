@@ -40,7 +40,7 @@ struct StairFrame {
     // Across the flight from cmin to cmax: stepped runs and the painted curbs between them.
     std::vector<StairSpan> spans;
 };
-void generateStairsGroup(Zelda3D::CmbDrawGroup& g, const StairCurbs& curbs); // ramp group -> stepped geometry
+
 // The ramp's height at a, and a curb's top there: on the step noses, level with the landing past them.
 inline float stairRampY(const StairFrame& f, float a) {
     return f.ymin + (a - f.amin) * f.dy / f.da;
@@ -49,6 +49,11 @@ inline float stairCurbTop(const StairFrame& f, float a) {
     const float y = stairRampY(f, a) + f.dy;
     return y < f.ymax ? y : f.ymax;
 }
+// The ramp's texture coordinate at (a, c) of a patch.
+void stairRampUv(const Zelda3D::CmbDrawGroup& g, const std::vector<int>& tris, const StairFrame& f, float a, float c,
+                 float uv[2]);
+// Ramp group -> stepped geometry in g (stone) and its curb walls in curbVerts (the ramp's own paint).
+void generateStairsGroup(Zelda3D::CmbDrawGroup& g, const StairCurbs& curbs, std::vector<Zelda3D::CmbVertex>& curbVerts);
 std::vector<std::array<float, 3>> stairTriNormals(const Zelda3D::CmbDrawGroup& g);
 std::vector<std::vector<int>> stairPatches(const Zelda3D::CmbDrawGroup& g,
                                            const std::vector<std::array<float, 3>>& triNrm);

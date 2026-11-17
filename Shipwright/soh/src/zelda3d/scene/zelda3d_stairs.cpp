@@ -273,27 +273,10 @@ bool stairFrameOf(const Zelda3D::CmbDrawGroup& g, const std::vector<int>& tris,
     // is often several strips with their own u, so u is read from the triangle under each sample.
     const float amid = 0.5f * (f.amin + f.amax);
     auto paintedCurb = [&](float c) {
-        for (int t : tris) {
-            float A[3], C[3], U[3];
-            for (int k = 0; k < 3; k++) {
-                const Zelda3D::CmbVertex& v = g.verts[3 * t + k];
-                A[k] = f.aDir[0] * v.pos[0] + f.aDir[2] * v.pos[2];
-                C[k] = f.cDir[0] * v.pos[0] + f.cDir[2] * v.pos[2];
-                U[k] = v.uv[0];
-            }
-            const float det = (C[1] - C[2]) * (A[0] - A[2]) + (A[2] - A[1]) * (C[0] - C[2]);
-            if (std::fabs(det) < 1e-6f)
-                continue;
-            const float w0 = ((C[1] - C[2]) * (amid - A[2]) + (A[2] - A[1]) * (c - C[2])) / det;
-            const float w1 = ((C[2] - C[0]) * (amid - A[2]) + (A[0] - A[2]) * (c - C[2])) / det;
-            const float w2 = 1.0f - w0 - w1;
-            if (w0 < -1e-4f || w1 < -1e-4f || w2 < -1e-4f)
-                continue;
-            const float u = w0 * U[0] + w1 * U[1] + w2 * U[2];
-            const float fu = u - std::floor(u);
-            return fu < curbs.first || fu > curbs.last;
-        }
-        return false;
+        float uv[2];
+        stairRampUv(g, tris, f, amid, c, uv);
+        const float fu = uv[0] - std::floor(uv[0]);
+        return fu < curbs.first || fu > curbs.last;
     };
     constexpr int kSamples = 1024;
     constexpr float kMinSpan = 1.0f;
@@ -333,10 +316,38 @@ bool stairFrameOf(const Zelda3D::CmbDrawGroup& g, const std::vector<int>& tris,
     return true;
 }
 
+void stairRampUv(const Zelda3D::CmbDrawGroup& g, const std::vector<int>& tris, const StairFrame& f, float a, float c,
+                 float uv[2]) {
+    // The triangle under (a, c), or past the patch's edge the one it lies least outside of.
+    float best = -1e30f;
+    for (int t : tris) {
+        float A[3], C[3];
+        for (int k = 0; k < 3; k++) {
+            const Zelda3D::CmbVertex& v = g.verts[3 * t + k];
+            A[k] = f.aDir[0] * v.pos[0] + f.aDir[2] * v.pos[2];
+            C[k] = f.cDir[0] * v.pos[0] + f.cDir[2] * v.pos[2];
+        }
+        const float det = (C[1] - C[2]) * (A[0] - A[2]) + (A[2] - A[1]) * (C[0] - C[2]);
+        if (std::fabs(det) < 1e-6f)
+            continue;
+        const float w0 = ((C[1] - C[2]) * (a - A[2]) + (A[2] - A[1]) * (c - C[2])) / det;
+        const float w1 = ((C[2] - C[0]) * (a - A[2]) + (A[0] - A[2]) * (c - C[2])) / det;
+        const float w2 = 1.0f - w0 - w1;
+        const float inside = std::min(w0, std::min(w1, w2));
+        if (inside <= best)
+            continue;
+        best = inside;
+        const Zelda3D::CmbVertex* v = &g.verts[3 * t];
+        uv[0] = w0 * v[0].uv[0] + w1 * v[1].uv[0] + w2 * v[2].uv[0];
+        uv[1] = w0 * v[0].uv[1] + w1 * v[1].uv[1] + w2 * v[2].uv[1];
+    }
+}
+
 // Replace one kaidan draw group's flat-ramp triangles with stepped geometry. Each
 // connected, coplanar patch (a single ramp; one group may hold several separate
 // staircases) is rebuilt as treads+risers over its footprint.
-void generateStairsGroup(Zelda3D::CmbDrawGroup& g, const StairCurbs& curbs) {
+void generateStairsGroup(Zelda3D::CmbDrawGroup& g, const StairCurbs& curbs,
+                         std::vector<Zelda3D::CmbVertex>& curbVerts) {
     size_t ntri = g.verts.size() / 3;
     if (ntri < 2) return;
 
@@ -345,6 +356,7 @@ void generateStairsGroup(Zelda3D::CmbDrawGroup& g, const StairCurbs& curbs) {
 
     std::vector<Zelda3D::CmbVertex> outv;
     outv.reserve(g.verts.size() * 4);
+    curbVerts.clear();
 
     static int stairDbg = -1;
     if (stairDbg < 0) { const char* e = getenv("ZELDA3D_STAIRDBG"); stairDbg = (e && *e) ? atoi(e) : 0; }
@@ -416,6 +428,8 @@ void generateStairsGroup(Zelda3D::CmbDrawGroup& g, const StairCurbs& curbs) {
         // for 3D readout: treads catch the most light, risers less, the side caps least.
         float baseCol[4] = { col[0], col[1], col[2], col[3] };
         float stepShade = 1.0f; // set per face below
+        // Steps go to the stone group; curbs keep the ramp's material and its own UVs.
+        bool curbFace = false;
         auto emit = [&](float aGeom, float y, float c, float u, float vtex, const float nrmv[3]) {
             Zelda3D::CmbVertex v = src;
             v.pos[0] = f.aDir[0] * aGeom + f.cDir[0] * c;
@@ -428,7 +442,7 @@ void generateStairsGroup(Zelda3D::CmbDrawGroup& g, const StairCurbs& curbs) {
             v.color[1] = baseCol[1] * stepShade;
             v.color[2] = baseCol[2] * stepShade;
             v.color[3] = baseCol[3];
-            outv.push_back(v);
+            (curbFace ? curbVerts : outv).push_back(v);
         };
         (void)mu; (void)mv; // affine fit kept only as the degeneracy gate above
         const float SH_TREAD = 1.00f, SH_RISER = 0.72f, SH_SIDE = 0.55f; // per-face shade
@@ -460,6 +474,15 @@ void generateStairsGroup(Zelda3D::CmbDrawGroup& g, const StairCurbs& curbs) {
                         cz = e1[0] * e2[1] - e1[1] * e2[0];
             if (cx * n[0] + cy * n[1] + cz * n[2] < 0.0f)
                 std::swap(q, r);
+            if (curbFace) {
+                // The curb's paint, its faces unrolled onto the ramp: a run below the top maps back along it.
+                for (Corner* k : { &p, &q, &r }) {
+                    float uv[2];
+                    stairRampUv(g, tris, f, k->a - (stairCurbTop(f, k->a) - k->y) * f.da / f.dy, k->c, uv);
+                    k->u = uv[0];
+                    k->v = uv[1];
+                }
+            }
             emit(p.a, p.y, p.c, p.u, p.v, n);
             emit(q.a, q.y, q.c, q.u, q.v, n);
             emit(r.a, r.y, r.c, r.u, r.v, n);
@@ -496,6 +519,7 @@ void generateStairsGroup(Zelda3D::CmbDrawGroup& g, const StairCurbs& curbs) {
                         tri({ a0, ramp0, c1, ua0, 1.0f }, { a0, yk, c1, ua0, Vnose }, { a1, yk, c1, ua1, Vnose },
                             nCmax);
                 } else {
+                    curbFace = true;
                     const float top0 = stairCurbTop(f, a0), top1 = stairCurbTop(f, a1);
                     stepShade = SH_TREAD;
                     quad({ a0, top0, c0, u0, Vnose }, { a1, top1, c0, u0, 0.0f }, { a1, top1, c1, u1, 0.0f },
@@ -516,12 +540,15 @@ void generateStairsGroup(Zelda3D::CmbDrawGroup& g, const StairCurbs& curbs) {
                         tri({ a0, top0, c1, ua0, Vnose }, { a1, top0, c1, ua1, Vnose }, { a1, top1, c1, ua1, 0.0f },
                             nCmax);
                     }
+                    curbFace = false;
                 }
             }
             // The first step's front, from its top down to the ground: risers stand at the back of treads.
             stepShade = SH_RISER;
+            curbFace = span.curb;
             quad({ f.amin, f.ymin, c0, u0, 1.0f }, { f.amin, f.ymin + f.dy, c0, u0, Vnose },
                  { f.amin, f.ymin + f.dy, c1, u1, Vnose }, { f.amin, f.ymin, c1, u1, 1.0f }, nDn);
+            curbFace = false;
         }
     }
     g.verts.swap(outv);

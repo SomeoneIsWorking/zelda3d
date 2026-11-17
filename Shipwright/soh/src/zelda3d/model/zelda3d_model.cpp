@@ -212,10 +212,24 @@ static void generateRoomStairs(LoadedModel* out) {
     if (!gZelda3dStairs || !out->cmb) {
         return;
     }
-    for (auto& g : out->groups) {
-        if (texNameIsKaidan(*out->cmb, g.material_index)) {
-            generateStairsGroup(g, stairTextureCurbs(*out->cmb, g.material_index));
+    out->stoneGroups.assign(out->groups.size(), false);
+    std::vector<Zelda3D::CmbDrawGroup> curbGroups;
+    for (size_t i = 0; i < out->groups.size(); i++) {
+        Zelda3D::CmbDrawGroup& g = out->groups[i];
+        if (!texNameIsKaidan(*out->cmb, g.material_index)) {
+            continue;
         }
+        Zelda3D::CmbDrawGroup curb = g;
+        generateStairsGroup(g, stairTextureCurbs(*out->cmb, g.material_index), curb.verts);
+        out->stoneGroups[i] = true;
+        if (!curb.verts.empty()) {
+            curbGroups.push_back(std::move(curb));
+        }
+    }
+    // The curbs draw with the ramp's own material, so its paint shows on them.
+    for (auto& curb : curbGroups) {
+        out->groups.push_back(std::move(curb));
+        out->stoneGroups.push_back(false);
     }
 }
 
@@ -275,9 +289,10 @@ static void buildFromCmb(LoadedModel* out, bool bakedVertexColor, const std::vec
     }
 
     out->cGroups.reserve(out->groups.size());
-    for (const auto& g : out->groups) {
+    for (size_t i = 0; i < out->groups.size(); i++) {
+        const auto& g = out->groups[i];
         Zelda3DGlGroup cg = makeCgroup(cmb, g, g.verts.data(), 0);
-        if (stairTexIdx >= 0 && texNameIsKaidan(cmb, g.material_index)) {
+        if (stairTexIdx >= 0 && i < out->stoneGroups.size() && out->stoneGroups[i]) {
             cg.texIndex = stairTexIdx;
             cg.wrapS = cg.wrapT = 0x2901; // GL_REPEAT — tile the stone across width & length
             cg.blendEnable = 0;
