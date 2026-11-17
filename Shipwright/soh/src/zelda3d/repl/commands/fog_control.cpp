@@ -14,6 +14,10 @@ bool Zelda3D_FogControlReplCommand(PlayState* play, const char* command, const c
         // A/B latch for the OoT3D PICA distance-fog port. Diagnostic only; game code never sets it.
         gZelda3dFog3dForceOff = value == 0 ? 1 : 0;
         Zelda3D_ReplReply(outPath, "fog3d %s (forceOff=%d)", value ? "on" : "OFF", gZelda3dFog3dForceOff);
+    } else if (strcmp(command, "fog3d") == 0) {
+        Zelda3D_ReplReply(outPath, "fog3d on=%d a=%g b=%g near=%g far=%g fwd=(%g,%g,%g) fwd.eye=%g", gZelda3dFog3dOn,
+                          gZelda3dFog3d[0], gZelda3dFog3d[1], gZelda3dFog3d[2], gZelda3dFog3d[3], gZelda3dFog3d[4],
+                          gZelda3dFog3d[5], gZelda3dFog3d[6], gZelda3dFog3d[7]);
     } else if (strcmp(command, "fog") == 0) {
         EnvLightSettings* settings = &play->envCtx.lightSettings;
         char subcommand[32];
