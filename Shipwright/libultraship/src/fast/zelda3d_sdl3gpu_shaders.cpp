@@ -79,7 +79,7 @@ bool CompileGlsl(EShLanguage stage, const char* src, std::vector<uint32_t>& spv)
     "    vec4 uPrimaryCtl;\n"                                                                 \
     "    vec4 uFragCtl;\n"                                                                    \
     "    vec4 uFragGlobalAmbient;\n"                                                          \
-    "    vec4 uFragLight[" SG_STR(ZELDA3D_FRAG_LIGHT_SLOTS * 16) "];\n"                       \
+    "    vec4 uFragLight[" SG_STR(ZELDA3D_FRAG_LIGHT_SLOTS * 4) "];\n"                        \
                                                                  "    vec4 uMatConst;\n"      \
                                                                  "    vec4 uSheen;\n"         \
                                                                  "    vec4 uTex0Xf;\n"        \
@@ -447,7 +447,7 @@ void main() {
             vec3 specularSum = vec3(0.0);
             int slots = int(ubo.uFragCtl.x + 0.5);
             for (int i = 0; i < slots; ++i) {
-                int b = i * 16;
+                int b = i * 4;
                 vec4 ambient = ubo.uFragLight[b];
                 vec4 diffuse = ubo.uFragLight[b + 1];
                 vec4 spec0 = ubo.uFragLight[b + 2];

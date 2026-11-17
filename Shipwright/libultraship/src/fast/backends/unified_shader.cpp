@@ -450,7 +450,7 @@ const char* kUnifiedShaderTemplate = R"PRISM(@prism(type='fragment', name='Unifi
                 vec3 specularSum = vec3(0.0);
                 int slots = int(ubo.uFragCtl.x + 0.5);
                 for (int i = 0; i < slots; ++i) {
-                    int b = i * 16;
+                    int b = i * 4;
                     vec4 ambient = ubo.uFragLight[b];
                     vec4 diffuse = ubo.uFragLight[b + 1];
                     vec4 spec0 = ubo.uFragLight[b + 2];
