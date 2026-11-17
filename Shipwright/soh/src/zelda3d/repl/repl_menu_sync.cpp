@@ -78,10 +78,10 @@ void SyncLinkMode() {
 }
 
 void SyncStairSize() {
-    static constexpr float kStairSizeRise[3] = { 8.0f, 14.0f, 22.0f };
+    static constexpr float kStairSizeRise[3] = { 5.0f, 8.0f, 14.0f };
     if (!sMenu.stairSizeSeeded) {
         const float rise = Zelda3D_GetStairRiserY();
-        const int index = rise < 11.0f ? 0 : (rise < 18.0f ? 1 : 2);
+        const int index = rise < 6.5f ? 0 : (rise < 11.0f ? 1 : 2);
         gZelda3dMenuStairSize = index;
         sMenu.lastStairSize = index;
         sMenu.stairSizeSeeded = true;

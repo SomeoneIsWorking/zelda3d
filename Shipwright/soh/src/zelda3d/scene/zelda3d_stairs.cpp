@@ -18,7 +18,7 @@
 #include <cstring>
 #include <vector>
 
-float gZelda3dStairRiserY = 14.0f;
+float gZelda3dStairRiserY = 8.0f;
 int gZelda3dStairs = 1; // env ZELDA3D_STAIRS / REPL `stairs` gate (default on)
 
 // Decode the embedded custom stair texture (PNG -> RGBA8) once. Returns the cached pixel

@@ -200,7 +200,7 @@ static bool strEndsWith(const std::string& value, const char* suffix) {
 // ~86 world-Y per V-tile). Now that the steps wear our own tiled stone texture (not the
 // painted kaidan ramp), the rise is no longer pinned to the asset — it's a runtime tunable
 // (RmlUi "Stair Step Size" / Zelda3D_SetStairRiserY), so the player can pick larger/smaller
-// steps. N = round(rampRiseY / gZelda3dStairRiserY). Default is chunkier than the old 7.8.
+// steps. N = round(rampRiseY / gZelda3dStairRiserY). Sizes 5 / 8 / 14, default 8.
 //
 // Curbs: the u columns of the kaidan texture where the step period is weak are painted curbs.
 // Where the ramp maps them, the flight keeps a wall topped on the step noses instead of steps.
